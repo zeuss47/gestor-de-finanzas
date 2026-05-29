@@ -16,6 +16,7 @@
 
 import { DB, uuid, nowTs } from './db.js';
 import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto } from './cards.js';
+import { calcularCapacidad, simularCompra, cuotasPendientes } from './credito.js';
 import { diagnosticar } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
 import { Notif, chequeoDiarioTarjetas } from './notifications.js';
@@ -28,10 +29,63 @@ const state = {
   ingresos: [],
   tarjetas: [],
   metas: [],
+  cuentas: [],
   resumenes: [],     // resúmenes de tarjetas precomputados
+  capacidad: null,   // cálculo de capacidad crediticia
   estado: null,      // estado global
   diagnosticos: [],
+  version: null,     // info del archivo version.json
 };
+
+/* ============ Versión / Build ============ */
+async function cargarVersion() {
+  try {
+    // Cache-bust con timestamp del momento de carga para que siempre traiga la última
+    const r = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) return null;
+    const v = await r.json();
+    state.version = v;
+    actualizarVersionUI();
+    return v;
+  } catch (e) {
+    console.warn('Sin version.json', e);
+    return null;
+  }
+}
+
+function actualizarVersionUI() {
+  const v = state.version;
+  if (!v) return;
+
+  // Sidebar
+  const sbVer = document.getElementById('sb-version');
+  if (sbVer) {
+    const dt = new Date(v.modified);
+    const fechaCorta = dt.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }).replace('.','');
+    sbVer.innerHTML = `
+      <span class="version-tag">v${v.version}</span>
+      <span class="version-build">#${v.build}</span>
+      <span class="version-fecha">${fechaCorta}</span>
+    `;
+    sbVer.title = `Versión ${v.version} · Build #${v.build}\nÚltima actualización: ${dt.toLocaleString('es-AR')}\nCommit: ${v.commit}`;
+  }
+
+  // Mini badge mobile en header
+  const hdVer = document.getElementById('hd-version');
+  if (hdVer) {
+    hdVer.textContent = `v${v.version}·#${v.build}`;
+  }
+
+  // Toast al detectar versión nueva (comparado con la guardada en localStorage)
+  try {
+    const last = localStorage.getItem('app_last_build');
+    if (last && parseInt(last) !== v.build) {
+      setTimeout(() => toast(`✨ Versión actualizada: v${v.version} · build #${v.build}`, 3500), 1500);
+    }
+    localStorage.setItem('app_last_build', String(v.build));
+    localStorage.setItem('app_last_version', v.version);
+  } catch {}
+}
 
 const FMT = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 
@@ -190,6 +244,14 @@ async function reloadAll() {
   state.resumenes = state.tarjetas
     .filter(t => t.activa !== false)
     .map(t => resumenTarjeta(t, state.gastos));
+
+  // Capacidad crediticia avanzada (considera cuotas pendientes)
+  state.capacidad = calcularCapacidad({
+    gastos:    state.gastos,
+    ingresos:  state.ingresos,
+    tarjetas:  state.tarjetas,
+    resumenes: state.resumenes,
+  });
 
   // Estado global (cálculo local, sin backend)
   state.estado = computarEstadoGlobal();
@@ -588,8 +650,8 @@ function renderTarjetas(el) {
     const badgeVenc   = diasV <= 1 ? 'badge-danger' : diasV <= 5 ? 'badge-warning' : 'badge-muted';
 
     box.insertAdjacentHTML('beforeend', `
-      <div class="credit-card ${claseUrgente}"
-           style="background:linear-gradient(135deg,${colorBase}dd 0%,${colorBase}88 100%)">
+      <div class="credit-card ${claseUrgente}" data-tarjeta-id="${t.id}"
+           style="background:linear-gradient(135deg,${colorBase}dd 0%,${colorBase}88 100%);cursor:pointer">
         <!-- fila superior -->
         <div class="flex items-start justify-between mb-3 relative z-10">
           <div>
@@ -632,46 +694,87 @@ function renderTarjetas(el) {
       </div>`);
   }
   el.querySelector('[data-action="add-card"]').onclick = () => openDialog('dlg-tarjeta');
+
+  // Click en cada tarjeta → drawer de uso detallado
+  el.querySelectorAll('.credit-card[data-tarjeta-id]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      // Evitar que el click en el widget bubble dispare el historial general
+      e.stopPropagation();
+      abrirDrawerTarjeta(card.dataset.tarjetaId);
+    });
+  });
 }
 
 function renderCredito(el) {
-  const ingreso     = state.estado.ingresos_netos_mes;
-  const compromisos = state.resumenes.reduce((a,r)=>a+r.total_resumen, 0);
-  const cuotaSegura = ingreso * 0.30;
-  const disponible  = Math.max(0, cuotaSegura - compromisos);
-  const ratio       = ingreso > 0 ? compromisos/ingreso : 0;
-  const pct         = Math.min(100, Math.round(ratio * 100));
+  const cap = state.capacidad;
+  if (!cap) return;
 
-  // Colores del gauge
-  const gaugeColor = ratio <= 0.30 ? 'var(--success)' : ratio <= 0.40 ? 'var(--warning)' : 'var(--danger)';
-  const semLabel   = ratio <= 0.30 ? 'Verde'           : ratio <= 0.40 ? 'Amarillo'        : 'Rojo';
-  const semClass   = ratio <= 0.30 ? 'badge-success'   : ratio <= 0.40 ? 'badge-warning'   : 'badge-danger';
+  const ratio = cap.ratio_uso_ingreso;
+  const pct   = cap.porcentaje_uso;
+
+  // Mapeo de semáforo → color/label/badge class
+  const semMap = {
+    verde:    { color: 'var(--success)', label: 'Verde',    cls: 'badge-success' },
+    amarillo: { color: 'var(--warning)', label: 'Amarillo', cls: 'badge-warning' },
+    naranja:  { color: '#fb923c',        label: 'Naranja',  cls: 'badge-warning' },
+    rojo:     { color: 'var(--danger)',  label: 'Rojo',     cls: 'badge-danger'  },
+  };
+  const sem = semMap[cap.semaforo] || semMap.verde;
 
   // Badge semáforo
   const badge = el.querySelector('[data-bind="semaforo-badge"]');
-  if (badge) { badge.className = `badge ${semClass}`; badge.textContent = semLabel; }
+  if (badge) { badge.className = `badge ${sem.cls}`; badge.textContent = sem.label; }
 
-  // Gauge arc: track = 175.9 (longitud del semi-arco), fill proporcional
-  const arcLen  = 175.9;
-  const offset  = arcLen - (arcLen * Math.min(ratio, 1));
+  // Gauge arc
+  const arcLen = 175.9;
+  const offset = arcLen - (arcLen * Math.min(ratio, 1));
   const gaugeFill = el.querySelector('[data-bind="gauge-arc"]');
   if (gaugeFill) {
-    gaugeFill.style.stroke = gaugeColor;
-    // Animamos con requestAnimationFrame para que aplique después del DOM
+    gaugeFill.style.stroke = sem.color;
     requestAnimationFrame(() => { gaugeFill.style.strokeDashoffset = offset.toFixed(1); });
   }
 
   const ratioPct = el.querySelector('[data-bind="ratio-pct"]');
-  if (ratioPct) { ratioPct.textContent = pct + '%'; ratioPct.style.color = gaugeColor; }
+  if (ratioPct) { ratioPct.textContent = pct + '%'; ratioPct.style.color = sem.color; }
 
+  // Cuota segura y disponible
   const cuotaEl = el.querySelector('[data-bind="cuota-segura"]');
-  if (cuotaEl) cuotaEl.textContent = FMT.format(cuotaSegura);
+  if (cuotaEl) cuotaEl.textContent = FMT.format(cap.cuota_segura_30);
 
   const dispEl = el.querySelector('[data-bind="disponible"]');
   if (dispEl) {
-    dispEl.textContent = FMT.format(disponible);
-    dispEl.style.color = disponible > 0 ? 'var(--success)' : 'var(--danger)';
+    dispEl.textContent = FMT.format(cap.capacidad_libre);
+    dispEl.style.color = cap.capacidad_libre > 0 ? 'var(--success)' : 'var(--danger)';
   }
+
+  // Si hay cuotas pendientes o sugerencia avanzada, mostrarla
+  let infoExtra = el.querySelector('[data-bind="credito-info-extra"]');
+  if (!infoExtra) {
+    infoExtra = document.createElement('div');
+    infoExtra.setAttribute('data-bind', 'credito-info-extra');
+    infoExtra.style.cssText = 'margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border)';
+    el.querySelector('article')?.appendChild(infoExtra) || el.appendChild(infoExtra);
+  }
+  const cuotasNum = cap.cuotas_pendientes.length;
+  const cuotasTotal = cap.cuotas_mensuales_proyectadas;
+  infoExtra.innerHTML = `
+    <p class="text-[10px] uppercase tracking-widest mb-1" style="color:var(--ink-muted)">Compromiso mensual real</p>
+    <div class="flex items-center justify-between text-xs mb-1.5">
+      <span style="color:var(--ink-2)">Gastos fijos</span>
+      <span class="ff-display font-semibold" style="color:var(--ink)">${FMT.format(cap.gastos_fijos_mes)}</span>
+    </div>
+    <div class="flex items-center justify-between text-xs mb-1.5">
+      <span style="color:var(--ink-2)">Resúmenes tarjetas</span>
+      <span class="ff-display font-semibold" style="color:var(--ink)">${FMT.format(cap.compromiso_tarjetas)}</span>
+    </div>
+    <div class="flex items-center justify-between text-xs mb-2">
+      <span style="color:var(--ink-2)">Cuotas pendientes (${cuotasNum})</span>
+      <span class="ff-display font-semibold" style="color:${cuotasTotal > 0 ? 'var(--warning)' : 'var(--ink-muted)'}">${FMT.format(cuotasTotal)}</span>
+    </div>
+    <p class="text-[11px] mt-2 px-2.5 py-1.5 rounded-lg" style="background:${sem.color}1a;color:${sem.color};border:1px solid ${sem.color}55">
+      ${escapeHtml(cap.sugerencia)}
+    </p>
+  `;
 }
 
 function renderIA(el) {
@@ -1943,6 +2046,190 @@ function escapeHtml(s='') {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+/* ============ DRAWER DETALLE DE TARJETA ============ */
+let _drawerTarjetaIdActual = null;
+
+function abrirDrawerTarjeta(tarjetaId) {
+  const dlg = document.getElementById('dlg-tarjeta-detalle');
+  if (!dlg) return;
+
+  const tarjeta = state.tarjetas.find(t => t.id === tarjetaId);
+  if (!tarjeta) return;
+
+  _drawerTarjetaIdActual = tarjetaId;
+  const resumen = state.resumenes.find(r => r.tarjeta_id === tarjetaId);
+  const cap     = state.capacidad;
+  const capTarjeta = cap?.por_tarjeta?.find(p => p.tarjeta_id === tarjetaId);
+
+  // Header con colores de la tarjeta
+  const colorBase = tarjeta.color || '#00f0ff';
+  const header = document.getElementById('td-header');
+  if (header) header.style.background = `linear-gradient(135deg, ${colorBase}dd 0%, ${colorBase}88 100%)`;
+
+  document.getElementById('td-nombre').textContent = tarjeta.nombre;
+  document.getElementById('td-banco').textContent  = tarjeta.banco || tarjeta.tipo || '—';
+
+  // KPIs superiores
+  const limTotal = (tarjeta.limite_un_pago || 0) + (tarjeta.limite_cuotas || 0);
+  const usado    = resumen?.total_resumen || 0;
+  const disponibleTarjeta = Math.max(0, limTotal - usado);
+  const pctUso   = limTotal > 0 ? Math.round((usado/limTotal)*100) : 0;
+
+  document.getElementById('td-resumen').textContent    = FMT.format(usado);
+  document.getElementById('td-disponible').textContent = FMT.format(disponibleTarjeta);
+  document.getElementById('td-pct').textContent        = pctUso + '%';
+
+  // Composición del resumen
+  document.getElementById('td-comp-unpago').textContent = FMT.format(resumen?.total_un_pago || 0);
+  document.getElementById('td-comp-cuotas').textContent = FMT.format(resumen?.total_cuotas || 0);
+  document.getElementById('td-comp-recurr').textContent = FMT.format(resumen?.total_recurrentes || 0);
+
+  // Capacidad
+  if (capTarjeta) {
+    const semMap = {
+      verde:    { color: 'var(--success)', label: 'Verde',    cls: 'badge-success' },
+      amarillo: { color: 'var(--warning)', label: 'Amarillo', cls: 'badge-warning' },
+      naranja:  { color: '#fb923c',        label: 'Naranja',  cls: 'badge-warning' },
+      rojo:     { color: 'var(--danger)',  label: 'Rojo',     cls: 'badge-danger'  },
+    };
+    const sem = semMap[cap.semaforo] || semMap.verde;
+    const semBadge = document.getElementById('td-semaforo');
+    semBadge.className = `badge ${sem.cls}`;
+    semBadge.textContent = sem.label;
+    document.getElementById('td-capacidad-box').style.borderColor = sem.color;
+    document.getElementById('td-recomendado').textContent   = FMT.format(capTarjeta.recomendado_seguro);
+    document.getElementById('td-recomendado').style.color   = sem.color;
+    document.getElementById('td-disp-tarjeta').textContent  = FMT.format(capTarjeta.disponible_tarjeta);
+    document.getElementById('td-sugerencia').textContent    = cap.sugerencia;
+  }
+
+  // Cuotas pendientes
+  const cuotasBox = document.getElementById('td-cuotas-pendientes');
+  cuotasBox.innerHTML = '';
+  const cuotas = capTarjeta?.cuotas_pendientes || [];
+  if (cuotas.length === 0) {
+    cuotasBox.innerHTML = `<p class="text-xs text-center py-2" style="color:var(--ink-muted)">✓ Sin cuotas pendientes en esta tarjeta</p>`;
+  } else {
+    cuotas.forEach(c => {
+      cuotasBox.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">📦</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(c.descripcion)}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">
+              Cuota ${c.cuotas_pagadas+1}/${c.cuotas_total} · Pendiente: ${c.cuotas_pendientes} cuotas · Saldo total ${FMT.format(c.saldo_pendiente)}
+            </p>
+          </div>
+          <span class="hd-item-monto" style="color:var(--warning)">${FMT.format(c.monto_cuota)}/mes</span>
+        </div>`);
+    });
+  }
+
+  // Próximos ciclos
+  const proxBox = document.getElementById('td-proximos-ciclos');
+  proxBox.innerHTML = '';
+  const hoy = new Date();
+  for (let i = 0; i < 3; i++) {
+    const futuro = new Date(hoy.getFullYear(), hoy.getMonth() + i, hoy.getDate());
+    const ciclo = fechasCiclo(tarjeta, futuro);
+    const fmt = (d) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+    const cuotaMensualTotal = cuotas.reduce((a, c) => {
+      const cuotasAFuturo = Math.min(c.cuotas_pendientes, i + 1);
+      return cuotasAFuturo > i ? a + c.monto_cuota : a;
+    }, 0);
+    proxBox.insertAdjacentHTML('beforeend', `
+      <div class="hd-item">
+        <span class="hd-item-icon">${i === 0 ? '🟢' : i === 1 ? '🟡' : '🔵'}</span>
+        <div class="hd-item-info">
+          <p class="text-sm font-semibold" style="color:var(--ink)">${ciclo.periodo}</p>
+          <p class="text-[10px]" style="color:var(--ink-muted)">
+            Cierra ${fmt(ciclo.cierre)} · Vence ${fmt(ciclo.vencimiento)}
+          </p>
+        </div>
+        <span class="hd-item-monto" style="color:var(--brand)">
+          ${cuotaMensualTotal > 0 ? '~' + FMT.format(cuotaMensualTotal) : '—'}
+        </span>
+      </div>`);
+  }
+
+  // Reset simulador
+  document.getElementById('td-sim-monto').value = '';
+  document.getElementById('td-sim-cuotas').value = '1';
+  const simRes = document.getElementById('td-sim-result');
+  simRes.hidden = true;
+  simRes.innerHTML = '';
+
+  dlg.showModal();
+}
+
+/* Handlers del drawer de tarjeta */
+function bindDrawerTarjetaHandlers() {
+  const dlg = document.getElementById('dlg-tarjeta-detalle');
+  if (!dlg) return;
+
+  document.getElementById('td-close')?.addEventListener('click',  () => dlg.close());
+  document.getElementById('td-close-2')?.addEventListener('click', () => dlg.close());
+
+  document.getElementById('td-add-gasto')?.addEventListener('click', () => {
+    if (!_drawerTarjetaIdActual) return;
+    dlg.close();
+    openDialog('dlg-gasto');
+    // Pre-seleccionar la tarjeta + método crédito
+    setTimeout(() => {
+      const form = document.querySelector('#dlg-gasto form');
+      if (!form) return;
+      const radioCredito = form.querySelector('input[name="metodo_pago"][value="credito"]');
+      if (radioCredito) {
+        radioCredito.checked = true;
+        radioCredito.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      // Esperar a que aparezca el row-tarjeta
+      setTimeout(() => {
+        const sel = form.querySelector('select[name="tarjeta_id_simple"]');
+        if (sel) { sel.value = _drawerTarjetaIdActual; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+        if (typeof actualizarCicloInfo === 'function') actualizarCicloInfo();
+      }, 150);
+    }, 100);
+  });
+
+  document.getElementById('td-sim-go')?.addEventListener('click', () => {
+    if (!_drawerTarjetaIdActual) return;
+    const monto  = parseFloat(document.getElementById('td-sim-monto').value) || 0;
+    const cuotas = Math.max(1, parseInt(document.getElementById('td-sim-cuotas').value) || 1);
+    if (monto <= 0) { toast('Ingresá un monto válido'); return; }
+
+    const sim = simularCompra({
+      monto, cuotas,
+      tarjeta_id: _drawerTarjetaIdActual,
+      capacidad: state.capacidad,
+    });
+
+    const simRes = document.getElementById('td-sim-result');
+    simRes.hidden = false;
+    const color = sim.permitido
+      ? (sim.advertencias.length === 0 ? 'var(--success)' : 'var(--warning)')
+      : 'var(--danger)';
+    simRes.innerHTML = `
+      <div class="mt-3 p-3 rounded-xl" style="background:${color}1a;border:1px solid ${color}">
+        <p class="text-sm font-semibold mb-1" style="color:${color}">${escapeHtml(sim.mensaje)}</p>
+        <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+          <div>
+            <p style="color:var(--ink-muted)">Cuota mensual</p>
+            <p class="ff-display font-bold" style="color:var(--ink)">${FMT.format(sim.nueva_cuota_mensual)}</p>
+          </div>
+          <div>
+            <p style="color:var(--ink-muted)">Nuevo % comprometido</p>
+            <p class="ff-display font-bold" style="color:${color}">${Math.round(sim.nuevo_ratio*100)}%</p>
+          </div>
+        </div>
+        ${sim.advertencias.length > 0 ? `
+          <div class="mt-2 space-y-1">
+            ${sim.advertencias.map(a => `<p class="text-[11px]" style="color:${color}">• ${escapeHtml(a)}</p>`).join('')}
+          </div>` : ''}
+      </div>`;
+  });
+}
+
 /* ============ HISTORIAL POR WIDGET (drawer) ============ */
 
 const WIDGET_META = {
@@ -2559,6 +2846,9 @@ async function init() {
   await loadAjustes();
   aplicarTema();
 
+  // Cargar version.json (no bloqueante: si falla, seguimos)
+  cargarVersion();
+
   // Service Worker
   if ('serviceWorker' in navigator) {
     try {
@@ -2767,6 +3057,9 @@ async function init() {
     toast('Datos eliminados');
   });
 
+  // ── DRAWER DE TARJETA handlers ────────────────────────────────
+  bindDrawerTarjetaHandlers();
+
   // ── WIDGET HISTORY DRAWER handlers ────────────────────────────
   const hdDlg = document.getElementById('dlg-widget-history');
 
@@ -2879,8 +3172,37 @@ async function init() {
 
 /* ============ Editor de catálogos en Settings ============ */
 
-const EMOJI_POOL = ['🛒','⛽','🏠','🎬','🍽','💊','👗','🚌','💡','🥤','📚','📌','💼','💻','🎁','📈','🏘','🏷','✨','⚽','🎵','🎮','✈️','🏖','🚗','🛍','🎓','💪','🐾','🎨'];
-const COLOR_POOL = ['#10b981','#f59e0b','#a78bfa','#ec4899','#fb923c','#f43f5e','#c084fc','#38bdf8','#facc15','#f87171','#22d3ee','#94a3b8','#00f0ff','#39ff14'];
+// Pool extendido de emojis organizados por categoría
+const EMOJI_CATEGORIES = {
+  'Comida':    ['🛒','🍽','🍕','🍔','🍟','🥗','🥪','🍱','🍜','🍣','🥘','🍳','🥖','🧀','🥕','🍎','🥑','🍰','🍪','🍫','🍩','🍦','☕','🍷','🍺','🍶','🥃','🍵'],
+  'Hogar':     ['🏠','🏡','🛋','🛏','🛁','🚪','🪑','🧹','🧺','🪴','🌿','🧼','🧽','💡','🔌','🪞','🏘','🪟','🔑','🪛'],
+  'Transporte':['🚗','🚙','🚕','🚌','🚎','🚐','🚓','🏎','🚲','🛵','🏍','🛺','🚖','⛽','⚡','🔋','🅿️','🛞','🛣','✈️','🚂','🚊'],
+  'Ocio':      ['🎬','🎮','🎵','🎤','🎸','🎹','🎲','🎯','🎨','📚','📖','✏️','🎭','🎪','🎢','🎡','🎠','🏖','🌊','⛱','🎁','🎉','🎊','🎈'],
+  'Salud':     ['💊','🩺','🏥','💉','🧴','🩹','🪥','🧻','😷','🦷','👁','👂','🧬','🫀','🫁','🧠','💪','🤲','👶','🧓'],
+  'Trabajo':   ['💼','💻','📱','📞','📧','📊','📈','📉','📅','📋','🖨','📎','📌','🖋','✂️','🗂','📁','📦','💳','💰','💵','💸','🏦','🪙','📝'],
+  'Ropa':      ['👗','👕','👖','🧥','👔','👚','🩱','👙','🩳','🩲','👘','🥻','🧣','🧤','🧦','👟','👞','👢','👠','👜','🛍','🎒','💍','💎','👓'],
+  'Servicios': ['💡','🔥','💧','📡','📶','📺','📻','🔧','🪜','🔨','🛠','⚙️','🧰','🔍','✂️','🪒','💈','🧴'],
+  'Educación': ['📚','🎓','🏫','📖','📝','✏️','🖊','🖍','📏','📐','🔬','🔭','🧮','🌐','🖥','⌨️','🖱'],
+  'Animales':  ['🐶','🐱','🐭','🐰','🐢','🐠','🐦','🐔','🐴','🐺','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐝','🐛','🐾'],
+  'Naturaleza':['🌳','🌲','🌴','🌵','🌻','🌷','🌹','🌺','🌸','💐','🍀','🌿','🌱','☀️','⛅','☁️','🌧','⛈','❄️','⭐','🌈','🌊','🏔','🌋'],
+  'Símbolos':  ['📌','✨','⭐','🔥','💎','💍','🎁','🎗','🏷','📍','✅','✔️','⚡','💡','💫','🌟','🆕','🆗','🔔','🔕','🚀','💯','⚠️','✖️'],
+};
+
+const EMOJI_POOL = Object.values(EMOJI_CATEGORIES).flat();
+
+// Paleta extendida de colores neón + tradicionales
+const COLOR_POOL = [
+  // Cyberpunk neón
+  '#00f0ff','#ff00ea','#39ff14','#ffea00','#ff2d92','#b537ff','#00ff9f','#ff2d6e',
+  // Vibrantes
+  '#10b981','#f59e0b','#a78bfa','#ec4899','#fb923c','#f43f5e','#c084fc','#38bdf8',
+  // Suaves
+  '#facc15','#f87171','#22d3ee','#94a3b8','#84cc16','#06b6d4','#fde047','#fda4af',
+  // Profundos
+  '#0ea5e9','#7c3aed','#db2777','#dc2626','#ea580c','#65a30d','#0d9488','#1e40af',
+  // Neutros
+  '#64748b','#475569','#334155','#1e293b',
+];
 
 function renderCatalogoSettings(tipo) {
   const lista = state.ajustes?.catalogos?.[`categorias_${tipo}`] || [];
@@ -2892,32 +3214,91 @@ function renderCatalogoSettings(tipo) {
   lista.forEach((cat, idx) => {
     const item = document.createElement('div');
     item.className = 'catalog-item';
+    item.dataset.idx = idx;
+    item.dataset.tipo = tipo;
+    item.draggable = true;
     item.innerHTML = `
-      <span class="catalog-item-emoji" data-action="emoji" data-idx="${idx}" data-tipo="${tipo}">${cat.icono}</span>
-      <input class="catalog-item-name" type="text" value="${escapeHtml(cat.nombre)}" data-idx="${idx}" data-tipo="${tipo}" maxlength="32"/>
-      <span class="catalog-item-color" data-action="color" data-idx="${idx}" data-tipo="${tipo}" style="background:${cat.color}"></span>
+      <button type="button" class="catalog-item-drag" title="Arrastrá para reordenar" data-action="drag" tabindex="-1">⋮⋮</button>
+      <span class="catalog-item-emoji" data-action="emoji" data-idx="${idx}" data-tipo="${tipo}" style="border-color:${cat.color}33;background:${cat.color}11">${cat.icono}</span>
+      <input class="catalog-item-name" type="text" value="${escapeHtml(cat.nombre)}" data-idx="${idx}" data-tipo="${tipo}" maxlength="32" placeholder="Nombre"/>
+      <span class="catalog-item-color" data-action="color" data-idx="${idx}" data-tipo="${tipo}" style="background:${cat.color}" title="Color"></span>
+      <div class="catalog-item-order">
+        <button type="button" class="catalog-order-btn" data-action="up"   data-idx="${idx}" data-tipo="${tipo}" title="Mover arriba"  ${idx === 0 ? 'disabled' : ''}>▴</button>
+        <button type="button" class="catalog-order-btn" data-action="down" data-idx="${idx}" data-tipo="${tipo}" title="Mover abajo"  ${idx === lista.length - 1 ? 'disabled' : ''}>▾</button>
+      </div>
       <button type="button" class="catalog-item-del" data-action="del" data-idx="${idx}" data-tipo="${tipo}" title="Eliminar">✕</button>
     `;
     cont.appendChild(item);
   });
 
-  // Bindings de eventos
+  // Editor de nombre con auto-id
   cont.querySelectorAll('.catalog-item-name').forEach(inp => {
     inp.oninput = (e) => {
       const idx = parseInt(e.target.dataset.idx);
       const tp = e.target.dataset.tipo;
       const arr = state.ajustes.catalogos[`categorias_${tp}`];
       arr[idx].nombre = e.target.value;
-      // Auto-generar id desde nombre si está vacío
       if (!arr[idx].id) arr[idx].id = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_');
     };
   });
+
+  // Picker emoji con búsqueda
   cont.querySelectorAll('[data-action="emoji"]').forEach(el => {
-    el.onclick = (e) => mostrarPickerEmoji(e.target);
+    el.onclick = (e) => mostrarPickerEmoji(e.currentTarget);
   });
+
+  // Picker color con paleta extendida
   cont.querySelectorAll('[data-action="color"]').forEach(el => {
-    el.onclick = (e) => mostrarPickerColor(e.target);
+    el.onclick = (e) => mostrarPickerColor(e.currentTarget);
   });
+
+  // Botones flecha (orden manual)
+  cont.querySelectorAll('[data-action="up"], [data-action="down"]').forEach(btn => {
+    btn.onclick = (e) => {
+      const idx = parseInt(btn.dataset.idx);
+      const tp = btn.dataset.tipo;
+      const arr = state.ajustes.catalogos[`categorias_${tp}`];
+      const delta = btn.dataset.action === 'up' ? -1 : 1;
+      const newIdx = idx + delta;
+      if (newIdx < 0 || newIdx >= arr.length) return;
+      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+      renderCatalogoSettings(tp);
+    };
+  });
+
+  // Drag & drop
+  let dragSrcIdx = null;
+  cont.querySelectorAll('.catalog-item').forEach(it => {
+    it.addEventListener('dragstart', (e) => {
+      dragSrcIdx = parseInt(it.dataset.idx);
+      it.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragSrcIdx);
+    });
+    it.addEventListener('dragend', () => {
+      it.classList.remove('dragging');
+      cont.querySelectorAll('.catalog-item').forEach(x => x.classList.remove('drag-over'));
+    });
+    it.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      cont.querySelectorAll('.catalog-item').forEach(x => x.classList.remove('drag-over'));
+      it.classList.add('drag-over');
+    });
+    it.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetIdx = parseInt(it.dataset.idx);
+      const tp = it.dataset.tipo;
+      if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+      const arr = state.ajustes.catalogos[`categorias_${tp}`];
+      const [moved] = arr.splice(dragSrcIdx, 1);
+      arr.splice(targetIdx, 0, moved);
+      dragSrcIdx = null;
+      renderCatalogoSettings(tp);
+    });
+  });
+
+  // Eliminar
   cont.querySelectorAll('[data-action="del"]').forEach(btn => {
     btn.onclick = (e) => {
       const idx = parseInt(btn.dataset.idx);
@@ -2930,68 +3311,196 @@ function renderCatalogoSettings(tipo) {
 }
 
 function mostrarPickerEmoji(target) {
-  // Cerrar pickers previos
   document.querySelectorAll('.catalog-item-edit-popover').forEach(p => p.remove());
 
   const idx = parseInt(target.dataset.idx);
   const tipo = target.dataset.tipo;
   const popover = document.createElement('div');
-  popover.className = 'catalog-item-edit-popover';
-  EMOJI_POOL.forEach(e => {
-    const b = document.createElement('button');
-    b.className = 'catalog-emoji-btn';
-    b.type = 'button';
-    b.textContent = e;
-    b.onclick = () => {
-      state.ajustes.catalogos[`categorias_${tipo}`][idx].icono = e;
-      renderCatalogoSettings(tipo);
-      popover.remove();
+  popover.className = 'catalog-item-edit-popover popover-emoji';
+
+  // Header con buscador y tabs de categoría
+  const header = document.createElement('div');
+  header.className = 'popover-header';
+  header.innerHTML = `
+    <input type="search" class="popover-search" placeholder="🔍 Buscar emoji…" autofocus />
+    <div class="popover-tabs"></div>
+  `;
+  popover.appendChild(header);
+
+  const grid = document.createElement('div');
+  grid.className = 'popover-grid emoji-grid';
+  popover.appendChild(grid);
+
+  const render = (filtroBusqueda = '', categoriaActiva = 'all') => {
+    grid.innerHTML = '';
+    const f = (filtroBusqueda || '').toLowerCase().trim();
+
+    // Si hay búsqueda, ignoramos tab y filtramos sobre categorías cuyo nombre matchee.
+    let lista;
+    if (f) {
+      const matchingCats = Object.keys(EMOJI_CATEGORIES).filter(cat =>
+        cat.toLowerCase().includes(f));
+      const set = new Set();
+      matchingCats.forEach(cat => EMOJI_CATEGORIES[cat].forEach(e => set.add(e)));
+      lista = [...set];
+      if (lista.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'popover-empty';
+        empty.textContent = `Sin resultados para "${filtroBusqueda}"`;
+        grid.appendChild(empty);
+        return;
+      }
+    } else {
+      lista = categoriaActiva === 'all'
+        ? EMOJI_POOL
+        : (EMOJI_CATEGORIES[categoriaActiva] || []);
+    }
+
+    lista.forEach(emoji => {
+      const b = document.createElement('button');
+      b.className = 'catalog-emoji-btn';
+      b.type = 'button';
+      b.textContent = emoji;
+      b.title = emoji;
+      b.onclick = () => {
+        state.ajustes.catalogos[`categorias_${tipo}`][idx].icono = emoji;
+        renderCatalogoSettings(tipo);
+        popover.remove();
+      };
+      grid.appendChild(b);
+    });
+  };
+
+  // Tabs categorías
+  const tabsCont = header.querySelector('.popover-tabs');
+  const cats = ['all', ...Object.keys(EMOJI_CATEGORIES)];
+  cats.forEach((cat, i) => {
+    const t = document.createElement('button');
+    t.type = 'button';
+    t.className = 'popover-tab' + (i === 0 ? ' active' : '');
+    t.textContent = cat === 'all' ? '✨ Todos' : cat;
+    t.onclick = () => {
+      tabsCont.querySelectorAll('.popover-tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      render(header.querySelector('.popover-search').value, cat);
     };
-    popover.appendChild(b);
+    tabsCont.appendChild(t);
   });
-  // Posicionar
-  const rect = target.getBoundingClientRect();
-  popover.style.top  = `${rect.bottom + 4}px`;
-  popover.style.left = `${rect.left}px`;
-  document.body.appendChild(popover);
-  // Cerrar al clickear fuera
-  setTimeout(() => {
-    const close = (e) => {
-      if (!popover.contains(e.target)) { popover.remove(); document.removeEventListener('click', close); }
-    };
-    document.addEventListener('click', close);
-  }, 10);
+
+  // Buscador
+  header.querySelector('.popover-search').oninput = (e) => {
+    const activeTab = tabsCont.querySelector('.popover-tab.active');
+    render(e.target.value, activeTab ? (activeTab.textContent === '✨ Todos' ? 'all' : activeTab.textContent) : 'all');
+  };
+
+  render('', 'all');
+
+  const host = target.closest('dialog[open]') || document.body;
+  posicionarPopover(popover, target);
+  host.appendChild(popover);
+  cerrarAlClickearFuera(popover);
 }
 
 function mostrarPickerColor(target) {
   document.querySelectorAll('.catalog-item-edit-popover').forEach(p => p.remove());
   const idx = parseInt(target.dataset.idx);
   const tipo = target.dataset.tipo;
+
   const popover = document.createElement('div');
-  popover.className = 'catalog-item-edit-popover';
-  popover.style.gridTemplateColumns = 'repeat(7, 28px)';
+  popover.className = 'catalog-item-edit-popover popover-color';
+
+  const header = document.createElement('div');
+  header.className = 'popover-header';
+  header.innerHTML = `
+    <p class="popover-title">Color de la categoría</p>
+    <div class="popover-custom-color">
+      <input type="color" class="popover-color-input" value="${state.ajustes.catalogos[`categorias_${tipo}`][idx].color}" />
+      <span>Color personalizado</span>
+    </div>
+  `;
+  popover.appendChild(header);
+
+  const grid = document.createElement('div');
+  grid.className = 'popover-grid color-grid';
+  popover.appendChild(grid);
+
   COLOR_POOL.forEach(c => {
     const b = document.createElement('button');
-    b.className = 'catalog-emoji-btn';
+    b.className = 'catalog-emoji-btn color-swatch-btn';
     b.type = 'button';
     b.style.background = c;
+    b.title = c;
+    if (c === state.ajustes.catalogos[`categorias_${tipo}`][idx].color) {
+      b.classList.add('active');
+    }
     b.onclick = () => {
       state.ajustes.catalogos[`categorias_${tipo}`][idx].color = c;
       renderCatalogoSettings(tipo);
       popover.remove();
     };
-    popover.appendChild(b);
+    grid.appendChild(b);
   });
-  const rect = target.getBoundingClientRect();
-  popover.style.top  = `${rect.bottom + 4}px`;
-  popover.style.left = `${rect.left}px`;
-  document.body.appendChild(popover);
+
+  // Color custom
+  header.querySelector('.popover-color-input').oninput = (e) => {
+    state.ajustes.catalogos[`categorias_${tipo}`][idx].color = e.target.value;
+    renderCatalogoSettings(tipo);
+    popover.remove();
+  };
+
+  const host = target.closest('dialog[open]') || document.body;
+  posicionarPopover(popover, target);
+  host.appendChild(popover);
+  cerrarAlClickearFuera(popover);
+}
+
+// Posiciona el popover debajo del target, ajustando si se sale del viewport.
+// IMPORTANTE: si el target está dentro de un <dialog open>, el popover debe
+// adjuntarse al dialog para quedar en el mismo top-layer; sino los modales
+// modales interceptan los clicks.
+function posicionarPopover(popover, target) {
+  const dialogContainer = target.closest('dialog[open]');
+  const host = dialogContainer || document.body;
+
+  // Agregar oculto al host para medir
+  popover.style.visibility = 'hidden';
+  popover.style.left = '0px';
+  popover.style.top = '0px';
+  host.appendChild(popover);
+  const popRect = popover.getBoundingClientRect();
+  host.removeChild(popover);
+  popover.style.visibility = '';
+
+  const targetRect = target.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Horizontal: alinear al inicio del target, pero no salir del viewport
+  let left = targetRect.left;
+  if (left + popRect.width > vw - 8) {
+    left = Math.max(8, vw - popRect.width - 8);
+  }
+
+  // Vertical: debajo del target. Si no entra, ponerlo encima.
+  let top = targetRect.bottom + 6;
+  if (top + popRect.height > vh - 8) {
+    top = Math.max(8, targetRect.top - popRect.height - 6);
+  }
+
+  popover.style.left = left + 'px';
+  popover.style.top  = top + 'px';
+}
+
+function cerrarAlClickearFuera(popover) {
   setTimeout(() => {
     const close = (e) => {
-      if (!popover.contains(e.target)) { popover.remove(); document.removeEventListener('click', close); }
+      if (!popover.contains(e.target)) {
+        popover.remove();
+        document.removeEventListener('click', close);
+      }
     };
     document.addEventListener('click', close);
-  }, 10);
+  }, 50);
 }
 
 function renderCuentasSettings() {

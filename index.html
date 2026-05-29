@@ -348,6 +348,11 @@
       </svg>
       Ajustes
     </button>
+
+    <!-- Badge de versión -->
+    <div id="sb-version" class="sidebar-version" title="Cargando versión…">
+      <span class="version-tag">v—</span>
+    </div>
   </div>
 </aside>
 
@@ -357,9 +362,12 @@
   <!-- HEADER -->
   <header id="app-header">
     <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
-      <div>
-        <p class="text-xs text-dimmed mb-0.5">Hola,</p>
-        <h1 class="ff-display text-xl font-semibold leading-tight" id="hd-greeting">tus finanzas</h1>
+      <div class="flex items-center gap-2">
+        <div>
+          <p class="text-xs text-dimmed mb-0.5">Hola,</p>
+          <h1 class="ff-display text-xl font-semibold leading-tight" id="hd-greeting">tus finanzas</h1>
+        </div>
+        <span id="hd-version" class="mobile-only header-version-badge" title="Versión"></span>
       </div>
       <div class="flex items-center gap-2">
         <button id="btn-sync"
@@ -1539,6 +1547,129 @@
 </dialog>
 
 <!-- ===== WIDGET HISTORY DRAWER ============================== -->
+<!-- ===== DRAWER DETALLE DE TARJETA ============================= -->
+<dialog id="dlg-tarjeta-detalle">
+  <div class="widget-drawer" style="min-width:min(96vw,720px);max-width:720px">
+
+    <!-- Header con tarjeta visual -->
+    <div class="widget-drawer-header" id="td-header" style="background:linear-gradient(135deg,#00f0ffdd,#00f0ff88)">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <span class="widget-drawer-icon" style="background:rgba(255,255,255,0.18);box-shadow:0 0 12px rgba(255,255,255,0.2)">💳</span>
+          <div class="min-w-0">
+            <h3 class="ff-display text-lg font-bold leading-tight truncate text-white" id="td-nombre">—</h3>
+            <p class="text-[11px] truncate text-white/70" id="td-banco">—</p>
+          </div>
+        </div>
+        <button type="button" id="td-close" class="hd-close-btn" title="Cerrar">✕</button>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-3 gap-2 mt-4">
+        <div class="hd-kpi" style="background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.2)">
+          <p class="text-[9px] uppercase tracking-widest text-white/70">Resumen</p>
+          <p class="ff-display font-bold text-base mt-0.5 text-white" id="td-resumen">$0</p>
+        </div>
+        <div class="hd-kpi" style="background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.2)">
+          <p class="text-[9px] uppercase tracking-widest text-white/70">Disponible</p>
+          <p class="ff-display font-bold text-base mt-0.5 text-white" id="td-disponible">$0</p>
+        </div>
+        <div class="hd-kpi" style="background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.2)">
+          <p class="text-[9px] uppercase tracking-widest text-white/70">% del límite</p>
+          <p class="ff-display font-bold text-base mt-0.5 text-white" id="td-pct">0%</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="widget-drawer-body" style="padding:1rem 1.25rem">
+
+      <!-- Sección: Composición del resumen actual -->
+      <div class="mb-4">
+        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted)">Composición del resumen actual</p>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="p-2.5 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
+            <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Un pago</p>
+            <p class="ff-display font-bold text-sm mt-0.5" id="td-comp-unpago">$0</p>
+          </div>
+          <div class="p-2.5 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
+            <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Cuotas</p>
+            <p class="ff-display font-bold text-sm mt-0.5" id="td-comp-cuotas">$0</p>
+          </div>
+          <div class="p-2.5 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
+            <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Recurrentes</p>
+            <p class="ff-display font-bold text-sm mt-0.5" id="td-comp-recurr">$0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección: Capacidad -->
+      <div class="mb-4 p-3 rounded-xl" id="td-capacidad-box" style="border:1px solid var(--border)">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[11px] uppercase tracking-widest font-semibold" style="color:var(--ink-muted)">Capacidad disponible</p>
+          <span class="badge" id="td-semaforo">Verde</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <div>
+            <p class="text-[10px]" style="color:var(--ink-muted)">Recomendado seguro</p>
+            <p class="ff-display font-bold text-lg text-glow-cyan" id="td-recomendado">$0</p>
+          </div>
+          <div>
+            <p class="text-[10px]" style="color:var(--ink-muted)">Disponible en tarjeta</p>
+            <p class="ff-display font-bold text-lg" id="td-disp-tarjeta">$0</p>
+          </div>
+        </div>
+        <p class="text-[11px] mt-2" id="td-sugerencia" style="color:var(--ink-2)">—</p>
+      </div>
+
+      <!-- Sección: Cuotas pendientes -->
+      <div class="mb-4">
+        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted)">Cuotas pendientes en esta tarjeta</p>
+        <div id="td-cuotas-pendientes" class="space-y-1.5"></div>
+      </div>
+
+      <!-- Sección: Próximos cierres -->
+      <div class="mb-4">
+        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted)">Próximos cierres y vencimientos</p>
+        <div id="td-proximos-ciclos" class="space-y-1.5"></div>
+      </div>
+
+      <!-- Sección: Simulador de compra -->
+      <details class="form-collapse">
+        <summary>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="6" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12" y2="16"/>
+          </svg>
+          🧪 Simular compra
+        </summary>
+        <div class="mt-3 space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <div class="form-section">
+              <label class="form-label">Monto</label>
+              <input type="number" id="td-sim-monto" class="input" placeholder="0" step="100"/>
+            </div>
+            <div class="form-section">
+              <label class="form-label">Cuotas</label>
+              <input type="number" id="td-sim-cuotas" class="input" placeholder="1" value="1" min="1" max="60"/>
+            </div>
+          </div>
+          <button type="button" id="td-sim-go" class="btn-primary w-full text-sm">⚡ Simular</button>
+          <div id="td-sim-result" hidden></div>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="widget-drawer-footer">
+      <button type="button" id="td-add-gasto" class="btn-primary flex-1">+ Cargar gasto en esta tarjeta</button>
+      <button type="button" id="td-close-2"  class="btn-secondary flex-1">Cerrar</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="dlg-widget-history">
   <div class="p-0 widget-drawer" style="min-width:min(96vw,640px);max-width:720px">
 
