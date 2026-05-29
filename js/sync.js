@@ -125,10 +125,81 @@ async function setState(patch) {
   await DB.put('ajustes', aj);
 }
 
+/* ---------- Meta de reset global ----------
+ * Archivo _meta.json en el repo con { last_reset_at: <ts> }. Cuando un
+ * dispositivo hace sync y ve que last_reset_at > su last_pull_ts, sabe que
+ * hubo un reset desde su última sincronización y debe descartar sus locales
+ * antes de mergear. Sin esto, el merge LWW preserva datos locales antiguos
+ * y los re-sube al repo, deshaciendo el reset.
+ */
+const META_FILE = '_meta.json';
+
+async function leerMetaRemoto(cfg) {
+  const url = `${urlArchivo(cfg, META_FILE)}?ref=${encodeURIComponent(cfg.branch || 'main')}&_=${Date.now()}`;
+  const data = await gh('GET', url, cfg);
+  if (!data) return { meta: { last_reset_at: 0 }, sha: null };
+  try {
+    return { meta: JSON.parse(fromB64(data.content)), sha: data.sha };
+  } catch {
+    return { meta: { last_reset_at: 0 }, sha: data.sha };
+  }
+}
+
+async function _pushRaw(cfg, archivo, contenidoStr, mensaje, shaPrevio) {
+  const body = {
+    message: mensaje,
+    content: toB64(contenidoStr),
+    branch: cfg.branch || 'main',
+  };
+  if (shaPrevio) body.sha = shaPrevio;
+  const res = await gh('PUT', urlArchivo(cfg, archivo), cfg, body);
+  return res.content.sha;
+}
+
+async function escribirMetaRemoto(cfg, meta, maxRetries = 5) {
+  const contenido = JSON.stringify(meta, null, 2);
+  const mensaje = `meta: last_reset_at=${meta.last_reset_at}`;
+  let { sha } = await leerMetaRemoto(cfg);
+  let lastErr = null;
+  for (let intento = 0; intento < maxRetries; intento++) {
+    try { return await _pushRaw(cfg, META_FILE, contenido, mensaje, sha); }
+    catch (e) {
+      lastErr = e;
+      const msg = String(e.message || '');
+      console.warn(`[meta] intento ${intento + 1}/${maxRetries}:`, msg.slice(0, 140));
+      if (msg.includes('"sha"') && msg.includes("wasn't supplied")) {
+        sha = (await leerMetaRemoto(cfg)).sha; continue;
+      }
+      if (msg.includes("doesn't exist")) { sha = null; continue; }
+      if (msg.includes(' 409') || msg.includes('"status": "409"') || msg.includes('does not match')) {
+        await new Promise(r => setTimeout(r, 600 * (intento + 1)));
+        sha = (await leerMetaRemoto(cfg)).sha;
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
+}
+
 /* ---------- SYNC orquestada (pull -> merge -> push si hubo cambios) ---------- */
 export async function syncAll(cfg, { onProgress } = {}) {
   if (!cfg || !cfg.pat || !cfg.owner || !cfg.repo) {
     throw new Error('Configurá GitHub PAT/owner/repo en Ajustes.');
+  }
+
+  // 1. Leer _meta.json y detectar si hubo reset desde nuestra última sync
+  onProgress?.('Verificando reset global…');
+  const { meta } = await leerMetaRemoto(cfg);
+  const state = await getState();
+  const huboResetRemoto = (meta.last_reset_at || 0) > (state.last_pull_ts || 0);
+
+  if (huboResetRemoto) {
+    onProgress?.('Reset detectado, limpiando local…');
+    console.warn(`[sync] reset remoto detectado (last_reset_at=${meta.last_reset_at} > last_pull_ts=${state.last_pull_ts || 0}). Vaciando locales antes del merge.`);
+    for (const store of Object.keys(ARCHIVOS)) {
+      try { await DB.clear(store); } catch (e) { console.warn('No se pudo limpiar', store, e); }
+    }
   }
 
   const resultados = {};
@@ -152,7 +223,8 @@ export async function syncAll(cfg, { onProgress } = {}) {
     resultados[archivo] = { count: merged.length, sha: nuevoSha };
   }
 
-  await setState({ last_sync_ts: Math.floor(Date.now() / 1000), last_ok: true });
+  const ahora = Math.floor(Date.now() / 1000);
+  await setState({ last_sync_ts: ahora, last_pull_ts: ahora, last_ok: true });
   return resultados;
 }
 
@@ -229,18 +301,39 @@ export async function wipeRemoto(cfg, { onProgress } = {}) {
   if (!cfg?.pat || !cfg?.owner || !cfg?.repo) {
     throw new Error('Configurá GitHub PAT/owner/repo antes de borrar remoto.');
   }
+  const ahora = Math.floor(Date.now() / 1000);
   const resultados = {};
+
+  // 1. PRIMERO escribir _meta.json con last_reset_at. Si después fallan algunos
+  //    push de archivos, los otros dispositivos ya saben del reset y vaciarán
+  //    sus locales en su próximo sync (la app re-pushea archivos vacíos).
+  onProgress?.('Subiendo marker de reset (_meta.json)…');
+  await escribirMetaRemoto(cfg, { last_reset_at: ahora, schema_version: 1 });
+
+  // 2. Vaciar los 5 archivos de datos
   for (const [, archivo] of Object.entries(ARCHIVOS)) {
     onProgress?.(`Borrando remoto ${archivo}…`);
     const nuevoSha = await _pushIdempotente(cfg, archivo, [], `reset(${archivo}) vaciado desde app`);
     resultados[archivo] = nuevoSha;
   }
+  resultados._meta = { last_reset_at: ahora };
   return resultados;
 }
 
 /* ---------- Pull-only (útil para arranque inicial) ---------- */
 export async function pullAll(cfg) {
   if (!cfg?.pat) throw new Error('Sin PAT configurado.');
+
+  // Verificar reset remoto antes de mergear
+  const { meta } = await leerMetaRemoto(cfg);
+  const state = await getState();
+  if ((meta.last_reset_at || 0) > (state.last_pull_ts || 0)) {
+    console.warn(`[pullAll] reset remoto detectado, vaciando locales antes del merge.`);
+    for (const store of Object.keys(ARCHIVOS)) {
+      try { await DB.clear(store); } catch { /* noop */ }
+    }
+  }
+
   for (const [store, archivo] of Object.entries(ARCHIVOS)) {
     const { items: remotos } = await pullArchivo(cfg, archivo);
     const locales = await DB.all(store);
