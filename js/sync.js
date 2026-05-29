@@ -172,12 +172,16 @@ async function _getShaActual(cfg, archivo) {
 }
 
 /**
- * PUT robusto contra 409. GitHub Contents API a veces devuelve un SHA
- * cacheado en el GET. Si el PUT falla con "does not match XXX", el SHA
- * correcto está embebido en el mensaje de error — lo extraemos y reintentamos.
+ * PUT robusto contra 409. La API Contents de GitHub responde 409 cuando el
+ * `sha` que mandaste no coincide con el actual del archivo. El mensaje de
+ * error NO contiene el SHA correcto (solo repite el que pasaste), así que
+ * la única solución es re-leer el SHA actual y reintentar.
+ *
+ * También maneja 422 "sha wasn't supplied" (pasamos null pero el archivo
+ * sí existe) y 422 "doesn't exist" (pasamos sha pero el archivo no existe).
  *
  * @param {string|null|undefined} shaInicial - Si se pasa, evita el primer GET.
- *   Pasar `null` indica "no existe el archivo"; pasar `undefined` fuerza el GET.
+ *   `null` indica "asumo que no existe el archivo"; `undefined` fuerza GET.
  */
 async function _pushIdempotente(cfg, archivo, items, mensaje, maxRetries = 5, shaInicial = undefined) {
   let shaPrevio = (shaInicial !== undefined) ? shaInicial : await _getShaActual(cfg, archivo);
@@ -189,26 +193,27 @@ async function _pushIdempotente(cfg, archivo, items, mensaje, maxRetries = 5, sh
     } catch (e) {
       lastErr = e;
       const msg = String(e?.message || '');
-      console.warn(`[wipeRemoto] intento ${intento + 1}/${maxRetries} falló para ${archivo}:`, msg);
+      console.warn(`[sync] intento ${intento + 1}/${maxRetries} falló para ${archivo}:`, msg.slice(0, 200));
 
-      // Caso 1: GitHub nos dice el SHA correcto en el mensaje
-      const match = msg.match(/does not match ([a-f0-9]{40})/i);
-      if (match) {
-        shaPrevio = match[1];
+      // 422 "sha wasn't supplied" → existe pero mandamos null: leemos sha actual
+      if (msg.includes('"sha"') && msg.includes("wasn't supplied")) {
         await new Promise(r => setTimeout(r, 200));
+        shaPrevio = await _getShaActual(cfg, archivo);
         continue;
       }
 
-      // Caso 2: 422 "sha wasn't supplied" → el archivo no existe en realidad
-      if (msg.includes('"sha"') && msg.includes('wasn\'t supplied')) {
+      // 422 "doesn't exist" → mandamos sha pero el archivo no existe: probamos sin sha
+      if (msg.includes("doesn't exist") || msg.includes('does not exist')) {
         shaPrevio = null;
         continue;
       }
 
-      // Caso 3: 409 sin SHA explícito → re-leemos con cache-buster
-      const esConflicto = msg.includes(' 409') || msg.includes('"status": "409"');
+      // 409 → conflicto de SHA. Re-leemos el sha actual con cache-buster.
+      // GitHub Contents API tiene CDN: damos backoff incremental para que propague.
+      const esConflicto = msg.includes(' 409') || msg.includes('"status": "409"') ||
+                          msg.includes('does not match');
       if (esConflicto) {
-        await new Promise(r => setTimeout(r, 500 * (intento + 1)));
+        await new Promise(r => setTimeout(r, 600 * (intento + 1)));
         shaPrevio = await _getShaActual(cfg, archivo);
         continue;
       }
