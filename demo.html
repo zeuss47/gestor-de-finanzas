@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>Cargando datos de demo…</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:#07090f;color:#e2e8f0;
+         display:flex;align-items:center;justify-content:center;
+         min-height:100dvh;flex-direction:column;gap:1.5rem;padding:2rem}
+    h1{font-size:1.5rem;font-weight:700}
+    p{color:#94a3b8;font-size:.95rem;text-align:center;max-width:400px}
+    .bar-wrap{width:340px;height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#8b5cf6);
+         border-radius:999px;transition:width .4s ease}
+    .status{font-size:.85rem;color:#6366f1;font-weight:600;min-height:1.2rem}
+    .btn{display:none;padding:.75rem 2rem;border-radius:12px;
+         background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;
+         font-weight:600;font-size:1rem;border:none;cursor:pointer;
+         box-shadow:0 4px 18px rgba(99,102,241,.4)}
+    .btn:hover{opacity:.9}
+    .error{color:#f43f5e;font-size:.85rem;text-align:center}
+  </style>
+</head>
+<body>
+  <h1>💹 Cargando demo…</h1>
+  <p>Cargando datos de ejemplo en tu navegador. Esto sólo tarda unos segundos.</p>
+  <div class="bar-wrap"><div class="bar" id="bar"></div></div>
+  <p class="status" id="status">Iniciando…</p>
+  <p class="error" id="error"></p>
+  <button class="btn" id="btn" onclick="location.href='/'">Abrir la app →</button>
+
+<script>
+const DB_NAME    = 'gestor_finanzas_db';
+const DB_VERSION = 1;
+const bar    = document.getElementById('bar');
+const status = document.getElementById('status');
+const errEl  = document.getElementById('error');
+const btn    = document.getElementById('btn');
+
+function setBar(pct, txt) { bar.style.width=pct+'%'; status.textContent=txt; }
+
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random()*16)|0, v = c==='x'?r:(r&0x3)|0x8;
+    return v.toString(16);
+  });
+}
+const ts = () => Math.floor(Date.now()/1000);
+
+// ── Demo data ────────────────────────────────────────────────────
+const tarjetas = [
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Visa Galicia',
+    banco: 'Galicia', ultimos_4: '4242', limite_un_pago: 600000, limite_cuotas: 400000,
+    dia_cierre: 20, dia_vencimiento: 5, color: '#6366f1', activa: true },
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Mastercard Santander',
+    banco: 'Santander', ultimos_4: '9999', limite_un_pago: 350000, limite_cuotas: 200000,
+    dia_cierre: 15, dia_vencimiento: 30, color: '#f59e0b', activa: true },
+];
+
+const ingresos = [
+  { id: uuid(), updated_at: ts(), deleted: false,
+    fecha: '2026-05-01', periodo_aplicacion: '2026-05',
+    descripcion: 'Sueldo Mayo', sueldo_bruto: 820000, descuentos: 180000,
+    bonos: 50000, sueldo_neto: 690000, es_recurrente: true },
+  { id: uuid(), updated_at: ts(), deleted: false,
+    fecha: '2026-04-01', periodo_aplicacion: '2026-04',
+    descripcion: 'Sueldo Abril', sueldo_bruto: 820000, descuentos: 180000,
+    bonos: 0, sueldo_neto: 640000, es_recurrente: true },
+  { id: uuid(), updated_at: ts(), deleted: false,
+    fecha: '2026-03-01', periodo_aplicacion: '2026-03',
+    descripcion: 'Sueldo Marzo', sueldo_bruto: 780000, descuentos: 170000,
+    bonos: 0, sueldo_neto: 610000, es_recurrente: true },
+];
+
+const gastosMayo = [
+  { desc:'Alquiler Mayo',       monto:195000, fecha:'2026-05-01', cat:'hogar',       metodo:'transferencia', tipo:'unico' },
+  { desc:'Supermercado Coto',   monto:67500,  fecha:'2026-05-07', cat:'comida',       metodo:'debito',        tipo:'unico' },
+  { desc:'Netflix + Spotify',   monto:11200,  fecha:'2026-05-01', cat:'ocio',         metodo:'credito',       tipo:'recurrente', tid:tarjetas[0].id },
+  { desc:'YPF Combustible',     monto:32000,  fecha:'2026-05-10', cat:'combustible',  metodo:'debito',        tipo:'unico' },
+  { desc:'Farmacity',           monto:14800,  fecha:'2026-05-12', cat:'salud',        metodo:'efectivo',      tipo:'unico' },
+  { desc:'Restaurante',         monto:38500,  fecha:'2026-05-16', cat:'restaurante',  metodo:'credito',       tipo:'unico', tid:tarjetas[0].id },
+  { desc:'Internet Fibertel',   monto:9200,   fecha:'2026-05-01', cat:'servicios',    metodo:'debito',        tipo:'recurrente' },
+  { desc:'Ropa Zara',           monto:52000,  fecha:'2026-05-20', cat:'ropa',         metodo:'credito',       tipo:'unico', tid:tarjetas[1].id },
+  { desc:'Cine',                monto:8400,   fecha:'2026-05-22', cat:'ocio',         metodo:'efectivo',      tipo:'unico' },
+];
+
+const gastosAbril = [
+  { desc:'Alquiler Abril',     monto:195000, fecha:'2026-04-01', cat:'hogar',     metodo:'transferencia', tipo:'unico' },
+  { desc:'Supermercado',       monto:59000,  fecha:'2026-04-08', cat:'comida',    metodo:'debito',        tipo:'unico' },
+  { desc:'Nafta Shell',        monto:28000,  fecha:'2026-04-15', cat:'combustible',metodo:'debito',       tipo:'unico' },
+  { desc:'Farmacia',           monto:9800,   fecha:'2026-04-18', cat:'salud',     metodo:'efectivo',      tipo:'unico' },
+];
+
+const gastosMar = [
+  { desc:'Alquiler Marzo',     monto:185000, fecha:'2026-03-01', cat:'hogar',     metodo:'transferencia', tipo:'unico' },
+  { desc:'Supermercado',       monto:55000,  fecha:'2026-03-10', cat:'comida',    metodo:'debito',        tipo:'unico' },
+  { desc:'Nafta YPF',          monto:25000,  fecha:'2026-03-20', cat:'combustible',metodo:'debito',       tipo:'unico' },
+];
+
+function makeGasto(g) {
+  return { id:uuid(), updated_at:ts(), deleted:false,
+    fecha:g.fecha, monto:g.monto, descripcion:g.desc,
+    categoria:g.cat, metodo_pago:g.metodo, tipo:g.tipo||'unico',
+    tarjeta_id:g.tid||null, cuotas_total:1, cuota_numero:1,
+    compartido:null, es_amortizacion_anual:false, adjunto_ref:null };
+}
+
+const gastos = [
+  ...gastosMayo.map(makeGasto),
+  ...gastosAbril.map(makeGasto),
+  ...gastosMar.map(makeGasto),
+];
+
+const cuentas = [
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Galicia caja',  banco: 'Galicia',     tipo: 'caja_ahorro',     moneda: 'ARS', saldo_inicial: 250000, color: '#00ff9f', activa: true },
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Mercado Pago',  banco: 'MercadoPago', tipo: 'billetera',       moneda: 'ARS', saldo_inicial: 45000,  color: '#00f0ff', activa: true },
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Efectivo',      banco: '',            tipo: 'efectivo',        moneda: 'ARS', saldo_inicial: 12000,  color: '#ffea00', activa: true },
+];
+
+const metas = [
+  { id:uuid(), updated_at:ts(), deleted:false,
+    nombre:'Fondo de Emergencia', monto_objetivo:1200000, monto_actual:340000,
+    fecha_objetivo:'2026-12-31', prioridad:1, es_emergencia:true },
+  { id:uuid(), updated_at:ts(), deleted:false,
+    nombre:'Vacaciones Brasil', monto_objetivo:650000, monto_actual:95000,
+    fecha_objetivo:'2027-01-15', prioridad:2, es_emergencia:false },
+];
+
+const ajustes = {
+  id:'ajustes_globales', updated_at:ts(),
+  github:{ pat:null, owner:null, repo:null, branch:'main', ruta_datos:'data' },
+  notificaciones:{ habilitadas:true, alertas_tarjeta_dias:[5,2,1], confirmar_movimientos:true, alertas_ia:true },
+  ui:{
+    tema:'auto', color_primario:'#00f0ff',
+    widgets_visibles:['estado_global','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+    widgets_orden:  ['estado_global','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+  },
+  sensibilidad_ia:'moderado', moneda:'ARS',
+  tipos_cambio: {
+    USD:      { nombre:'Dólar oficial', valor:1100, simbolo:'🇺🇸' },
+    USD_BLUE: { nombre:'Dólar blue',    valor:1450, simbolo:'💵' },
+    EUR:      { nombre:'Euro',          valor:1200, simbolo:'🇪🇺' },
+    BRL:      { nombre:'Real',          valor:220,  simbolo:'🇧🇷' },
+  },
+  catalogos: {
+    categorias_gasto: [
+      { id:'comida',      nombre:'Comida',      icono:'🛒', color:'#10b981' },
+      { id:'combustible', nombre:'Combustible', icono:'⛽', color:'#f59e0b' },
+      { id:'hogar',       nombre:'Hogar',       icono:'🏠', color:'#a78bfa' },
+      { id:'ocio',        nombre:'Ocio',        icono:'🎬', color:'#ec4899' },
+      { id:'restaurante', nombre:'Restaurante', icono:'🍽', color:'#fb923c' },
+      { id:'salud',       nombre:'Salud',       icono:'💊', color:'#f43f5e' },
+      { id:'ropa',        nombre:'Ropa',        icono:'👗', color:'#c084fc' },
+      { id:'transporte',  nombre:'Transporte',  icono:'🚌', color:'#38bdf8' },
+      { id:'servicios',   nombre:'Servicios',   icono:'💡', color:'#facc15' },
+      { id:'kiosco',      nombre:'Kiosco',      icono:'🥤', color:'#f87171' },
+      { id:'educacion',   nombre:'Educación',   icono:'📚', color:'#22d3ee' },
+      { id:'general',     nombre:'General',     icono:'📌', color:'#94a3b8' },
+    ],
+    categorias_ingreso: [
+      { id:'sueldo',      nombre:'Sueldo',      icono:'💼', color:'#10b981' },
+      { id:'freelance',   nombre:'Freelance',   icono:'💻', color:'#00f0ff' },
+      { id:'bonos',       nombre:'Bonos',       icono:'🎁', color:'#facc15' },
+      { id:'inversiones', nombre:'Inversiones', icono:'📈', color:'#a78bfa' },
+      { id:'alquiler',    nombre:'Alquiler',    icono:'🏘', color:'#fb923c' },
+      { id:'venta',       nombre:'Venta',       icono:'🏷', color:'#ec4899' },
+      { id:'otros',       nombre:'Otros',       icono:'✨', color:'#94a3b8' },
+    ],
+  },
+};
+
+// ── Abrir/limpiar DB y cargar todo ───────────────────────────────
+async function loadDemo() {
+  try {
+    setBar(5, 'Abriendo base de datos…');
+    const db = await new Promise((res,rej) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = ev => {
+        const d = req.result;
+        const schema = {
+          gastos:    { keyPath:'id', indexes:['fecha','tarjeta_id','cuenta_id','categoria','updated_at'] },
+          ingresos:  { keyPath:'id', indexes:['fecha','periodo_aplicacion','cuenta_id','categoria','updated_at'] },
+          tarjetas:  { keyPath:'id', indexes:['nombre','updated_at'] },
+          cuentas:   { keyPath:'id', indexes:['nombre','tipo','updated_at'] },
+          metas:     { keyPath:'id', indexes:['prioridad','updated_at'] },
+          ajustes:   { keyPath:'id' },
+          sync_queue:{ keyPath:'qid', autoIncrement:true },
+        };
+        for (const [name, def] of Object.entries(schema)) {
+          if (d.objectStoreNames.contains(name)) continue;
+          const s = d.createObjectStore(name, def.autoIncrement?{keyPath:def.keyPath,autoIncrement:true}:{keyPath:def.keyPath});
+          (def.indexes||[]).forEach(ix => s.createIndex(ix,ix,{unique:false}));
+        }
+      };
+      req.onsuccess = () => res(req.result);
+      req.onerror  = () => rej(req.error);
+    });
+
+    const stores = { tarjetas, cuentas, ingresos, gastos, metas };
+    const labels = { tarjetas:'Cargando tarjetas', cuentas:'Cargando cuentas', ingresos:'Cargando ingresos', gastos:'Cargando gastos', metas:'Cargando metas' };
+    const pcts   = { tarjetas:15, cuentas:25, ingresos:40, gastos:70, metas:85 };
+
+    for (const [store, items] of Object.entries(stores)) {
+      setBar(pcts[store], labels[store]+'…');
+      await new Promise((res,rej) => {
+        const tx = db.transaction(store, 'readwrite');
+        const s  = tx.objectStore(store);
+        s.clear();
+        items.forEach(it => s.put(it));
+        tx.oncomplete = res;
+        tx.onerror    = () => rej(tx.error);
+      });
+    }
+
+    setBar(92, 'Guardando ajustes…');
+    await new Promise((res,rej) => {
+      const tx = db.transaction('ajustes','readwrite');
+      tx.objectStore('ajustes').put(ajustes);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+
+    setBar(100, 'Listo — redirigiendo…');
+    btn.style.display = 'block';
+    setTimeout(() => { location.href = '/'; }, 1200);
+
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+    status.textContent = '';
+  }
+}
+
+loadDemo();
+</script>
+</body>
+</html>

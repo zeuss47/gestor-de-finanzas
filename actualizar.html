@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Actualizar app · Forzar recarga</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',-apple-system,sans-serif}
+    body{
+      background: #050614;
+      color: #e8f5ff;
+      min-height: 100dvh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 2rem;
+      background-image:
+        radial-gradient(ellipse 800px 600px at 20% -5%, rgba(0,240,255,0.18), transparent),
+        radial-gradient(ellipse 600px 400px at 80% 100%, rgba(255,0,234,0.12), transparent);
+    }
+    .card {
+      max-width: 480px; width: 100%;
+      background: linear-gradient(135deg, rgba(0,240,255,0.05), rgba(255,0,234,0.03));
+      border: 1px solid rgba(0,240,255,0.28);
+      border-radius: 22px;
+      padding: 2rem;
+      box-shadow: 0 0 60px rgba(0,240,255,0.15);
+    }
+    h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: .25rem; color: #00f0ff; text-shadow: 0 0 12px rgba(0,240,255,.5) }
+    .sub { color: #7a9bc2; font-size: .85rem; margin-bottom: 1.5rem }
+    .step { display: flex; gap: .6rem; align-items: start; padding: .65rem 0; border-top: 1px solid rgba(0,240,255,0.12); font-size: .85rem }
+    .step:first-of-type { border-top: none }
+    .badge { width: 22px; height: 22px; border-radius: 50%; background: rgba(0,240,255,0.15); color: #00f0ff; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 700; flex-shrink: 0; border: 1px solid rgba(0,240,255,0.4) }
+    .badge.ok { background: rgba(0,255,159,0.15); color: #00ff9f; border-color: rgba(0,255,159,0.4) }
+    .badge.err { background: rgba(255,45,110,0.15); color: #ff2d6e; border-color: rgba(255,45,110,0.4) }
+    .btn {
+      width: 100%; padding: .9rem 1.5rem;
+      background: linear-gradient(135deg, #00f0ff, #b537ff);
+      color: #001f24; font-weight: 700;
+      font-size: .95rem; text-transform: uppercase; letter-spacing: .08em;
+      border: none; border-radius: 12px; cursor: pointer;
+      margin-top: 1.5rem;
+      box-shadow: 0 4px 24px rgba(0,240,255,0.5);
+      transition: transform .15s;
+    }
+    .btn:hover { transform: translateY(-2px) }
+    .btn:disabled { opacity: .5; cursor: not-allowed }
+    .log { margin-top: 1rem; padding: .75rem; background: rgba(0,0,0,0.4); border-radius: 8px; font-family: 'Consolas',monospace; font-size: .7rem; max-height: 200px; overflow-y: auto; border: 1px solid rgba(0,240,255,0.12) }
+    .log p { padding: 2px 0; color: #7a9bc2 }
+    .log p.ok { color: #00ff9f }
+    .log p.err { color: #ff2d6e }
+    a { color: #00f0ff; text-decoration: none }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>⚡ Forzar actualización</h1>
+    <p class="sub">Esto va a limpiar el caché del navegador y traer la última versión de la app.</p>
+
+    <div class="step" id="s1"><span class="badge">1</span> Desregistrar Service Worker viejo</div>
+    <div class="step" id="s2"><span class="badge">2</span> Borrar todos los cachés</div>
+    <div class="step" id="s3"><span class="badge">3</span> Recargar app sin caché</div>
+
+    <button class="btn" id="go">🔄 Actualizar ahora</button>
+
+    <div class="log" id="log" style="display:none"></div>
+
+    <p style="margin-top:1rem;font-size:.7rem;color:#4a6789;text-align:center">
+      Tus datos en IndexedDB (gastos, tarjetas, etc.) NO se borran.<br/>
+      Solo se actualiza el código de la app.
+    </p>
+  </div>
+
+<script>
+const $   = id => document.getElementById(id);
+const log = $('log');
+
+function l(msg, cls='') {
+  log.style.display = 'block';
+  const p = document.createElement('p');
+  p.className = cls;
+  p.textContent = msg;
+  log.appendChild(p);
+  log.scrollTop = log.scrollHeight;
+}
+
+function setStep(id, status) {
+  const badge = $(id).querySelector('.badge');
+  badge.className = 'badge ' + status;
+  badge.textContent = status === 'ok' ? '✓' : status === 'err' ? '✗' : id.slice(-1);
+}
+
+$('go').addEventListener('click', async () => {
+  $('go').disabled = true;
+
+  // 1. Service Workers
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      l(`Encontrados ${regs.length} service worker(s)`);
+      for (const r of regs) {
+        await r.unregister();
+        l(`✓ Desregistrado: ${r.scope}`, 'ok');
+      }
+    } else {
+      l('Service Worker no soportado, saltando paso 1');
+    }
+    setStep('s1', 'ok');
+  } catch (e) {
+    l('Error: ' + e.message, 'err');
+    setStep('s1', 'err');
+  }
+
+  // 2. Caches API
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      l(`Encontrados ${keys.length} caché(s)`);
+      for (const k of keys) {
+        await caches.delete(k);
+        l(`✓ Borrado: ${k}`, 'ok');
+      }
+    }
+    setStep('s2', 'ok');
+  } catch (e) {
+    l('Error: ' + e.message, 'err');
+    setStep('s2', 'err');
+  }
+
+  // 3. Recargar con bust de cache
+  setStep('s3', 'ok');
+  l('Recargando app en 1 segundo...', 'ok');
+  setTimeout(() => {
+    location.href = '/?refresh=' + Date.now();
+  }, 1000);
+});
+</script>
+</body>
+</html>

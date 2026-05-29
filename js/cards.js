@@ -1,0 +1,211 @@
+/**
+ * cards.js
+ * --------
+ * Motor de ciclos de tarjeta REPLICADO en cliente para que el dashboard
+ * funcione 100% offline. Esta lógica debe mantenerse en sincronía bit-a-bit
+ * con main.py (funciones calcular_fechas_ciclo / cuota_cae_en_periodo /
+ * resumen_tarjeta).
+ *
+ * Por qué duplicar:
+ *   - Filosofía "offline-first": el frontend no puede depender del backend.
+ *   - El backend Python existe sólo como motor de cálculo opcional y relé
+ *     de sincronización (útil para CI/cron headless o despliegues remotos).
+ */
+
+/* ============ Helpers de fecha ============ */
+function ultimoDiaMes(anio, mes) {
+  return new Date(anio, mes, 0).getDate(); // mes 1-12 -> day 0 del siguiente
+}
+function ajustarDia(anio, mes, dia) {
+  const dd = Math.min(dia, ultimoDiaMes(anio, mes));
+  return new Date(anio, mes - 1, dd);
+}
+function mesSig(anio, mes) {
+  return mes === 12 ? [anio + 1, 1] : [anio, mes + 1];
+}
+function diasEntre(a, b) {
+  const MS = 86400000;
+  return Math.round((b.getTime() - a.getTime()) / MS);
+}
+function toISO(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+/* ============ Cálculo de cierre/vencimiento ============ */
+export function fechasCiclo(tarjeta, hoy = new Date()) {
+  const Y = hoy.getFullYear(), M = hoy.getMonth() + 1, D = hoy.getDate();
+  let cierre;
+  if (D <= tarjeta.dia_cierre) {
+    cierre = ajustarDia(Y, M, tarjeta.dia_cierre);
+  } else {
+    const [ay, am] = mesSig(Y, M);
+    cierre = ajustarDia(ay, am, tarjeta.dia_cierre);
+  }
+  let venc;
+  if (tarjeta.dia_vencimiento > tarjeta.dia_cierre) {
+    venc = ajustarDia(cierre.getFullYear(), cierre.getMonth() + 1, tarjeta.dia_vencimiento);
+  } else {
+    const [vy, vm] = mesSig(cierre.getFullYear(), cierre.getMonth() + 1);
+    venc = ajustarDia(vy, vm, tarjeta.dia_vencimiento);
+  }
+  return {
+    cierre,
+    vencimiento: venc,
+    periodo: `${cierre.getFullYear()}-${String(cierre.getMonth() + 1).padStart(2, '0')}`,
+    diasParaCierre: diasEntre(hoy, cierre),
+    diasParaVencimiento: diasEntre(hoy, venc),
+  };
+}
+
+/* ============ ¿La compra cae en este período de cierre? ============ */
+export function cuotaEnPeriodo(fechaCompra, tarjeta, periodoY, periodoM) {
+  const fc = new Date(fechaCompra + 'T00:00:00');
+  let baseY, baseM;
+  if (fc.getDate() <= tarjeta.dia_cierre) {
+    baseY = fc.getFullYear();
+    baseM = fc.getMonth() + 1;
+  } else {
+    [baseY, baseM] = mesSig(fc.getFullYear(), fc.getMonth() + 1);
+  }
+  return baseY === periodoY && baseM === periodoM;
+}
+
+/* ============ Resumen del próximo cierre ============ */
+export function resumenTarjeta(tarjeta, gastos, hoy = new Date()) {
+  const { cierre, vencimiento, periodo, diasParaCierre, diasParaVencimiento } =
+    fechasCiclo(tarjeta, hoy);
+  const py = cierre.getFullYear();
+  const pm = cierre.getMonth() + 1;
+
+  let unPago = 0, cuotasSum = 0, recurr = 0;
+  const ids = [];
+
+  for (const g of gastos) {
+    if (g.deleted || g.tarjeta_id !== tarjeta.id) continue;
+
+    if (g.tipo === 'recurrente') {
+      recurr += g.monto;
+      ids.push(g.id);
+      continue;
+    }
+    if (g.tipo === 'unico') {
+      if (cuotaEnPeriodo(g.fecha, tarjeta, py, pm)) {
+        unPago += g.monto;
+        ids.push(g.id);
+      }
+      continue;
+    }
+    if (g.tipo === 'cuotas' && g.cuotas_total > 0) {
+      // Calcular en qué cuota va para ESTE período
+      const fc = new Date(g.fecha + 'T00:00:00');
+      let baseY, baseM;
+      if (fc.getDate() <= tarjeta.dia_cierre) {
+        baseY = fc.getFullYear();
+        baseM = fc.getMonth() + 1;
+      } else {
+        [baseY, baseM] = mesSig(fc.getFullYear(), fc.getMonth() + 1);
+      }
+      const dist = (py - baseY) * 12 + (pm - baseM);
+      const nCuota = dist + 1;
+      if (nCuota >= 1 && nCuota <= g.cuotas_total) {
+        cuotasSum += g.monto / g.cuotas_total;
+        ids.push(g.id);
+      }
+    }
+  }
+
+  const total = unPago + cuotasSum + recurr;
+  const limite = (tarjeta.limite_un_pago || 0) + (tarjeta.limite_cuotas || 0) || 1;
+
+  return {
+    tarjeta_id: tarjeta.id,
+    tarjeta_nombre: tarjeta.nombre,
+    periodo,
+    fecha_cierre: toISO(cierre),
+    fecha_vencimiento: toISO(vencimiento),
+    dias_para_cierre: diasParaCierre,
+    dias_para_vencimiento: diasParaVencimiento,
+    total_un_pago: round2(unPago),
+    total_cuotas: round2(cuotasSum),
+    total_recurrentes: round2(recurr),
+    total_resumen: round2(total),
+    porcentaje_limite_usado: round2((100 * total) / limite),
+    movimientos_ids: ids,
+  };
+}
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+/* ============ Helpers de ciclo expuestos para la UI ============ */
+
+/**
+ * Devuelve el primer día del ciclo actual (día siguiente al cierre anterior).
+ * Ejemplo: cierre día 25 → si hoy es 5/may → inicio ciclo = 26/abr → cierre = 25/may
+ */
+export function inicioCicloActual(tarjeta, hoy = new Date()) {
+  const { cierre } = fechasCiclo(tarjeta, hoy);
+  // El ciclo actual empieza el día siguiente al cierre del MES ANTERIOR.
+  const cierreAnterior = new Date(cierre);
+  cierreAnterior.setMonth(cierreAnterior.getMonth() - 1);
+  const ajustado = ajustarDia(cierreAnterior.getFullYear(), cierreAnterior.getMonth() + 1, tarjeta.dia_cierre);
+  // Día siguiente
+  const inicio = new Date(ajustado);
+  inicio.setDate(inicio.getDate() + 1);
+  return inicio;
+}
+
+/**
+ * Dado un gasto con fecha + tarjeta, devuelve a qué ciclo de cierre cae
+ * y cuándo se paga ese ciclo. Útil para mostrar feedback en el form de gasto.
+ *
+ * @returns {{
+ *   cierre: Date,        // fecha de cierre del resumen donde cae este gasto
+ *   vencimiento: Date,   // fecha de vencimiento (pago)
+ *   periodo: string,     // 'YYYY-MM' del resumen
+ *   esCicloActual: boolean,
+ *   mensaje: string,     // descripción legible para el usuario
+ * }}
+ */
+export function cicloDelGasto(fechaCompraISO, tarjeta, hoy = new Date()) {
+  const fc = new Date(fechaCompraISO + 'T12:00:00');
+  // ¿En qué cierre cae?
+  let cierreY, cierreM;
+  if (fc.getDate() <= tarjeta.dia_cierre) {
+    cierreY = fc.getFullYear();
+    cierreM = fc.getMonth() + 1;
+  } else {
+    [cierreY, cierreM] = mesSig(fc.getFullYear(), fc.getMonth() + 1);
+  }
+  const cierre = ajustarDia(cierreY, cierreM, tarjeta.dia_cierre);
+
+  // Vencimiento del resumen
+  let venc;
+  if (tarjeta.dia_vencimiento > tarjeta.dia_cierre) {
+    venc = ajustarDia(cierreY, cierreM, tarjeta.dia_vencimiento);
+  } else {
+    const [vy, vm] = mesSig(cierreY, cierreM);
+    venc = ajustarDia(vy, vm, tarjeta.dia_vencimiento);
+  }
+
+  const cicloActual = fechasCiclo(tarjeta, hoy);
+  const periodo = `${cierreY}-${String(cierreM).padStart(2, '0')}`;
+  const esCicloActual = periodo === cicloActual.periodo;
+
+  const mesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const mensaje = `Cierra el ${cierre.getDate()} de ${mesNombres[cierre.getMonth()]} · Se paga el ${venc.getDate()} de ${mesNombres[venc.getMonth()]}`;
+
+  return { cierre, vencimiento: venc, periodo, esCicloActual, mensaje };
+}
+
+/**
+ * Rango del ciclo actual: { inicio, fin } como strings ISO.
+ * Útil para mostrar "Gastos del 26/abr al 25/may" en el widget de tarjeta.
+ */
+export function rangoCicloActual(tarjeta, hoy = new Date()) {
+  const inicio = inicioCicloActual(tarjeta, hoy);
+  const { cierre } = fechasCiclo(tarjeta, hoy);
+  return { inicio, fin: cierre };
+}

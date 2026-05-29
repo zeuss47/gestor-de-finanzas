@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>Redirigiendo…</title>
+  <script>
+    // GitHub Pages devuelve 404.html para rutas SPA inexistentes.
+    // Redirigir al index manteniendo el path. Como la app no usa
+    // routing por path (solo querystring), basta con ir al index.
+    const repoBase = location.pathname.split('/').slice(0, 2).join('/') + '/';
+    location.replace(repoBase + location.search + location.hash);
+  </script>
+</head>
+<body></body>
+</html>

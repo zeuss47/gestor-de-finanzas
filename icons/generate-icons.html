@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Generador de iconos PWA — Gestor de Finanzas</title>
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: #f1f5f9; padding: 2rem; }
+    h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+    .grid { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem; }
+    canvas { border-radius: 12px; border: 1px solid rgba(255,255,255,.1); }
+    button {
+      padding: .5rem 1.2rem; border-radius: 8px; border: none;
+      background: #4f46e5; color: white; cursor: pointer; font-size: .9rem;
+    }
+    button:hover { background: #6366f1; }
+    .dl-btn { display: block; margin-top: .4rem; font-size: .7rem; text-align: center;
+              color: #94a3b8; cursor: pointer; text-decoration: underline; }
+    .item { display: flex; flex-direction: column; align-items: center; }
+    p.label { font-size: .75rem; color: #94a3b8; margin-top: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>Generador de iconos PWA — Gestor de Finanzas</h1>
+  <p style="color:#94a3b8;margin-bottom:1.5rem">
+    Abrí este archivo en el navegador, luego descargá cada icono haciendo clic en el link.
+    Copiá los PNG a la carpeta <code>icons/</code> del frontend.
+  </p>
+
+  <div class="grid" id="previews"></div>
+  <button id="btn-all">Descargar todos</button>
+
+  <script>
+    const BG        = '#0f172a';
+    const ACCENT    = '#4f46e5';
+    const ACCENT2   = '#818cf8';
+    const WHITE     = '#ffffff';
+
+    const ICONS = [
+      { name: 'icon-192.png',          size: 192,  maskable: false },
+      { name: 'icon-512.png',          size: 512,  maskable: false },
+      { name: 'icon-maskable-192.png', size: 192,  maskable: true  },
+      { name: 'icon-maskable-512.png', size: 512,  maskable: true  },
+      { name: 'badge.png',             size: 96,   maskable: false, badge: true },
+    ];
+
+    function drawIcon(canvas, size, maskable, badge) {
+      const ctx  = canvas.getContext('2d');
+      const cx   = size / 2;
+      const cy   = size / 2;
+      const pad  = maskable ? size * 0.15 : size * 0.07; // safe zone para maskable
+      const r    = (size - pad * 2) / 2;
+
+      // Fondo
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, size, size);
+
+      if (badge) {
+        // Badge monocromo: símbolo de pesos / dollar
+        ctx.fillStyle = WHITE;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cx * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = BG;
+        ctx.font = `bold ${size * 0.52}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('$', cx, cy + size * 0.02);
+        return;
+      }
+
+      // Círculo principal con gradiente
+      const grad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+      grad.addColorStop(0, ACCENT);
+      grad.addColorStop(1, ACCENT2);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sombra interna sutil
+      const sInner = ctx.createRadialGradient(cx - r*0.3, cy - r*0.3, 0, cx, cy, r);
+      sInner.addColorStop(0, 'rgba(255,255,255,0.15)');
+      sInner.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = sInner;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Símbolo "$" en blanco
+      ctx.fillStyle = WHITE;
+      ctx.font = `bold ${r * 0.85}px 'Space Grotesk', 'Segoe UI', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('$', cx, cy + r * 0.04);
+
+      // Línea de "tendencia" en la parte inferior derecha (décor)
+      const lx  = cx + r * 0.05;
+      const ly  = cy + r * 0.48;
+      const lw  = r * 0.55;
+      const lh  = r * 0.08;
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath();
+      ctx.roundRect(lx - lw/2, ly - lh/2, lw, lh, lh/2);
+      ctx.fill();
+    }
+
+    const grid = document.getElementById('previews');
+
+    function build(def) {
+      const item   = document.createElement('div');
+      item.className = 'item';
+      const canvas = document.createElement('canvas');
+      canvas.width  = def.size;
+      canvas.height = def.size;
+      // Mostrar preview escalado
+      const display = Math.min(def.size, 128);
+      canvas.style.width  = display + 'px';
+      canvas.style.height = display + 'px';
+      drawIcon(canvas, def.size, def.maskable, def.badge);
+
+      const label = document.createElement('p');
+      label.className = 'label';
+      label.textContent = `${def.name} (${def.size}px)`;
+
+      const link = document.createElement('a');
+      link.className = 'dl-btn';
+      link.textContent = 'Descargar';
+      link.onclick = () => downloadCanvas(canvas, def.name);
+
+      item.appendChild(canvas);
+      item.appendChild(label);
+      item.appendChild(link);
+      grid.appendChild(item);
+      return canvas;
+    }
+
+    function downloadCanvas(canvas, name) {
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = name;
+      a.click();
+    }
+
+    const canvases = ICONS.map(def => ({ canvas: build(def), name: def.name }));
+
+    document.getElementById('btn-all').onclick = () => {
+      canvases.forEach(({ canvas, name }) => {
+        setTimeout(() => downloadCanvas(canvas, name), 50);
+      });
+    };
+  </script>
+</body>
+</html>
