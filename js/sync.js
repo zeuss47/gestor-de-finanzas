@@ -163,25 +163,53 @@ export async function syncAll(cfg, { onProgress } = {}) {
  * un sha cacheado por CDN. En ese caso releemos y reintentamos hasta 3 veces.
  */
 async function _getShaActual(cfg, archivo) {
-  // Cache-buster + Accept "raw" en url para forzar revalidación del CDN.
+  // Cache-buster para forzar revalidación del CDN de GitHub.
   const url = `${urlArchivo(cfg, archivo)}?ref=${encodeURIComponent(cfg.branch || 'main')}&_=${Date.now()}`;
   const data = await gh('GET', url, cfg);
   return data ? data.sha : null;
 }
 
-async function _pushIdempotente(cfg, archivo, items, mensaje, maxRetries = 4) {
+/**
+ * PUT robusto contra 409. GitHub Contents API a veces devuelve un SHA
+ * cacheado en el GET. Si el PUT falla con "does not match XXX", el SHA
+ * correcto está embebido en el mensaje de error — lo extraemos y reintentamos.
+ */
+async function _pushIdempotente(cfg, archivo, items, mensaje, maxRetries = 5) {
+  let shaPrevio = await _getShaActual(cfg, archivo);
   let lastErr = null;
+
   for (let intento = 0; intento < maxRetries; intento++) {
-    const shaPrevio = await _getShaActual(cfg, archivo);
     try {
       return await pushArchivo(cfg, archivo, items, shaPrevio, mensaje);
     } catch (e) {
-      const msg = String(e?.message || '');
-      const esConflicto = msg.includes(' 409') || msg.includes('does not match') || msg.includes('"status": "409"');
       lastErr = e;
-      if (!esConflicto) throw e;
-      // Backoff exponencial corto para dar tiempo al CDN
-      await new Promise(r => setTimeout(r, 400 * (intento + 1)));
+      const msg = String(e?.message || '');
+      console.warn(`[wipeRemoto] intento ${intento + 1}/${maxRetries} falló para ${archivo}:`, msg);
+
+      // Caso 1: GitHub nos dice el SHA correcto en el mensaje
+      const match = msg.match(/does not match ([a-f0-9]{40})/i);
+      if (match) {
+        shaPrevio = match[1];
+        await new Promise(r => setTimeout(r, 200));
+        continue;
+      }
+
+      // Caso 2: 422 "sha wasn't supplied" → el archivo no existe en realidad
+      if (msg.includes('"sha"') && msg.includes('wasn\'t supplied')) {
+        shaPrevio = null;
+        continue;
+      }
+
+      // Caso 3: 409 sin SHA explícito → re-leemos con cache-buster
+      const esConflicto = msg.includes(' 409') || msg.includes('"status": "409"');
+      if (esConflicto) {
+        await new Promise(r => setTimeout(r, 500 * (intento + 1)));
+        shaPrevio = await _getShaActual(cfg, archivo);
+        continue;
+      }
+
+      // Otros errores: no reintentar
+      throw e;
     }
   }
   throw lastErr || new Error(`No se pudo escribir ${archivo} tras ${maxRetries} intentos`);

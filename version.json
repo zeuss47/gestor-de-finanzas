@@ -1,7 +1,7 @@
 ﻿{
     "version":  "1.0.7",
-    "build":  12,
-    "modified":  "2026-05-29T23:16:47Z",
-    "commit":  "M js/app.js, M js/sync.js",
-    "notes":  "Auto-update 2026-05-29 20:16"
+    "build":  13,
+    "modified":  "2026-05-29T23:21:58Z",
+    "commit":  "M js/sync.js",
+    "notes":  "Auto-update 2026-05-29 20:21"
 }
