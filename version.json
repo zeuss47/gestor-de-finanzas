@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.0.6",
-    "build":  10,
-    "modified":  "2026-05-29T23:05:52Z",
-    "commit":  "M index.html, M js/app.js, M js/db.js, D reset-datos.html",
-    "notes":  "Auto-update 2026-05-29 20:05"
+    "version":  "1.0.7",
+    "build":  11,
+    "modified":  "2026-05-29T23:08:44Z",
+    "commit":  "M index.html, M js/app.js, M js/sync.js",
+    "notes":  "Auto-update 2026-05-29 20:08"
 }

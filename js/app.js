@@ -21,7 +21,7 @@ import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
 import { fetchCotizaciones, timestampUltimoFetch } from './cotizaciones.js';
 import { Notif, chequeoDiarioTarjetas } from './notifications.js';
-import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync } from './sync.js';
+import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync, wipeRemoto } from './sync.js';
 
 /* ============ Estado en memoria (cache de render) ============ */
 const state = {
@@ -3859,29 +3859,58 @@ async function init() {
     }
   });
 
-  // Resetear app completa — dejar todo en cero
+  // Resetear datos — local + remoto en GitHub, SIN tocar la config de Sync
   document.getElementById('btn-clear-data')?.addEventListener('click', async () => {
-    if (!confirm('¿Resetear la app por completo?\n\nVas a perder: gastos, ingresos, tarjetas, cuentas, metas, ajustes (incluyendo configuración de GitHub Sync) y caché de cotizaciones.\n\nEsta acción NO se puede deshacer.')) return;
-    if (!confirm('Última confirmación: vas a arrancar de cero. ¿Continuar?')) return;
+    if (!confirm('¿Resetear todos los datos?\n\nVas a perder: gastos, ingresos, tarjetas, cuentas y metas (acá y en el repo de GitHub si tenés Sync configurada).\n\nSE MANTIENE: tu PAT y la configuración de GitHub Sync, para que no tengas que reconectar.\n\nEsta acción NO se puede deshacer.')) return;
+    if (!confirm('Última confirmación: vas a arrancar de cero con la app vacía. ¿Continuar?')) return;
 
     try {
-      // 1. Vaciar IndexedDB completa
-      await DB.nuke();
+      // 1. Detener auto-sync para que no re-baje datos del repo mientras borramos
+      stopAutoSync();
 
-      // 2. Limpiar localStorage solo de las claves conocidas de la app
+      // 2. Leer config de GitHub ANTES de tocar nada
+      const aj = (await DB.get('ajustes', 'ajustes_globales')) || null;
+      const cfg = aj?.github || null;
+
+      // 3. Vaciar stores de datos en local (NO tocamos `ajustes`)
+      const storesDatos = ['gastos', 'ingresos', 'tarjetas', 'cuentas', 'metas', 'sync_queue'];
+      for (const s of storesDatos) {
+        try { await DB.clear(s); } catch (e) { console.warn('No se pudo limpiar', s, e); }
+      }
+
+      // 4. Resetear el _sync_state dentro de ajustes (sin tocar github/pat/etc.)
+      if (aj) {
+        delete aj._sync_state;
+        await DB.put('ajustes', aj);
+      }
+
+      // 5. Vaciar archivos en GitHub si hay sync configurada
+      if (cfg && cfg.pat && cfg.owner && cfg.repo) {
+        try {
+          toast('Borrando datos en GitHub…');
+          await wipeRemoto(cfg);
+        } catch (e) {
+          console.error('Error borrando datos remotos:', e);
+          alert('Local borrado, pero falló el borrado en GitHub:\n' + (e?.message || e) +
+                '\n\nLa app se va a recargar igual. Si no querés que se re-bajen los datos del repo, ' +
+                'borrá los archivos manualmente del repo o desactivá Sync antes de seguir.');
+        }
+      }
+
+      // 6. Limpiar localStorage de caches (NO tocar nada de auth)
       const keysApp = ['_cotiz_cache', 'app_last_build', 'app_last_version', 'cotiz_manual'];
       for (const k of keysApp) {
         try { localStorage.removeItem(k); } catch { /* noop */ }
       }
 
-      // 3. Recargar la app con bust de caché — al volver levantará una DB vacía
-      toast('App reseteada. Recargando…');
+      // 7. Recargar con bust de caché
+      toast('Datos reseteados. Recargando…');
       setTimeout(() => {
         location.href = './?reset=' + Date.now();
-      }, 600);
+      }, 800);
     } catch (e) {
-      console.error('Error reseteando app:', e);
-      alert('No se pudo resetear la app: ' + (e?.message || e) + '\n\nProbá cerrar todas las pestañas de la app y volver a intentar.');
+      console.error('Error reseteando datos:', e);
+      alert('No se pudo resetear: ' + (e?.message || e) + '\n\nProbá cerrar otras pestañas de la app y reintentar.');
     }
   });
 

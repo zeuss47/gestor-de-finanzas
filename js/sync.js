@@ -154,6 +154,28 @@ export async function syncAll(cfg, { onProgress } = {}) {
   return resultados;
 }
 
+/* ---------- Wipe remoto: subir archivos vacíos al repo ----------
+ * Deja los 5 JSON de datos en GitHub con items=[]. NO toca el PAT ni
+ * la config local. Útil para "resetear app" sin perder GitHub Sync.
+ * Devuelve { archivo: sha } por cada archivo subido.
+ */
+export async function wipeRemoto(cfg, { onProgress } = {}) {
+  if (!cfg?.pat || !cfg?.owner || !cfg?.repo) {
+    throw new Error('Configurá GitHub PAT/owner/repo antes de borrar remoto.');
+  }
+  const resultados = {};
+  for (const [, archivo] of Object.entries(ARCHIVOS)) {
+    onProgress?.(`Borrando remoto ${archivo}…`);
+    // Necesitamos el sha previo (si el archivo existe) para sobreescribirlo
+    const url = `${urlArchivo(cfg, archivo)}?ref=${encodeURIComponent(cfg.branch || 'main')}`;
+    const data = await gh('GET', url, cfg);
+    const shaPrevio = data ? data.sha : null;
+    const nuevoSha = await pushArchivo(cfg, archivo, [], shaPrevio, `reset(${archivo}) vaciado desde app`);
+    resultados[archivo] = nuevoSha;
+  }
+  return resultados;
+}
+
 /* ---------- Pull-only (útil para arranque inicial) ---------- */
 export async function pullAll(cfg) {
   if (!cfg?.pat) throw new Error('Sin PAT configurado.');
