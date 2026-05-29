@@ -3872,29 +3872,33 @@ async function init() {
       const aj = (await DB.get('ajustes', 'ajustes_globales')) || null;
       const cfg = aj?.github || null;
 
-      // 3. Vaciar stores de datos en local (NO tocamos `ajustes`)
-      const storesDatos = ['gastos', 'ingresos', 'tarjetas', 'cuentas', 'metas', 'sync_queue'];
-      for (const s of storesDatos) {
-        try { await DB.clear(s); } catch (e) { console.warn('No se pudo limpiar', s, e); }
-      }
-
-      // 4. Resetear el _sync_state dentro de ajustes (sin tocar github/pat/etc.)
-      if (aj) {
-        delete aj._sync_state;
-        await DB.put('ajustes', aj);
-      }
-
-      // 5. Vaciar archivos en GitHub si hay sync configurada
+      // 3. PRIMERO vaciar remoto en GitHub (si hay sync configurada).
+      //    Si esto falla, NO tocamos local: el usuario puede reintentar sin
+      //    quedar en un estado inconsistente.
       if (cfg && cfg.pat && cfg.owner && cfg.repo) {
         try {
           toast('Borrando datos en GitHub…');
           await wipeRemoto(cfg);
         } catch (e) {
           console.error('Error borrando datos remotos:', e);
-          alert('Local borrado, pero falló el borrado en GitHub:\n' + (e?.message || e) +
-                '\n\nLa app se va a recargar igual. Si no querés que se re-bajen los datos del repo, ' +
-                'borrá los archivos manualmente del repo o desactivá Sync antes de seguir.');
+          alert('No se pudo borrar los datos en GitHub:\n\n' + (e?.message || e) +
+                '\n\nNo se tocó nada en local. Probá de nuevo en unos segundos ' +
+                '(suele ser cache del CDN de GitHub) o desactivá Sync antes de resetear ' +
+                'para borrar solo local.');
+          return;
         }
+      }
+
+      // 4. Vaciar stores de datos en local (NO tocamos `ajustes`)
+      const storesDatos = ['gastos', 'ingresos', 'tarjetas', 'cuentas', 'metas', 'sync_queue'];
+      for (const s of storesDatos) {
+        try { await DB.clear(s); } catch (e) { console.warn('No se pudo limpiar', s, e); }
+      }
+
+      // 5. Resetear el _sync_state dentro de ajustes (sin tocar github/pat/etc.)
+      if (aj) {
+        delete aj._sync_state;
+        await DB.put('ajustes', aj);
       }
 
       // 6. Limpiar localStorage de caches (NO tocar nada de auth)

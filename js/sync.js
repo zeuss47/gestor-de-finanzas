@@ -158,7 +158,35 @@ export async function syncAll(cfg, { onProgress } = {}) {
  * Deja los 5 JSON de datos en GitHub con items=[]. NO toca el PAT ni
  * la config local. Útil para "resetear app" sin perder GitHub Sync.
  * Devuelve { archivo: sha } por cada archivo subido.
+ *
+ * Robusto contra 409 de conflicto de SHA: la API Contents a veces devuelve
+ * un sha cacheado por CDN. En ese caso releemos y reintentamos hasta 3 veces.
  */
+async function _getShaActual(cfg, archivo) {
+  // Cache-buster + Accept "raw" en url para forzar revalidación del CDN.
+  const url = `${urlArchivo(cfg, archivo)}?ref=${encodeURIComponent(cfg.branch || 'main')}&_=${Date.now()}`;
+  const data = await gh('GET', url, cfg);
+  return data ? data.sha : null;
+}
+
+async function _pushIdempotente(cfg, archivo, items, mensaje, maxRetries = 4) {
+  let lastErr = null;
+  for (let intento = 0; intento < maxRetries; intento++) {
+    const shaPrevio = await _getShaActual(cfg, archivo);
+    try {
+      return await pushArchivo(cfg, archivo, items, shaPrevio, mensaje);
+    } catch (e) {
+      const msg = String(e?.message || '');
+      const esConflicto = msg.includes(' 409') || msg.includes('does not match') || msg.includes('"status": "409"');
+      lastErr = e;
+      if (!esConflicto) throw e;
+      // Backoff exponencial corto para dar tiempo al CDN
+      await new Promise(r => setTimeout(r, 400 * (intento + 1)));
+    }
+  }
+  throw lastErr || new Error(`No se pudo escribir ${archivo} tras ${maxRetries} intentos`);
+}
+
 export async function wipeRemoto(cfg, { onProgress } = {}) {
   if (!cfg?.pat || !cfg?.owner || !cfg?.repo) {
     throw new Error('Configurá GitHub PAT/owner/repo antes de borrar remoto.');
@@ -166,11 +194,7 @@ export async function wipeRemoto(cfg, { onProgress } = {}) {
   const resultados = {};
   for (const [, archivo] of Object.entries(ARCHIVOS)) {
     onProgress?.(`Borrando remoto ${archivo}…`);
-    // Necesitamos el sha previo (si el archivo existe) para sobreescribirlo
-    const url = `${urlArchivo(cfg, archivo)}?ref=${encodeURIComponent(cfg.branch || 'main')}`;
-    const data = await gh('GET', url, cfg);
-    const shaPrevio = data ? data.sha : null;
-    const nuevoSha = await pushArchivo(cfg, archivo, [], shaPrevio, `reset(${archivo}) vaciado desde app`);
+    const nuevoSha = await _pushIdempotente(cfg, archivo, [], `reset(${archivo}) vaciado desde app`);
     resultados[archivo] = nuevoSha;
   }
   return resultados;
