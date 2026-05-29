@@ -146,7 +146,9 @@ export async function syncAll(cfg, { onProgress } = {}) {
     // Subir SIEMPRE que detectemos diferencias (más simple y robusto que
     // calcular hashes; el merge ya es idempotente).
     onProgress?.(`Push ${archivo}…`);
-    const nuevoSha = await pushArchivo(cfg, archivo, merged, sha);
+    const nuevoSha = await _pushIdempotente(
+      cfg, archivo, merged, `sync(${archivo}) ${merged.length} items`, 5, sha
+    );
     resultados[archivo] = { count: merged.length, sha: nuevoSha };
   }
 
@@ -173,9 +175,12 @@ async function _getShaActual(cfg, archivo) {
  * PUT robusto contra 409. GitHub Contents API a veces devuelve un SHA
  * cacheado en el GET. Si el PUT falla con "does not match XXX", el SHA
  * correcto está embebido en el mensaje de error — lo extraemos y reintentamos.
+ *
+ * @param {string|null|undefined} shaInicial - Si se pasa, evita el primer GET.
+ *   Pasar `null` indica "no existe el archivo"; pasar `undefined` fuerza el GET.
  */
-async function _pushIdempotente(cfg, archivo, items, mensaje, maxRetries = 5) {
-  let shaPrevio = await _getShaActual(cfg, archivo);
+async function _pushIdempotente(cfg, archivo, items, mensaje, maxRetries = 5, shaInicial = undefined) {
+  let shaPrevio = (shaInicial !== undefined) ? shaInicial : await _getShaActual(cfg, archivo);
   let lastErr = null;
 
   for (let intento = 0; intento < maxRetries; intento++) {
