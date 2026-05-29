@@ -19,6 +19,7 @@ import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto } from './
 import { calcularCapacidad, simularCompra, cuotasPendientes } from './credito.js';
 import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
+import { fetchCotizaciones, timestampUltimoFetch } from './cotizaciones.js';
 import { Notif, chequeoDiarioTarjetas } from './notifications.js';
 import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync } from './sync.js';
 
@@ -1135,16 +1136,28 @@ function renderTipoCambio(el) {
   const box = el.querySelector('[data-bind="rates-list"]');
   if (!box) return;
   box.innerHTML = '';
-  for (const [key, c] of Object.entries(cambios)) {
-    const equiv = state.estado.saldo_liquido / c.valor;
+
+  // Ordenar: oficial primero, después blue/tarjeta/etc, otros al final
+  const orden = ['USD', 'USD_BLUE', 'USD_TARJETA', 'USD_MEP', 'USD_CCL', 'USD_CRIPTO', 'USD_MAYOR', 'EUR', 'BRL'];
+  const sorted = Object.entries(cambios).sort(([a],[b]) => {
+    const ia = orden.indexOf(a); const ib = orden.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  for (const [key, c] of sorted) {
+    const equiv = (state.estado?.saldo_liquido || 0) / (c.valor || 1);
+    const esAuto = c.auto === true; // se actualizó automáticamente vía API
     box.insertAdjacentHTML('beforeend', `
       <div class="flex items-center justify-between p-3 rounded-xl"
            style="background:var(--surface-2);border:1px solid var(--border)">
         <div class="flex items-center gap-2 min-w-0">
           <span class="text-lg flex-shrink-0">${c.simbolo}</span>
           <div class="min-w-0">
-            <p class="text-xs font-semibold truncate text-glow-cyan">${escapeHtml(c.nombre)}</p>
-            <p class="text-[10px]" style="color:var(--ink-muted)">1 ${key} = ${FMT.format(c.valor)}</p>
+            <p class="text-xs font-semibold truncate text-glow-cyan">
+              ${escapeHtml(c.nombre)}
+              ${esAuto ? '<span class="text-[8px] ml-1 px-1.5 py-0.5 rounded-full" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success)">LIVE</span>' : ''}
+            </p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">1 ${key.replace('USD_','')} = ${FMT.format(c.valor)}</p>
           </div>
         </div>
         <p class="ff-display text-sm font-bold" style="color:var(--brand)">
@@ -1152,10 +1165,80 @@ function renderTipoCambio(el) {
         </p>
       </div>`);
   }
-  const upd = el.querySelector('[data-bind="rates-updated"]');
-  if (upd) upd.textContent = state.ajustes?.tipos_cambio_updated || 'manual';
 
+  // Estado del último fetch
+  const upd = el.querySelector('[data-bind="rates-updated"]');
+  if (upd) {
+    const ts = timestampUltimoFetch();
+    if (ts) {
+      const diffMin = Math.round((Date.now() - ts) / 60000);
+      upd.textContent = diffMin < 1 ? 'hace segundos'
+        : diffMin < 60 ? `hace ${diffMin}m`
+        : `hace ${Math.round(diffMin/60)}h`;
+    } else {
+      upd.textContent = state.ajustes?.tipos_cambio_updated || 'manual';
+    }
+  }
+
+  // Botón "Editar" → editor manual
   el.querySelector('[data-action="edit-rates"]')?.addEventListener('click', () => abrirEditorTiposCambio());
+
+  // Botón "Actualizar" → fetch live
+  el.querySelector('[data-action="refresh-rates"]')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const labelOrig = btn.textContent;
+    btn.textContent = '⏳';
+    try {
+      await actualizarCotizacionesAuto(true);
+      toast('✓ Cotizaciones actualizadas', 2000);
+      renderTipoCambio(el);
+    } catch (err) {
+      toast('No se pudo actualizar: ' + err.message, 2500);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = labelOrig;
+    }
+  });
+}
+
+/**
+ * Fetch automático de cotizaciones desde dolarapi.com y mergeo en ajustes.
+ * Las cotizaciones marcadas con `auto:true` se sobrescriben; las manuales
+ * que tenga el usuario se preservan.
+ */
+async function actualizarCotizacionesAuto(force = false) {
+  try {
+    const fresh = await fetchCotizaciones(force);
+    if (!fresh || Object.keys(fresh).length === 0) return null;
+
+    if (!state.ajustes.tipos_cambio) state.ajustes.tipos_cambio = {};
+    const cambios = state.ajustes.tipos_cambio;
+
+    // Sobrescribir/agregar las claves que vienen de la API
+    for (const [key, val] of Object.entries(fresh)) {
+      const previo = cambios[key] || {};
+      // Si el previo era manual y el usuario lo tocó, no lo pisamos
+      if (previo.manual === true) continue;
+      cambios[key] = {
+        nombre: val.nombre,
+        simbolo: val.simbolo,
+        valor: val.valor,
+        compra: val.compra,
+        venta: val.venta,
+        fecha_api: val.fecha,
+        auto: true,
+      };
+    }
+    state.ajustes.tipos_cambio_updated = new Date().toLocaleString('es-AR');
+
+    // Persistir sin disparar sync
+    await DB.put('ajustes', state.ajustes);
+    return fresh;
+  } catch (e) {
+    console.warn('actualizarCotizacionesAuto:', e.message);
+    throw e;
+  }
 }
 
 async function abrirEditorTiposCambio() {
@@ -2453,12 +2536,22 @@ async function cerrarPeriodoUSD(tarjetaId) {
   const tarjeta = state.tarjetas.find(t => t.id === tarjetaId);
   if (!tarjeta) return;
 
-  const cambios = state.ajustes?.tipos_cambio || {};
-  const cotizSugerida = cambios.USD_BLUE?.valor || cambios.USD?.valor || 0;
+  // Intentar refrescar cotizaciones live antes de pedirla
+  try { await actualizarCotizacionesAuto(true); } catch {}
 
-  // Pedir cotización al usuario
+  const cambios = state.ajustes?.tipos_cambio || {};
+  // Para tarjetas, usar el "dólar tarjeta" (oficial + impuestos) que es lo
+  // que efectivamente cobran los bancos. Fallback: blue, después oficial.
+  const cotizSugerida = cambios.USD_TARJETA?.valor
+                     || cambios.USD_BLUE?.valor
+                     || cambios.USD?.valor
+                     || 0;
+  const fuente = cambios.USD_TARJETA?.valor ? 'tarjeta (oficial + impuestos)'
+              : cambios.USD_BLUE?.valor ? 'blue' : 'oficial';
+
   const cotizStr = prompt(
-    `Ingresá la cotización USD de hoy para cerrar el período de "${tarjeta.nombre}".\n\nValor sugerido: ${cotizSugerida}`,
+    `Ingresá la cotización USD de hoy para cerrar el período de "${tarjeta.nombre}".\n\n` +
+    `Sugerencia live (${fuente}): $${cotizSugerida.toFixed(2)}`,
     cotizSugerida || ''
   );
   if (cotizStr === null) return;
@@ -3269,6 +3362,27 @@ async function init() {
   }
 
   await reloadAll();
+
+  // Auto-fetch de cotizaciones live (cache 5min, silencioso si falla)
+  actualizarCotizacionesAuto(false).then(fresh => {
+    if (fresh) {
+      // Re-render del widget si está visible (sin recargar todo)
+      const w = document.querySelector('[data-widget="tipo_cambio"]');
+      if (w && typeof renderTipoCambio === 'function') renderTipoCambio(w);
+    }
+  }).catch(() => {});
+
+  // Refresh periódico cada 15 min (solo si la app está visible)
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      actualizarCotizacionesAuto(false).then(fresh => {
+        if (fresh) {
+          const w = document.querySelector('[data-widget="tipo_cambio"]');
+          if (w) renderTipoCambio(w);
+        }
+      }).catch(() => {});
+    }
+  }, 15 * 60 * 1000);
 
   // Iniciar auto-sync (cada 5min + al volver online + al ocultar pestaña)
   reiniciarAutoSync();

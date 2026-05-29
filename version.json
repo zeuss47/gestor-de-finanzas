@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.0.2",
-    "build":  3,
-    "modified":  "2026-05-29T18:19:06Z",
-    "commit":  "M css/styles.css, M index.html, M js/ai-local.js, M js/app.js, M js/cards.js, setup-pat.ps1",
-    "notes":  "Auto-update 2026-05-29 15:19"
+    "version":  "1.0.3",
+    "build":  4,
+    "modified":  "2026-05-29T21:19:39Z",
+    "commit":  "M index.html, M js/app.js, js/cotizaciones.js",
+    "notes":  "Auto-update 2026-05-29 18:19"
 }

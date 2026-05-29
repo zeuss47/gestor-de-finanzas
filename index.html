@@ -796,9 +796,14 @@
       <h2 class="ff-display text-sm font-semibold uppercase tracking-wider" style="color:var(--ink-muted)">
         Tipo de cambio
       </h2>
-      <button class="text-xs font-semibold px-3 py-1 rounded-full transition glitch"
-              style="background:var(--brand-soft);color:var(--brand)"
-              data-action="edit-rates">⚙ Editar</button>
+      <div class="flex items-center gap-1">
+        <button class="text-xs font-semibold px-2 py-1 rounded-full transition"
+                style="background:var(--success-bg);color:var(--success);border:1px solid var(--success)"
+                data-action="refresh-rates" title="Traer cotizaciones live de dolarapi.com">🔄</button>
+        <button class="text-xs font-semibold px-3 py-1 rounded-full transition glitch"
+                style="background:var(--brand-soft);color:var(--brand)"
+                data-action="edit-rates">⚙</button>
+      </div>
     </header>
 
     <div class="space-y-3" data-bind="rates-list"></div>
