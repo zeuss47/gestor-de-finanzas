@@ -17,7 +17,7 @@
 import { DB, uuid, nowTs } from './db.js';
 import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto } from './cards.js';
 import { calcularCapacidad, simularCompra, cuotasPendientes } from './credito.js';
-import { diagnosticar } from './ai-local.js';
+import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
 import { Notif, chequeoDiarioTarjetas } from './notifications.js';
 import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync } from './sync.js';
@@ -57,23 +57,22 @@ function actualizarVersionUI() {
   const v = state.version;
   if (!v) return;
 
+  // Versión corta: 1.0.1 → 1.1, 1.2.3 → 1.2 (solo mayor.menor)
+  const partes = v.version.split('.');
+  const corto = partes.length >= 2 ? `${partes[0]}.${partes[1]}` : v.version;
+
   // Sidebar
   const sbVer = document.getElementById('sb-version');
   if (sbVer) {
     const dt = new Date(v.modified);
-    const fechaCorta = dt.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }).replace('.','');
-    sbVer.innerHTML = `
-      <span class="version-tag">v${v.version}</span>
-      <span class="version-build">#${v.build}</span>
-      <span class="version-fecha">${fechaCorta}</span>
-    `;
+    sbVer.innerHTML = `<span class="version-tag">v${corto}</span>`;
     sbVer.title = `Versión ${v.version} · Build #${v.build}\nÚltima actualización: ${dt.toLocaleString('es-AR')}\nCommit: ${v.commit}`;
   }
 
   // Mini badge mobile en header
   const hdVer = document.getElementById('hd-version');
   if (hdVer) {
-    hdVer.textContent = `v${v.version}·#${v.build}`;
+    hdVer.textContent = `v${corto}`;
   }
 
   // Toast al detectar versión nueva (comparado con la guardada en localStorage)
@@ -260,6 +259,17 @@ async function reloadAll() {
   state.diagnosticos = diagnosticar(state.gastos, {
     sensibilidad: state.ajustes?.sensibilidad_ia || 'moderado',
   });
+
+  // Diagnóstico específico de tarjetas (uso, cuotas, saturación, tendencias)
+  const diagTarjetas = diagnosticarTarjetas({
+    gastos:    state.gastos,
+    ingresos:  state.ingresos,
+    tarjetas:  state.tarjetas,
+    resumenes: state.resumenes,
+    capacidad: state.capacidad,
+  });
+  // Mergeamos: tarjetas primero (más críticas), después gastos generales
+  state.diagnosticos = [...diagTarjetas, ...state.diagnosticos];
 
   renderWidgets();
   if (currentTab === 'gastos') renderMovimientos();
@@ -605,7 +615,10 @@ function renderCuentas(el) {
       </div>
     `);
   }
-  el.querySelector('[data-action="add-account"]').onclick = () => openDialog('dlg-cuenta');
+  // El botón "+ Nueva" se quitó del widget — la creación ahora va por Ajustes → Cuentas
+  el.querySelectorAll('[data-cuenta-id]').forEach(c => {
+    c.addEventListener('click', () => abrirVistaCuentas());
+  });
 }
 
 function calcularSaldoCuenta(cuenta) {
@@ -658,7 +671,11 @@ function renderTarjetas(el) {
             <p class="font-semibold text-white text-base leading-tight">${escapeHtml(t.nombre)}</p>
             ${t.banco ? `<p class="text-white/60 text-xs mt-0.5">${escapeHtml(t.banco)}</p>` : ''}
           </div>
-          <span class="badge badge-muted text-white/70" style="background:rgba(255,255,255,0.15);border:none">${r.periodo}</span>
+          <span class="badge badge-muted text-white/80" style="background:rgba(255,255,255,0.18);border:none;font-size:.6rem">${(() => {
+            const [y, m] = r.periodo.split('-');
+            const mn = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            return `${mn[parseInt(m)-1]} '${y.slice(-2)}`;
+          })()}</span>
         </div>
         <!-- Monto -->
         <p class="ff-display font-bold text-white text-2xl mb-3 relative z-10"
@@ -682,18 +699,30 @@ function renderTarjetas(el) {
             <p class="text-white text-xs font-semibold">${fmtFecha(rango.inicio)} → ${fmtFecha(rango.fin)}</p>
           </div>`;
         })()}
-        <!-- Fechas -->
-        <div class="flex justify-between items-center relative z-10">
-          <span class="badge ${badgeCierre}" style="font-size:.65rem">
-            Cierra en ${diasC}d · ${r.fecha_cierre}
-          </span>
-          <span class="badge ${badgeVenc}" style="font-size:.65rem">
-            Vence ${r.fecha_vencimiento} (${diasV}d)
-          </span>
+        <!-- Fechas (formato compacto: "Cierra 20/jun · 21d") -->
+        <div class="flex justify-between items-center gap-1.5 relative z-10">
+          ${(() => {
+            const fmtCorto = (iso) => {
+              if (!iso) return '—';
+              const d = new Date(iso + 'T12:00:00');
+              const mn = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+              return `${d.getDate()}/${mn[d.getMonth()]}`;
+            };
+            return `
+              <span class="badge ${badgeCierre} flex items-center gap-1" style="font-size:.6rem;padding:.2rem .5rem;background:rgba(255,255,255,0.18);color:white;border:none;white-space:nowrap">
+                <span style="opacity:.7">🔒</span> ${fmtCorto(r.fecha_cierre)}
+                <span style="opacity:.6;font-weight:400;margin-left:2px">· ${diasC}d</span>
+              </span>
+              <span class="badge ${badgeVenc} flex items-center gap-1" style="font-size:.6rem;padding:.2rem .5rem;background:rgba(255,255,255,0.18);color:white;border:none;white-space:nowrap">
+                <span style="opacity:.7">💸</span> ${fmtCorto(r.fecha_vencimiento)}
+                <span style="opacity:.6;font-weight:400;margin-left:2px">· ${diasV}d</span>
+              </span>
+            `;
+          })()}
         </div>
       </div>`);
   }
-  el.querySelector('[data-action="add-card"]').onclick = () => openDialog('dlg-tarjeta');
+  // Botón "+ Nueva" se quitó — crear desde Ajustes → Cuentas
 
   // Click en cada tarjeta → drawer de uso detallado
   el.querySelectorAll('.credit-card[data-tarjeta-id]').forEach(card => {
@@ -835,10 +864,11 @@ function renderMetas(el) {
   }
 
   const margen    = Math.max(0, state.estado.margen_libre_mes);
-  const pesos     = state.metas.map(m => 1/(m.prioridad || 3));
+  // Nueva convención: prioridad alta = más estrellas. Peso ∝ prioridad.
+  const pesos     = state.metas.map(m => (m.prioridad || 3));
   const sumaPesos = pesos.reduce((a,b)=>a+b,0) || 1;
 
-  state.metas.sort((a,b)=>(a.prioridad||3)-(b.prioridad||3)).forEach((m, i) => {
+  state.metas.sort((a,b)=>(b.prioridad||3)-(a.prioridad||3)).forEach((m, i) => {
     const pct      = Math.min(100, Math.round((100*m.monto_actual)/(m.monto_objetivo||1)));
     const sugerido = margen * (pesos[i] / sumaPesos);
     const icon     = m.es_emergencia ? '🛡️' : '🎯';
@@ -864,7 +894,7 @@ function renderMetas(el) {
         </div>
       </div>`);
   });
-  el.querySelector('[data-action="add-meta"]').onclick = () => openDialog('dlg-meta');
+  // Botón "+ Nueva" se quitó — crear desde Ajustes → Cuentas
 }
 
 let chartEvol = null;
@@ -1626,6 +1656,13 @@ function prepararDialogoIngreso(form) {
 }
 
 function prepararDialogoGasto(form) {
+  // Resetear moneda a ARS por defecto y ocultar fila de cotización
+  const monedaSel = form.elements.moneda;
+  if (monedaSel) monedaSel.value = 'ARS';
+  const cotInp = form.elements.cotizacion;
+  if (cotInp) cotInp.value = '';
+  setTimeout(actualizarRowCotizacion, 0);
+
   // Poblar selects de tarjetas
   const tarjetas = state.tarjetas.filter(t => !t.deleted && t.activa !== false);
   for (const sel of form.querySelectorAll('select[name="tarjeta_id"], select[name="tarjeta_id_simple"]')) {
@@ -1668,6 +1705,8 @@ async function handleSubmitGasto(form) {
     : null;
 
   const base = editingId ? (await DB.get('gastos', editingId) || {}) : {};
+  const moneda = fd.get('moneda') || 'ARS';
+  const cotizacionRef = moneda !== 'ARS' ? (parseFloat(fd.get('cotizacion')) || null) : null;
   const g = {
     ...base,
     id: editingId || uuid(),
@@ -1675,6 +1714,9 @@ async function handleSubmitGasto(form) {
     deleted: false,
     fecha: fd.get('fecha'),
     monto: parseFloat(fd.get('monto')),
+    moneda,                              // 'ARS' | 'USD' | 'EUR' | 'BRL'
+    cotizacion_referencia: cotizacionRef, // Cotización al momento de la compra (referencia)
+    cotizacion_al_pagar: base.cotizacion_al_pagar || null,  // Se setea al cerrar período
     descripcion: fd.get('descripcion'),
     categoria: fd.get('categoria') || 'general',
     metodo_pago: fd.get('metodo_pago'),
@@ -1896,19 +1938,18 @@ async function guardarSettings(form) {
 const syncCallbacks = {
   onStart: (motivo) => {
     setSyncIndicator('progress');
-    if (motivo === 'manual') toast('Sincronizando…', 1200);
+    // Solo mostramos un mini-toast con icono si fue manual; el resto es silencioso.
+    if (motivo === 'manual') toast('🔄', 800);
   },
-  onProgress: (m, motivo) => {
-    if (motivo === 'manual') toast(m, 1000);
+  onProgress: () => {
+    // Silencio total. El usuario solo ve el dot animado en el sidebar.
   },
   onSuccess: async (result, motivo) => {
     await reloadAll();
     setSyncIndicator('ok');
     actualizarTimestampSync();
-    if (motivo === 'manual' || motivo === 'inicial') {
-      const totales = Object.values(result).reduce((a, r) => a + (r.count || 0), 0);
-      toast(`✓ Sincronizado · ${totales} items`, 1800);
-    }
+    // Mini toast solo si fue manual; las demás syncs son silenciosas.
+    if (motivo === 'manual') toast('✓', 1200);
   },
   onError: (err, motivo) => {
     setSyncIndicator('error');
@@ -2046,6 +2087,193 @@ function escapeHtml(s='') {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+/* ============ VISTAS DEL SIDEBAR (Tarjetas / Cuentas / Metas) ============
+   Cuando el usuario clickea en el sidebar, abrimos drawers que muestran
+   TODAS las entidades con sus datos. Para crear nuevas, va a Ajustes.    */
+
+function abrirVistaTarjetas() {
+  const tarjetas = state.tarjetas.filter(t => !t.deleted && t.activa !== false);
+  if (tarjetas.length === 0) {
+    toast('No hay tarjetas. Creá una desde Ajustes → Cuentas', 3000);
+    abrirSettings();
+    setTimeout(() => cambiarSettingsTab('cuentas'), 200);
+    return;
+  }
+  if (tarjetas.length === 1) {
+    abrirDrawerTarjeta(tarjetas[0].id);
+    return;
+  }
+  // Si hay varias, mostrar lista y al tocar una se abre el drawer detallado
+  abrirSelectorEntidad('tarjetas', tarjetas);
+}
+
+function abrirVistaCuentas() {
+  const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+  if (cuentas.length === 0) {
+    toast('No hay cuentas. Creá una desde Ajustes → Cuentas', 3000);
+    abrirSettings();
+    setTimeout(() => cambiarSettingsTab('cuentas'), 200);
+    return;
+  }
+  abrirSelectorEntidad('cuentas', cuentas);
+}
+
+function abrirVistaMetas() {
+  const metas = (state.metas || []).filter(m => !m.deleted);
+  if (metas.length === 0) {
+    toast('No hay metas. Creá una desde Ajustes', 3000);
+    abrirSettings();
+    setTimeout(() => cambiarSettingsTab('cuentas'), 200);
+    return;
+  }
+  abrirSelectorEntidad('metas', metas);
+}
+
+function abrirSelectorEntidad(tipo, items) {
+  // Reusamos el drawer history como contenedor genérico
+  const dlg = document.getElementById('dlg-widget-history');
+  if (!dlg) return;
+
+  // Customizar header según tipo
+  const titulos = { tarjetas: 'Mis tarjetas', cuentas: 'Mis cuentas', metas: 'Mis metas' };
+  const iconos  = { tarjetas: '💳', cuentas: '🏦', metas: '🎯' };
+  document.getElementById('hd-title').textContent    = titulos[tipo];
+  document.getElementById('hd-icon').textContent     = iconos[tipo];
+  document.getElementById('hd-subtitle').textContent = `${items.length} ${tipo}`;
+
+  // Ocultar filtros que no aplican
+  document.querySelector('.widget-drawer-filters').style.display = 'none';
+  const chartWrap = document.getElementById('hd-chart-wrap');
+  if (chartWrap) chartWrap.style.display = 'none';
+
+  // KPIs según tipo
+  const totEl = document.getElementById('hd-kpi-total');
+  const cntEl = document.getElementById('hd-kpi-count');
+  const avgEl = document.getElementById('hd-kpi-avg');
+  if (tipo === 'tarjetas') {
+    const totalLim = items.reduce((a,t) => a + (t.limite_un_pago||0) + (t.limite_cuotas||0), 0);
+    const totalRes = items.reduce((a,t) => {
+      const r = state.resumenes.find(x => x.tarjeta_id === t.id);
+      return a + (r?.total_resumen || 0);
+    }, 0);
+    totEl.textContent = FMT.format(totalLim);
+    cntEl.textContent = String(items.length);
+    avgEl.textContent = FMT.format(totalRes);
+    cntEl.previousElementSibling.textContent = 'Tarjetas';
+    avgEl.previousElementSibling.textContent = 'Resumen total';
+    totEl.previousElementSibling.textContent = 'Límite total';
+  } else if (tipo === 'cuentas') {
+    const totalSaldo = items.reduce((a,c) => a + calcularSaldoCuenta(c), 0);
+    totEl.textContent = FMT.format(totalSaldo);
+    cntEl.textContent = String(items.length);
+    avgEl.textContent = FMT.format(totalSaldo / items.length);
+    totEl.previousElementSibling.textContent = 'Saldo total';
+    cntEl.previousElementSibling.textContent = 'Cuentas';
+    avgEl.previousElementSibling.textContent = 'Promedio';
+  } else { // metas
+    const totalObj = items.reduce((a,m) => a + (m.monto_objetivo||0), 0);
+    const totalAct = items.reduce((a,m) => a + (m.monto_actual||0),   0);
+    totEl.textContent = FMT.format(totalObj);
+    cntEl.textContent = String(items.length);
+    avgEl.textContent = FMT.format(totalAct);
+    totEl.previousElementSibling.textContent = 'Objetivo total';
+    cntEl.previousElementSibling.textContent = 'Metas';
+    avgEl.previousElementSibling.textContent = 'Ahorrado';
+  }
+
+  // Lista de items
+  const list = document.getElementById('hd-list');
+  list.innerHTML = '';
+  if (tipo === 'tarjetas') {
+    items.forEach(t => {
+      const r = state.resumenes.find(x => x.tarjeta_id === t.id);
+      const lim = (t.limite_un_pago||0) + (t.limite_cuotas||0);
+      const usado = r?.total_resumen || 0;
+      const disp = Math.max(0, lim - usado);
+      const pct = lim ? Math.round(usado*100/lim) : 0;
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item" data-tarjeta-id="${t.id}" style="cursor:pointer">
+          <span class="hd-item-icon" style="background:${t.color}33;color:${t.color}">💳</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold" style="color:var(--ink)">${escapeHtml(t.nombre)}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">
+              ${t.banco || '—'} · Cierre día ${t.dia_cierre} · Pago día ${t.dia_vencimiento}
+            </p>
+            <div class="mt-1.5 flex items-center gap-2">
+              <div style="flex:1;height:4px;background:var(--surface-3);border-radius:999px;overflow:hidden">
+                <div style="width:${Math.min(100,pct)}%;height:100%;background:${t.color};box-shadow:0 0 6px ${t.color}"></div>
+              </div>
+              <span class="text-[10px] font-bold" style="color:${t.color}">${pct}%</span>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Disponible</p>
+            <p class="ff-display font-bold text-sm" style="color:var(--success)">${FMT.format(disp)}</p>
+          </div>
+        </div>`);
+    });
+    list.querySelectorAll('[data-tarjeta-id]').forEach(el =>
+      el.addEventListener('click', () => { dlg.close(); abrirDrawerTarjeta(el.dataset.tarjetaId); })
+    );
+  } else if (tipo === 'cuentas') {
+    const TIPOS = { caja_ahorro:'🏦', cuenta_corriente:'💼', billetera:'📱', efectivo:'💵', inversion:'📈', cripto:'₿' };
+    items.forEach(c => {
+      const saldo = calcularSaldoCuenta(c);
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon" style="background:${c.color}33;color:${c.color}">${TIPOS[c.tipo]||'🏦'}</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold" style="color:var(--ink)">${escapeHtml(c.nombre)}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${escapeHtml(c.banco||c.tipo)} · ${c.moneda||'ARS'}</p>
+          </div>
+          <span class="hd-item-monto" style="color:${saldo>=0?'var(--success)':'var(--danger)'}">${FMT.format(saldo)}</span>
+        </div>`);
+    });
+  } else { // metas
+    items.sort((a,b)=> (b.prioridad||3) - (a.prioridad||3));
+    items.forEach(m => {
+      const pct = m.monto_objetivo ? (m.monto_actual||0)*100/m.monto_objetivo : 0;
+      const p = m.prioridad || 3;
+      const estrellas = '★'.repeat(p) + '☆'.repeat(5 - p);
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon" style="background:var(--brand-soft);color:var(--brand)">🎯</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold" style="color:var(--ink)">${escapeHtml(m.nombre)}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">
+              ${estrellas} ${m.es_emergencia ? '· 🚨 Emergencia' : ''}
+            </p>
+            <div class="mt-1.5 flex items-center gap-2">
+              <div style="flex:1;height:4px;background:var(--surface-3);border-radius:999px;overflow:hidden">
+                <div style="width:${Math.min(100,pct)}%;height:100%;background:linear-gradient(90deg,var(--success),var(--brand))"></div>
+              </div>
+              <span class="text-[10px] font-bold text-glow-cyan">${pct.toFixed(0)}%</span>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Faltan</p>
+            <p class="ff-display font-bold text-sm" style="color:var(--brand)">${FMT.format(Math.max(0, (m.monto_objetivo||0) - (m.monto_actual||0)))}</p>
+          </div>
+        </div>`);
+    });
+  }
+  document.getElementById('hd-empty').classList.add('hidden');
+
+  // Footer: cambiar texto del botón principal
+  const addBtn = document.getElementById('hd-add');
+  if (addBtn) {
+    const labelMap = { tarjetas: '+ Agregar tarjeta', cuentas: '+ Agregar cuenta', metas: '+ Agregar meta' };
+    addBtn.textContent = labelMap[tipo];
+    addBtn.onclick = () => {
+      dlg.close();
+      abrirSettings();
+      setTimeout(() => cambiarSettingsTab('cuentas'), 200);
+    };
+  }
+
+  dlg.showModal();
+}
+
 /* ============ DRAWER DETALLE DE TARJETA ============ */
 let _drawerTarjetaIdActual = null;
 
@@ -2083,6 +2311,12 @@ function abrirDrawerTarjeta(tarjetaId) {
   document.getElementById('td-comp-unpago').textContent = FMT.format(resumen?.total_un_pago || 0);
   document.getElementById('td-comp-cuotas').textContent = FMT.format(resumen?.total_cuotas || 0);
   document.getElementById('td-comp-recurr').textContent = FMT.format(resumen?.total_recurrentes || 0);
+
+  // ── Sección de gastos en moneda extranjera ────────────────
+  renderSeccionUSD(tarjeta, resumen);
+
+  // ── Histórico de cotizaciones de esta tarjeta ─────────────
+  renderHistoricoCotizaciones(tarjeta);
 
   // Capacidad
   if (capTarjeta) {
@@ -2163,12 +2397,132 @@ function abrirDrawerTarjeta(tarjetaId) {
 }
 
 /* Handlers del drawer de tarjeta */
+function renderSeccionUSD(tarjeta, resumen) {
+  const sec = document.getElementById('td-usd-section');
+  if (!sec) return;
+
+  const monedasExtra = resumen?.monedas_extranjeras || {};
+  const totalUSD = monedasExtra.USD || 0;
+
+  if (totalUSD <= 0) {
+    sec.hidden = true;
+    return;
+  }
+  sec.hidden = false;
+
+  // Cotización sugerida (la más reciente de ajustes)
+  const cambios = state.ajustes?.tipos_cambio || {};
+  const cotizSugerida = cambios.USD_BLUE?.valor || cambios.USD?.valor || 0;
+
+  document.getElementById('td-usd-total').textContent       = 'US$' + totalUSD.toFixed(2);
+  document.getElementById('td-usd-cotiz-actual').textContent= FMT.format(cotizSugerida);
+  document.getElementById('td-usd-equiv').textContent       = FMT.format(totalUSD * cotizSugerida);
+
+  // Contar pendientes vs cerrados (en este resumen)
+  const pendCount = resumen?.pendientes_cierre_usd || 0;
+  document.getElementById('td-usd-count').textContent = `${pendCount} pendiente${pendCount !== 1 ? 's' : ''}`;
+}
+
+function renderHistoricoCotizaciones(tarjeta) {
+  const wrap  = document.getElementById('td-cotiz-history-wrap');
+  const cont  = document.getElementById('td-cotiz-history');
+  if (!wrap || !cont) return;
+
+  const historico = tarjeta.cotizaciones_historico || [];
+  if (historico.length === 0) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  cont.innerHTML = '';
+
+  // Más recientes primero
+  [...historico].reverse().slice(0, 6).forEach(h => {
+    cont.insertAdjacentHTML('beforeend', `
+      <div class="usd-history-card">
+        <div>
+          <p class="usd-history-period">${h.periodo} · ${h.moneda || 'USD'}</p>
+          <p class="text-[10px]" style="color:var(--ink-muted)">${new Date(h.fecha_aplicada).toLocaleDateString('es-AR')}</p>
+        </div>
+        <span class="usd-history-cotiz">${FMT.format(h.cotizacion)}</span>
+      </div>`);
+  });
+}
+
+async function cerrarPeriodoUSD(tarjetaId) {
+  const tarjeta = state.tarjetas.find(t => t.id === tarjetaId);
+  if (!tarjeta) return;
+
+  const cambios = state.ajustes?.tipos_cambio || {};
+  const cotizSugerida = cambios.USD_BLUE?.valor || cambios.USD?.valor || 0;
+
+  // Pedir cotización al usuario
+  const cotizStr = prompt(
+    `Ingresá la cotización USD de hoy para cerrar el período de "${tarjeta.nombre}".\n\nValor sugerido: ${cotizSugerida}`,
+    cotizSugerida || ''
+  );
+  if (cotizStr === null) return;
+  const cotiz = parseFloat(cotizStr);
+  if (!cotiz || cotiz <= 0) {
+    toast('Cotización inválida', 2000);
+    return;
+  }
+
+  // Buscar el resumen actual de esta tarjeta para saber qué gastos son
+  const resumen = state.resumenes.find(r => r.tarjeta_id === tarjetaId);
+  if (!resumen) { toast('No hay resumen activo', 2000); return; }
+
+  // Aplicar la cotización a TODOS los gastos USD/extranjeros pendientes del período actual
+  const py = parseInt(resumen.periodo.slice(0, 4));
+  const pm = parseInt(resumen.periodo.slice(5, 7));
+  const { cuotaEnPeriodo: _cep } = await import('./cards.js');
+
+  let aplicados = 0;
+  let totalUSD = 0;
+  for (const g of state.gastos) {
+    if (g.deleted || g.tarjeta_id !== tarjetaId) continue;
+    if (!g.moneda || g.moneda === 'ARS') continue;
+    if (g.cotizacion_al_pagar) continue;  // ya cerrado
+    if (!_cep(g.fecha, tarjeta, py, pm)) continue;
+    g.cotizacion_al_pagar = cotiz;
+    g.updated_at = nowTs();
+    await DB.put('gastos', g);
+    aplicados++;
+    totalUSD += g.monto;
+  }
+
+  // Agregar al histórico de cotizaciones de la tarjeta
+  if (!tarjeta.cotizaciones_historico) tarjeta.cotizaciones_historico = [];
+  tarjeta.cotizaciones_historico.push({
+    periodo: resumen.periodo,
+    moneda: 'USD',
+    cotizacion: cotiz,
+    fecha_aplicada: new Date().toISOString(),
+    gastos_aplicados: aplicados,
+    total_moneda: totalUSD,
+    total_ars: totalUSD * cotiz,
+  });
+  tarjeta.updated_at = nowTs();
+  await DB.put('tarjetas', tarjeta);
+  notificarCambioLocal();
+
+  await reloadAll();
+  toast(`✓ Período cerrado: ${aplicados} gastos USD a $${cotiz.toFixed(2)}`, 3000);
+  // Re-abrir el drawer con datos refrescados
+  abrirDrawerTarjeta(tarjetaId);
+}
+
 function bindDrawerTarjetaHandlers() {
   const dlg = document.getElementById('dlg-tarjeta-detalle');
   if (!dlg) return;
 
   document.getElementById('td-close')?.addEventListener('click',  () => dlg.close());
   document.getElementById('td-close-2')?.addEventListener('click', () => dlg.close());
+
+  // Cerrar período USD con cotización
+  document.getElementById('td-close-period')?.addEventListener('click', () => {
+    if (_drawerTarjetaIdActual) cerrarPeriodoUSD(_drawerTarjetaIdActual);
+  });
 
   document.getElementById('td-add-gasto')?.addEventListener('click', () => {
     if (!_drawerTarjetaIdActual) return;
@@ -2695,25 +3049,55 @@ function _hdRenderChart() {
   // Decidir tipo de chart según selector
   const modo = _hdState.chartMode || 'lineas';
 
-  let datasets;
+  // Respetar el filtro de tipo (Todos / Ingresos / Gastos)
+  const filtroTipo = _hdState.tipo || 'todos';
+  const showGastos   = filtroTipo === 'todos' || filtroTipo === 'gastos';
+  const showIngresos = filtroTipo === 'todos' || filtroTipo === 'ingresos';
+
+  let datasets = [];
   if (modo === 'lineas') {
-    datasets = [
-      { label: 'Gastos',      data: datG, borderColor: '#ff2d6e', backgroundColor: gradG, fill: true,  tension: .3, pointRadius: 0, borderWidth: 1.5, order: 2 },
-      { label: 'Ingresos',    data: datI, borderColor: '#00ff9f', backgroundColor: gradI, fill: true,  tension: .3, pointRadius: 0, borderWidth: 1.5, order: 1 },
-      { label: 'Media móvil', data: datMA, borderColor: 'rgba(0, 240, 255, 0.6)', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, order: 0 },
-    ];
+    if (showGastos) {
+      datasets.push({ label: 'Gastos', data: datG, borderColor: '#ff2d6e', backgroundColor: gradG, fill: true, tension: .3, pointRadius: 0, borderWidth: 1.5, order: 2 });
+    }
+    if (showIngresos) {
+      datasets.push({ label: 'Ingresos', data: datI, borderColor: '#00ff9f', backgroundColor: gradI, fill: true, tension: .3, pointRadius: 0, borderWidth: 1.5, order: 1 });
+    }
+    // Media móvil solo si mostramos gastos
+    if (showGastos) {
+      datasets.push({ label: 'Media móvil (7d)', data: datMA, borderColor: 'rgba(0, 240, 255, 0.6)', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, order: 0 });
+    }
   } else if (modo === 'acumulado') {
     const gradA = ctx.createLinearGradient(0, 0, 0, 160);
     gradA.addColorStop(0, 'rgba(0, 240, 255, 0.4)');
     gradA.addColorStop(1, 'rgba(0, 240, 255, 0.02)');
+    // Si filtro = solo gastos → acumulado de gastos. Si solo ingresos → acumulado de ingresos. Sino → saldo neto.
+    let datSerie, color, gradient, label;
+    if (showGastos && !showIngresos) {
+      let acum = 0;
+      datSerie = datG.map(v => { acum += v; return acum; });
+      color = '#ff2d6e';
+      gradient = ctx.createLinearGradient(0,0,0,160);
+      gradient.addColorStop(0,'rgba(255,45,110,0.4)'); gradient.addColorStop(1,'rgba(255,45,110,0.02)');
+      label = 'Gastos acumulados';
+    } else if (showIngresos && !showGastos) {
+      let acum = 0;
+      datSerie = datI.map(v => { acum += v; return acum; });
+      color = '#00ff9f';
+      gradient = ctx.createLinearGradient(0,0,0,160);
+      gradient.addColorStop(0,'rgba(0,255,159,0.4)'); gradient.addColorStop(1,'rgba(0,255,159,0.02)');
+      label = 'Ingresos acumulados';
+    } else {
+      datSerie = datAcum;
+      color = '#00f0ff';
+      gradient = gradA;
+      label = 'Saldo acumulado';
+    }
     datasets = [
-      { label: 'Saldo acumulado', data: datAcum, borderColor: '#00f0ff', backgroundColor: gradA, fill: true, tension: .25, pointRadius: 0, borderWidth: 2 },
+      { label, data: datSerie, borderColor: color, backgroundColor: gradient, fill: true, tension: .25, pointRadius: 0, borderWidth: 2 },
     ];
   } else { // barras
-    datasets = [
-      { label: 'Gastos',   data: datG, backgroundColor: 'rgba(255, 45, 110, 0.6)', borderRadius: 4, borderSkipped: false },
-      { label: 'Ingresos', data: datI, backgroundColor: 'rgba(0, 255, 159, 0.6)',  borderRadius: 4, borderSkipped: false },
-    ];
+    if (showGastos)   datasets.push({ label: 'Gastos',   data: datG, backgroundColor: 'rgba(255, 45, 110, 0.6)', borderRadius: 4, borderSkipped: false });
+    if (showIngresos) datasets.push({ label: 'Ingresos', data: datI, backgroundColor: 'rgba(0, 255, 159, 0.6)',  borderRadius: 4, borderSkipped: false });
   }
 
   _hdState.chart = new Chart(canvas, {
@@ -2788,6 +3172,22 @@ function _hdRenderChart() {
 function abrirHistorialWidget(widgetId) {
   const dlg = document.getElementById('dlg-widget-history');
   if (!dlg) return;
+
+  // Re-mostrar filtros y chart (por si se usaron como selector de entidades)
+  const filtros = document.querySelector('.widget-drawer-filters');
+  if (filtros) filtros.style.display = '';
+  const chartWrap = document.getElementById('hd-chart-wrap');
+  if (chartWrap) chartWrap.style.display = '';
+  // Restaurar labels KPI
+  const kpiTotal = document.getElementById('hd-kpi-total');
+  if (kpiTotal && kpiTotal.previousElementSibling) kpiTotal.previousElementSibling.textContent = 'Total';
+  const kpiCount = document.getElementById('hd-kpi-count');
+  if (kpiCount && kpiCount.previousElementSibling) kpiCount.previousElementSibling.textContent = 'Movimientos';
+  const kpiAvg = document.getElementById('hd-kpi-avg');
+  if (kpiAvg && kpiAvg.previousElementSibling) kpiAvg.previousElementSibling.textContent = 'Promedio';
+  // Restaurar footer
+  const addBtn = document.getElementById('hd-add');
+  if (addBtn) addBtn.textContent = '+ Agregar movimiento';
 
   _hdState.widget = widgetId;
   _hdState.range  = 'mes_actual';
@@ -2976,7 +3376,10 @@ async function init() {
       document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
       if (tab === 'gastos') switchTab('gastos');
       else if (tab === 'analisis') switchTab('analisis');
-      else { switchTab('home'); if(tab==='tarjetas') openDialog('dlg-tarjeta'); if(tab==='cuentas') openDialog('dlg-cuenta'); if(tab==='metas') openDialog('dlg-meta'); }
+      else if (tab === 'tarjetas') { switchTab('home'); abrirVistaTarjetas(); }
+      else if (tab === 'cuentas')  { switchTab('home'); abrirVistaCuentas();  }
+      else if (tab === 'metas')    { switchTab('home'); abrirVistaMetas();    }
+      else switchTab('home');
     });
   });
 
@@ -3677,6 +4080,72 @@ document.addEventListener('change', (e) => {
   }
 });
 
+/* ── Selector de moneda en dlg-gasto ─────────────────────────── */
+const CURRENCY_SYMBOLS = { ARS: '$', USD: 'US$', EUR: '€', BRL: 'R$' };
+
+document.addEventListener('change', (e) => {
+  if (e.target.id !== 'gasto-moneda') return;
+  actualizarRowCotizacion();
+});
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'gasto-cotizacion' || e.target.matches('#dlg-gasto input[name="monto"]') || e.target.id === 'gasto-moneda') {
+    actualizarEquivalenteCotizacion();
+  }
+});
+
+function actualizarRowCotizacion() {
+  const select  = document.getElementById('gasto-moneda');
+  const row     = document.getElementById('row-cotizacion');
+  const prefix  = document.getElementById('gasto-moneda-prefix');
+  const label   = document.getElementById('cot-currency-label');
+  const cotInp  = document.getElementById('gasto-cotizacion');
+  if (!select || !row) return;
+
+  const moneda = select.value || 'ARS';
+  select.dataset.active = moneda;
+  if (prefix) prefix.textContent = CURRENCY_SYMBOLS[moneda] || '$';
+  if (label)  label.textContent  = moneda;
+
+  if (moneda === 'ARS') {
+    row.hidden = true;
+    return;
+  }
+  row.hidden = false;
+
+  // Sugerir cotización actual desde ajustes.tipos_cambio
+  if (cotInp && !cotInp.value) {
+    const cambios = state.ajustes?.tipos_cambio || {};
+    const sugerencia = cambios[moneda]?.valor
+      || (moneda === 'USD' ? (cambios.USD_BLUE?.valor || cambios.USD?.valor) : null);
+    if (sugerencia) cotInp.value = sugerencia;
+  }
+  actualizarEquivalenteCotizacion();
+}
+
+function actualizarEquivalenteCotizacion() {
+  const form    = document.querySelector('#dlg-gasto form');
+  if (!form) return;
+  const monto   = parseFloat(form.elements.monto?.value) || 0;
+  const moneda  = form.elements.moneda?.value || 'ARS';
+  const cotiz   = parseFloat(form.elements.cotizacion?.value) || 0;
+  const equivEl = document.getElementById('cot-equiv');
+  const valEl   = document.getElementById('cot-equiv-valor');
+  if (!equivEl || !valEl) return;
+
+  if (moneda === 'ARS' || cotiz <= 0 || monto <= 0) {
+    equivEl.hidden = true;
+    return;
+  }
+  equivEl.hidden = false;
+  valEl.textContent = FMT.format(monto * cotiz);
+}
+
+// Cuando se abre dlg-gasto, resetear estado de moneda
+const _origPreparar = prepararDialogoGasto;
+if (typeof _origPreparar === 'function') {
+  window._origPrepararGasto = _origPreparar;
+}
+
 // ── Info banner del ciclo de pago (dlg-gasto) ──────────────────
 // Cuando el usuario elige "Crédito" + tarjeta + fecha, mostrar en qué
 // resumen cae el gasto y cuándo se pagará.
@@ -3770,9 +4239,54 @@ document.addEventListener('input', (e) => {
 document.addEventListener('input', (e) => {
   if (e.target.id === 'ip-cierre') {
     document.getElementById('badge-cierre').textContent = e.target.value;
+    actualizarCicloVisual();
   }
   if (e.target.id === 'ip-venc') {
     document.getElementById('badge-venc').textContent = e.target.value;
+    actualizarCicloVisual();
+  }
+});
+
+function actualizarCicloVisual() {
+  const closeDay = parseInt(document.getElementById('ip-cierre')?.value) || 15;
+  const dueDay   = parseInt(document.getElementById('ip-venc')?.value)   || 5;
+  const closeMarker = document.getElementById('cycle-marker-close');
+  const dueMarker   = document.getElementById('cycle-marker-due');
+  const fill        = document.getElementById('cycle-fill');
+  const summary     = document.getElementById('cycle-summary');
+  if (!closeMarker) return;
+
+  const pctClose = ((closeDay - 1) / 30) * 100;
+  const pctDue   = ((dueDay - 1) / 30) * 100;
+  closeMarker.style.left = pctClose + '%';
+  dueMarker.style.left   = pctDue + '%';
+
+  // El fill muestra el período de gastos: desde día siguiente al cierre anterior
+  // hasta el día de cierre. Visualmente: del 0 al closeDay.
+  if (fill) {
+    fill.style.left = '0%';
+    fill.style.width = pctClose + '%';
+  }
+
+  // Resumen explicativo
+  if (summary) {
+    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const hoy   = new Date();
+    const mesActual    = meses[hoy.getMonth()];
+    const mesSiguiente = meses[(hoy.getMonth() + 1) % 12];
+
+    const ventana = `Día <b>${closeDay + 1}</b> al <b>${closeDay}</b> del mes siguiente`;
+    const explicacion = dueDay < closeDay
+      ? `Todo lo que gastes desde el <b>día ${closeDay + 1} de ${mesActual}</b> hasta el <b>día ${closeDay} de ${mesSiguiente}</b> se factura en el resumen que se paga el <span class="pink">día ${dueDay}</span> del mes posterior.`
+      : `Todo lo que gastes desde el <b>día ${closeDay + 1} de ${mesActual}</b> hasta el <b>día ${closeDay} de ${mesSiguiente}</b> se factura en el resumen que se paga el <span class="pink">día ${dueDay} de ${mesSiguiente}</span>.`;
+    summary.innerHTML = explicacion;
+  }
+}
+
+// Actualizar el visual cuando se abre el dialog
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-action="add-card"], [data-sidebar-tab="tarjetas"], [data-tab="tarjetas"], #add-tarjeta-btn')) {
+    setTimeout(actualizarCicloVisual, 100);
   }
 });
 
@@ -3860,16 +4374,23 @@ document.addEventListener('click', (e) => {
 });
 
 // ── Dlg meta: estrellas de prioridad ────────────────────────
+// Convención NUEVA: 5 estrellas = máxima prioridad, 1 estrella = mínima.
+// Internamente seguimos guardando 1-5 pero la UX invierte: estrellas
+// "encendidas" = prioridad. Para mantener la regla de sort por menor=más
+// importante en el resto del código, transformamos: valorReal = 6 - estrellas.
 document.addEventListener('change', (e) => {
   if (!e.target.matches('#dlg-meta input[name="prioridad"]')) return;
-  const value = parseInt(e.target.value);
+  // El valor del radio ahora representa NÚMERO DE ESTRELLAS (1-5).
+  // Lo convertimos a prioridad interna (1=máxima, 5=mínima) para guardar.
+  const estrellas = parseInt(e.target.value);
+  // Marcar visualmente las N estrellas encendidas
   document.querySelectorAll('#meta-priority .prio-star').forEach(s => {
     const p = parseInt(s.dataset.prio);
-    s.classList.toggle('active', p <= value);
+    s.classList.toggle('active', p <= estrellas);
   });
-  const labels = { 1: 'Crítica', 2: 'Alta', 3: 'Media', 4: 'Baja', 5: 'Mínima' };
+  const labels = { 5: 'Crítica', 4: 'Alta', 3: 'Media', 2: 'Baja', 1: 'Mínima' };
   const lbl = document.getElementById('prio-label');
-  if (lbl) lbl.textContent = labels[value] || 'Media';
+  if (lbl) lbl.textContent = labels[estrellas] || 'Media';
 });
 
 // Inicializar estrellas en valor 3 al cargar

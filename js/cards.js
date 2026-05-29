@@ -80,26 +80,46 @@ export function resumenTarjeta(tarjeta, gastos, hoy = new Date()) {
   const py = cierre.getFullYear();
   const pm = cierre.getMonth() + 1;
 
+  // Totales en ARS (moneda local)
   let unPago = 0, cuotasSum = 0, recurr = 0;
+  // Por moneda extranjera: { USD: 250, EUR: 80, ... }
+  const monedasExtra = {};   // monto NOMINAL en moneda extranjera
+  const monedasARS   = {};   // monto convertido a ARS con cotización del gasto
   const ids = [];
+
+  // Cotización a usar para convertir USD/EUR/BRL a ARS:
+  // - Si el gasto tiene `cotizacion_al_pagar` (cierre ya hecho) → usar esa
+  // - Sino, usar `cotizacion_referencia` (la del momento de la compra)
+  // - Si ninguna existe, marcar como "pendiente"
+  const acumular = (g, monto) => {
+    const moneda = g.moneda || 'ARS';
+    if (moneda === 'ARS') return monto;
+    monedasExtra[moneda] = (monedasExtra[moneda] || 0) + monto;
+    const cotiz = g.cotizacion_al_pagar || g.cotizacion_referencia || 0;
+    if (cotiz > 0) {
+      const ars = monto * cotiz;
+      monedasARS[moneda] = (monedasARS[moneda] || 0) + ars;
+      return ars;
+    }
+    return 0; // sin cotización: no podemos contarlo en ARS todavía
+  };
 
   for (const g of gastos) {
     if (g.deleted || g.tarjeta_id !== tarjeta.id) continue;
 
     if (g.tipo === 'recurrente') {
-      recurr += g.monto;
+      recurr += acumular(g, g.monto);
       ids.push(g.id);
       continue;
     }
     if (g.tipo === 'unico') {
       if (cuotaEnPeriodo(g.fecha, tarjeta, py, pm)) {
-        unPago += g.monto;
+        unPago += acumular(g, g.monto);
         ids.push(g.id);
       }
       continue;
     }
     if (g.tipo === 'cuotas' && g.cuotas_total > 0) {
-      // Calcular en qué cuota va para ESTE período
       const fc = new Date(g.fecha + 'T00:00:00');
       let baseY, baseM;
       if (fc.getDate() <= tarjeta.dia_cierre) {
@@ -111,7 +131,7 @@ export function resumenTarjeta(tarjeta, gastos, hoy = new Date()) {
       const dist = (py - baseY) * 12 + (pm - baseM);
       const nCuota = dist + 1;
       if (nCuota >= 1 && nCuota <= g.cuotas_total) {
-        cuotasSum += g.monto / g.cuotas_total;
+        cuotasSum += acumular(g, g.monto / g.cuotas_total);
         ids.push(g.id);
       }
     }
@@ -119,6 +139,15 @@ export function resumenTarjeta(tarjeta, gastos, hoy = new Date()) {
 
   const total = unPago + cuotasSum + recurr;
   const limite = (tarjeta.limite_un_pago || 0) + (tarjeta.limite_cuotas || 0) || 1;
+
+  // ¿Hay gastos USD pendientes de cierre? (sin cotización_al_pagar)
+  const pendientesPorCerrar = gastos.filter(g =>
+    !g.deleted &&
+    g.tarjeta_id === tarjeta.id &&
+    g.moneda && g.moneda !== 'ARS' &&
+    !g.cotizacion_al_pagar &&
+    cuotaEnPeriodo(g.fecha, tarjeta, py, pm)
+  );
 
   return {
     tarjeta_id: tarjeta.id,
@@ -134,6 +163,10 @@ export function resumenTarjeta(tarjeta, gastos, hoy = new Date()) {
     total_resumen: round2(total),
     porcentaje_limite_usado: round2((100 * total) / limite),
     movimientos_ids: ids,
+    // Multi-moneda
+    monedas_extranjeras: monedasExtra,    // { USD: 250, EUR: 80 }
+    monedas_extranjeras_ars: monedasARS,  // { USD: 362500, EUR: 96000 } (con cotización aplicada)
+    pendientes_cierre_usd: pendientesPorCerrar.length, // cantidad de gastos USD sin cotización al pagar
   };
 }
 

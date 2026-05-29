@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.0.1",
-    "build":  2,
-    "modified":  "2026-05-29T16:55:11Z",
-    "commit":  "M auto-push.ps1, M css/styles.css, M index.html, M js/app.js, M manifest.json, BUILD-APK.md, icon...",
-    "notes":  "Auto-update 2026-05-29 13:55"
+    "version":  "1.0.2",
+    "build":  3,
+    "modified":  "2026-05-29T18:19:06Z",
+    "commit":  "M css/styles.css, M index.html, M js/ai-local.js, M js/app.js, M js/cards.js, setup-pat.ps1",
+    "notes":  "Auto-update 2026-05-29 15:19"
 }

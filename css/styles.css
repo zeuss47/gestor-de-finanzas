@@ -2990,3 +2990,231 @@ body.view-analisis #main-widgets::before {
   border-radius: 999px;
   text-shadow: 0 0 4px var(--brand-glow);
 }
+
+/* ── Visualizador del ciclo de facturación (dlg-tarjeta) ─────── */
+.billing-cycle-card {
+  padding: 1rem;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(0,240,255,0.06), rgba(255,0,234,0.03));
+  border: 1px solid var(--brand);
+  box-shadow: 0 0 16px rgba(0,240,255,.08);
+}
+.cycle-visual {
+  margin-bottom: .85rem;
+}
+.cycle-track {
+  position: relative;
+  height: 40px;
+  background: linear-gradient(90deg,
+    rgba(0,240,255,0.08) 0%,
+    rgba(0,240,255,0.04) 100%);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: visible;
+}
+.cycle-fill {
+  position: absolute;
+  top: 8px; bottom: 8px;
+  background: linear-gradient(90deg, var(--brand), var(--neon-pink));
+  border-radius: 4px;
+  box-shadow: 0 0 12px var(--brand-glow);
+  opacity: .85;
+  transition: left .3s ease, width .3s ease;
+}
+.cycle-marker {
+  position: absolute;
+  top: -8px;
+  bottom: -28px;
+  width: 2px;
+  pointer-events: none;
+  transition: left .3s ease;
+}
+.cycle-marker-close {
+  background: var(--brand);
+  box-shadow: 0 0 8px var(--brand);
+}
+.cycle-marker-due {
+  background: var(--neon-pink);
+  box-shadow: 0 0 8px var(--neon-pink);
+}
+.cycle-marker-dot {
+  position: absolute;
+  top: -4px;
+  left: -5px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: inherit;
+  background: var(--brand);
+}
+.cycle-marker-due .cycle-marker-dot {
+  background: var(--neon-pink);
+}
+.cycle-marker-label {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .55rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--brand);
+  white-space: nowrap;
+}
+.cycle-marker-due .cycle-marker-label {
+  color: var(--neon-pink);
+}
+.cycle-scale {
+  display: flex;
+  justify-content: space-between;
+  padding: .85rem .15rem 0;
+  font-size: .55rem;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.cycle-summary {
+  margin: .25rem 0 0;
+  padding: .55rem .75rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: .72rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.cycle-summary b { color: var(--brand); }
+.cycle-summary .pink { color: var(--neon-pink); }
+
+/* ── Selector de moneda en input de monto ────────────────────── */
+.input-with-currency {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+.input-with-currency .input {
+  flex: 1;
+  border-radius: var(--r-sm) 0 0 var(--r-sm);
+  padding-right: .5rem;
+}
+.currency-selector {
+  width: 64px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  border: 1px solid var(--border);
+  border-left: 1px solid var(--brand-soft);
+  background: var(--surface-2);
+  color: var(--brand);
+  font-size: .7rem;
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+  padding: 0 .35rem;
+  cursor: pointer;
+  outline: none;
+  text-align: center;
+}
+.currency-selector:focus {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.currency-selector[data-active="USD"],
+.currency-selector[data-active="EUR"],
+.currency-selector[data-active="BRL"] {
+  background: linear-gradient(135deg, rgba(0,255,159,0.15), rgba(0,240,255,0.08));
+  color: var(--success);
+  text-shadow: 0 0 6px rgba(0,255,159,.4);
+}
+
+.cotizacion-equivalente {
+  margin-top: .5rem;
+  padding: .5rem .75rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(0,240,255,0.05), rgba(0,255,159,0.03));
+  border: 1px solid var(--brand);
+  font-size: .72rem;
+  color: var(--ink-2);
+}
+
+/* Badge moneda en lista de gastos */
+.currency-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: .55rem;
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+  margin-left: 4px;
+  vertical-align: middle;
+  border: 1px solid var(--success);
+}
+
+/* Sección "Gastos en USD" en drawer de tarjeta */
+.usd-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(0,255,159,0.06), rgba(0,240,255,0.04));
+  border: 1px solid var(--success);
+}
+.usd-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .65rem;
+}
+.usd-section-title {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--success);
+  text-shadow: 0 0 6px rgba(0,255,159,.4);
+}
+.usd-amounts {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: .5rem;
+  margin-bottom: .65rem;
+}
+.usd-amount-card {
+  padding: .5rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.usd-amount-card .label {
+  font-size: .55rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-muted);
+  display: block;
+  margin-bottom: 2px;
+}
+.usd-amount-card .value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: .85rem;
+}
+
+.usd-history-card {
+  padding: .5rem .65rem;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .35rem;
+}
+.usd-history-card:last-child { margin-bottom: 0; }
+.usd-history-period {
+  font-size: .65rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.usd-history-cotiz {
+  font-family: 'Space Grotesk', monospace;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--brand);
+}

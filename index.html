@@ -571,9 +571,7 @@
   <article class="widget card-glass p-5">
     <header class="flex items-center justify-between mb-4">
       <h2 class="ff-display text-sm font-semibold uppercase tracking-wider text-muted">Tarjetas</h2>
-      <button class="text-xs font-semibold px-3 py-1 rounded-full transition"
-              style="background:var(--brand-soft);color:var(--brand-3)"
-              data-action="add-card">+ Nueva</button>
+      <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--border)" title="Crear desde Ajustes → Cuentas">⚙</span>
     </header>
     <div data-bind="cards" class="space-y-3"></div>
   </article>
@@ -584,7 +582,7 @@
   <article class="widget card-glass p-5">
     <header class="flex items-center justify-between mb-4">
       <h2 class="ff-display text-sm font-semibold uppercase tracking-wider" style="color:var(--ink-muted)">Cuentas</h2>
-      <button class="text-xs font-semibold px-3 py-1 rounded-full transition" style="background:var(--brand-soft);color:var(--brand)" data-action="add-account">+ Nueva</button>
+      <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--border)" title="Crear desde Ajustes → Cuentas">⚙</span>
     </header>
     <div data-bind="accounts-list" class="space-y-2"></div>
   </article>
@@ -652,9 +650,7 @@
   <article class="widget card-glass p-5">
     <header class="flex items-center justify-between mb-4">
       <h2 class="ff-display text-sm font-semibold uppercase tracking-wider text-muted">Metas de ahorro</h2>
-      <button class="text-xs font-semibold px-3 py-1 rounded-full transition"
-              style="background:var(--brand-soft);color:var(--brand-3)"
-              data-action="add-meta">+ Nueva</button>
+      <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--border)" title="Crear desde Ajustes → Cuentas">⚙</span>
     </header>
     <div data-bind="metas" class="space-y-4"></div>
   </article>
@@ -931,14 +927,35 @@
       <div class="grid grid-cols-2 gap-3">
         <div class="form-section">
           <label class="form-label">Monto</label>
-          <div class="input-with-prefix">
-            <span class="input-prefix">$</span>
+          <div class="input-with-prefix input-with-currency">
+            <span class="input-prefix" id="gasto-moneda-prefix">$</span>
             <input name="monto" required type="number" step="0.01" placeholder="0" class="input input-lg" data-bind-gasto="monto" />
+            <select name="moneda" class="currency-selector" id="gasto-moneda">
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="BRL">BRL</option>
+            </select>
           </div>
         </div>
         <div class="form-section">
           <label class="form-label">Fecha</label>
           <input name="fecha" required type="date" class="input input-lg" />
+        </div>
+      </div>
+
+      <!-- Cotización (solo si moneda != ARS) -->
+      <div class="form-section" id="row-cotizacion" hidden>
+        <label class="form-label">Cotización del día <span style="color:var(--brand);font-weight:700;font-size:.65rem" id="cot-currency-label">USD</span></label>
+        <div class="input-with-prefix">
+          <span class="input-prefix">$</span>
+          <input name="cotizacion" type="number" step="0.01" placeholder="0" class="input input-lg" id="gasto-cotizacion" />
+        </div>
+        <p class="text-[10px] mt-1" style="color:var(--ink-muted)">
+          Esta cotización se usa solo como referencia. Al cerrar el resumen, se aplicará la cotización oficial del día del pago.
+        </p>
+        <div class="cotizacion-equivalente" id="cot-equiv" hidden>
+          Equivale a <b style="color:var(--brand)" id="cot-equiv-valor">$0</b> ARS aproximadamente
         </div>
       </div>
 
@@ -1224,20 +1241,45 @@
         </div>
       </div>
 
-      <!-- Días: cierre y vencimiento con sliders visuales -->
+      <!-- Configurador visual del rango de facturación -->
       <div class="form-section">
-        <label class="form-label">Día de cierre</label>
-        <div class="day-slider-wrap">
-          <input name="dia_cierre" type="range" min="1" max="31" value="15" class="day-slider" id="ip-cierre" required />
-          <div class="day-badge" id="badge-cierre">15</div>
+        <label class="form-label">Período de facturación</label>
+        <div class="billing-cycle-card">
+          <div class="cycle-visual" id="cycle-visual">
+            <div class="cycle-track">
+              <div class="cycle-fill"  id="cycle-fill"></div>
+              <div class="cycle-marker cycle-marker-close" id="cycle-marker-close"  title="Cierre">
+                <span class="cycle-marker-dot"></span>
+                <span class="cycle-marker-label">CIERRE</span>
+              </div>
+              <div class="cycle-marker cycle-marker-due"   id="cycle-marker-due"    title="Vencimiento">
+                <span class="cycle-marker-dot"></span>
+                <span class="cycle-marker-label">PAGO</span>
+              </div>
+            </div>
+            <div class="cycle-scale">
+              <span>1</span><span>10</span><span>20</span><span>31</span>
+            </div>
+          </div>
+          <p class="cycle-summary" id="cycle-summary">—</p>
         </div>
       </div>
 
-      <div class="form-section">
-        <label class="form-label">Día de vencimiento</label>
-        <div class="day-slider-wrap">
-          <input name="dia_vencimiento" type="range" min="1" max="31" value="5" class="day-slider day-slider-pink" id="ip-venc" required />
-          <div class="day-badge day-badge-pink" id="badge-venc">5</div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="form-section">
+          <label class="form-label">Día de cierre</label>
+          <div class="day-slider-wrap">
+            <input name="dia_cierre" type="range" min="1" max="31" value="15" class="day-slider" id="ip-cierre" required />
+            <div class="day-badge" id="badge-cierre">15</div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <label class="form-label">Día de pago</label>
+          <div class="day-slider-wrap">
+            <input name="dia_vencimiento" type="range" min="1" max="31" value="5" class="day-slider day-slider-pink" id="ip-venc" required />
+            <div class="day-badge day-badge-pink" id="badge-venc">5</div>
+          </div>
         </div>
       </div>
 
@@ -1620,6 +1662,40 @@
           </div>
         </div>
         <p class="text-[11px] mt-2" id="td-sugerencia" style="color:var(--ink-2)">—</p>
+      </div>
+
+      <!-- Sección: Gastos en moneda extranjera (USD/EUR/BRL) -->
+      <div class="usd-section" id="td-usd-section" hidden>
+        <div class="usd-section-header">
+          <span class="usd-section-title">💵 Gastos en USD pendientes</span>
+          <span class="badge badge-warning" id="td-usd-count">0</span>
+        </div>
+        <div class="usd-amounts">
+          <div class="usd-amount-card">
+            <span class="label">Total USD</span>
+            <span class="value" style="color:var(--success)" id="td-usd-total">US$0</span>
+          </div>
+          <div class="usd-amount-card">
+            <span class="label">Cotización hoy</span>
+            <span class="value" style="color:var(--brand)" id="td-usd-cotiz-actual">$0</span>
+          </div>
+          <div class="usd-amount-card">
+            <span class="label">Equivale a</span>
+            <span class="value" style="color:var(--brand)" id="td-usd-equiv">$0</span>
+          </div>
+        </div>
+        <button type="button" id="td-close-period" class="btn-primary w-full text-sm">
+          🔒 Cerrar período con cotización del día
+        </button>
+        <p class="text-[10px] mt-2" style="color:var(--ink-muted)">
+          Al cerrar, todos los gastos en USD del período quedan fijados a la cotización del día. La próxima sumarán a la siguiente facturación.
+        </p>
+      </div>
+
+      <!-- Sección: Historial de cotizaciones -->
+      <div class="mb-4" id="td-cotiz-history-wrap" hidden>
+        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted)">Histórico de cotizaciones cerradas</p>
+        <div id="td-cotiz-history"></div>
       </div>
 
       <!-- Sección: Cuotas pendientes -->
