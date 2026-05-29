@@ -126,6 +126,27 @@ export const DB = {
   },
 
   /**
+   * Wipe total: cierra la conexión y elimina la base entera. Tras ejecutar,
+   * la próxima operación reabrirá una DB vacía con el esquema actual.
+   * Útil para "dejar la app en cero".
+   */
+  async nuke() {
+    if (_dbPromise) {
+      try {
+        const db = await _dbPromise;
+        db.close();
+      } catch { /* noop */ }
+      _dbPromise = null;
+    }
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = () => resolve(true);
+      req.onerror   = () => reject(req.error);
+      req.onblocked = () => reject(new Error('IndexedDB bloqueada: cerrá otras pestañas de la app y reintentá.'));
+    });
+  },
+
+  /**
    * Devuelve sólo registros vivos (deleted !== true).
    */
   async live(store) {

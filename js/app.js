@@ -3859,16 +3859,30 @@ async function init() {
     }
   });
 
-  // Borrar todos los datos
+  // Resetear app completa — dejar todo en cero
   document.getElementById('btn-clear-data')?.addEventListener('click', async () => {
-    if (!confirm('¿Borrar TODOS los gastos, ingresos, tarjetas y metas? Esta acción no se puede deshacer.')) return;
-    if (!confirm('Confirmá una vez más: vas a perder TODOS tus datos. ¿Continuar?')) return;
-    await DB.clear('gastos');
-    await DB.clear('ingresos');
-    await DB.clear('tarjetas');
-    await DB.clear('metas');
-    await reloadAll();
-    toast('Datos eliminados');
+    if (!confirm('¿Resetear la app por completo?\n\nVas a perder: gastos, ingresos, tarjetas, cuentas, metas, ajustes (incluyendo configuración de GitHub Sync) y caché de cotizaciones.\n\nEsta acción NO se puede deshacer.')) return;
+    if (!confirm('Última confirmación: vas a arrancar de cero. ¿Continuar?')) return;
+
+    try {
+      // 1. Vaciar IndexedDB completa
+      await DB.nuke();
+
+      // 2. Limpiar localStorage solo de las claves conocidas de la app
+      const keysApp = ['_cotiz_cache', 'app_last_build', 'app_last_version', 'cotiz_manual'];
+      for (const k of keysApp) {
+        try { localStorage.removeItem(k); } catch { /* noop */ }
+      }
+
+      // 3. Recargar la app con bust de caché — al volver levantará una DB vacía
+      toast('App reseteada. Recargando…');
+      setTimeout(() => {
+        location.href = './?reset=' + Date.now();
+      }, 600);
+    } catch (e) {
+      console.error('Error reseteando app:', e);
+      alert('No se pudo resetear la app: ' + (e?.message || e) + '\n\nProbá cerrar todas las pestañas de la app y volver a intentar.');
+    }
   });
 
   // ── DRAWER DE TARJETA handlers ────────────────────────────────
