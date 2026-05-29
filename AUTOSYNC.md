@@ -1,6 +1,8 @@
 # 🔄 Auto-sync de código
 
-Este repo tiene **auto-push** configurado: cada cambio que Claude hace en la app se sube automáticamente a `main` y se redeploya en GitHub Pages en ~1-2 minutos.
+Este repo tiene **auto-push activado**: cada cambio que Claude hace en la app se sube automáticamente a `main` y se redeploya en GitHub Pages en ~1-2 minutos.
+
+> **Estado:** ✅ Configurado y verificado el 2026-05-29.
 
 ## Cómo funciona
 
