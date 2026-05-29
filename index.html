@@ -317,16 +317,20 @@
   <hr style="border-color:var(--border);margin:1rem .75rem">
 
   <!-- Quick stats -->
-  <div class="px-3 space-y-3">
-    <p class="sidebar-section-title">Resumen</p>
+  <div class="px-3 space-y-3 sidebar-resumen-wrap">
+    <p class="sidebar-section-title">Saldo líquido</p>
     <div class="card-glass p-3 rounded-xl">
-      <p class="text-[10px]" style="color:var(--ink-muted)">Saldo líquido</p>
       <p class="ff-display font-bold text-lg" id="sb-saldo">$0</p>
+      <p class="text-[10px] mt-0.5" style="color:var(--ink-muted)" id="sb-saldo-proy">Proyectado: $0</p>
     </div>
-    <div class="card-glass p-3 rounded-xl">
-      <p class="text-[10px]" style="color:var(--ink-muted)">Próximo vencimiento</p>
-      <p class="text-sm font-semibold" id="sb-proximo">Sin tarjetas</p>
-    </div>
+
+    <!-- Lista de cuentas bancarias -->
+    <p class="sidebar-section-title">Cuentas</p>
+    <div id="sb-cuentas-list" class="sidebar-mini-list"></div>
+
+    <!-- Lista de tarjetas con datos completos -->
+    <p class="sidebar-section-title">Tarjetas</p>
+    <div id="sb-tarjetas-list" class="sidebar-mini-list"></div>
   </div>
 
   <div style="flex:1"></div>
@@ -789,6 +793,65 @@
   </article>
 </template>
 
+<!-- Sueldo y recibos -->
+<template id="tpl-widget-sueldo">
+  <article class="widget card-glass p-5">
+    <header class="flex items-center justify-between mb-3">
+      <h2 class="ff-display text-sm font-semibold uppercase tracking-wider" style="color:var(--ink-muted)">
+        💼 Sueldo y recibos
+      </h2>
+      <button class="text-xs font-semibold px-3 py-1 rounded-full transition"
+              style="background:var(--success-bg);color:var(--success);border:1px solid var(--success)"
+              data-action="add-recibo">+ Cargar recibo</button>
+    </header>
+
+    <!-- KPI principal: último sueldo neto -->
+    <div class="sueldo-hero">
+      <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Último neto cobrado</p>
+      <div class="flex items-baseline gap-2 mt-1">
+        <p class="ff-display font-bold text-3xl text-glow-cyan" data-bind="sueldo-actual">$0</p>
+        <span class="text-xs font-semibold" data-bind="sueldo-variacion">—</span>
+      </div>
+      <p class="text-[10px] mt-1" style="color:var(--ink-2)" data-bind="sueldo-periodo">—</p>
+    </div>
+
+    <!-- KPIs secundarios -->
+    <div class="grid grid-cols-3 gap-2 mt-3 mb-3">
+      <div class="sueldo-kpi-mini">
+        <p class="lbl">Promedio 3m</p>
+        <p class="val" data-bind="sueldo-prom">$0</p>
+      </div>
+      <div class="sueldo-kpi-mini">
+        <p class="lbl">Próximo</p>
+        <p class="val" data-bind="sueldo-prox">$0</p>
+      </div>
+      <div class="sueldo-kpi-mini">
+        <p class="lbl">Aguinaldo</p>
+        <p class="val" data-bind="sueldo-aguinaldo">$0</p>
+      </div>
+    </div>
+
+    <!-- Tabla histórica -->
+    <div class="recibos-tabla-wrap">
+      <table class="recibos-tabla">
+        <thead>
+          <tr>
+            <th>Período</th>
+            <th>Bruto</th>
+            <th>Desc</th>
+            <th>Neto</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody data-bind="recibos-rows"></tbody>
+      </table>
+      <p data-bind="recibos-empty" class="text-xs text-center py-3" style="color:var(--ink-muted);display:none">
+        Sin recibos cargados todavía. Tocá "+ Cargar recibo".
+      </p>
+    </div>
+  </article>
+</template>
+
 <!-- Tipo de cambio -->
 <template id="tpl-widget-tipo_cambio">
   <article class="widget card-glass p-5">
@@ -1141,6 +1204,7 @@
 <!-- Tarjeta -->
 <dialog id="dlg-tarjeta">
   <form method="dialog" class="form-modern" style="min-width:min(94vw,560px);max-width:600px">
+    <input type="hidden" name="_editing_id" />
 
     <!-- Header con icono tarjeta -->
     <div class="form-modern-header">
@@ -1287,6 +1351,44 @@
           </div>
         </div>
       </div>
+
+      <!-- Ciclos personalizados (override por mes) -->
+      <details class="form-collapse" id="ciclos-custom-wrap">
+        <summary>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+          </svg>
+          📅 Ciclos personalizados <span id="ciclos-count" style="margin-left:auto;color:var(--brand);font-weight:700">0</span>
+        </summary>
+        <div class="mt-3">
+          <p class="text-[11px] mb-3" style="color:var(--ink-muted)">
+            Si tu banco anuncia fechas distintas al día habitual (por feriados o cambios), agregalas acá. La regla del día fijo se sigue usando para los meses sin override.
+          </p>
+          <div id="ciclos-custom-list" class="space-y-2 mb-3"></div>
+
+          <div class="ciclo-custom-add">
+            <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--brand)">Agregar ciclo</p>
+            <div class="grid grid-cols-3 gap-2">
+              <div class="form-section">
+                <label class="form-label">Inicio</label>
+                <input type="date" id="cc-inicio" class="input" />
+              </div>
+              <div class="form-section">
+                <label class="form-label">Cierre</label>
+                <input type="date" id="cc-fin" class="input" />
+              </div>
+              <div class="form-section">
+                <label class="form-label">Vencimiento</label>
+                <input type="date" id="cc-venc" class="input" />
+              </div>
+            </div>
+            <button type="button" id="cc-add-btn" class="btn-secondary w-full text-xs mt-2">+ Agregar este ciclo</button>
+          </div>
+        </div>
+      </details>
 
       <!-- Color con presets -->
       <div class="form-section">
@@ -1437,6 +1539,7 @@
 <!-- Meta -->
 <dialog id="dlg-meta">
   <form method="dialog" class="form-modern" style="min-width:min(94vw,560px);max-width:600px">
+    <input type="hidden" name="_editing_id" />
 
     <!-- Header con icono diana -->
     <div class="form-modern-header">
@@ -1588,6 +1691,144 @@
           <polyline points="20 6 9 17 4 12"/>
         </svg>
         Crear meta
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Recibo de sueldo -->
+<dialog id="dlg-recibo">
+  <form method="dialog" class="form-modern" style="min-width:min(94vw,560px);max-width:600px">
+    <input type="hidden" name="_editing_id" />
+
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--success),var(--brand))">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <line x1="7" y1="9" x2="17" y2="9"/>
+          <line x1="7" y1="13" x2="17" y2="13"/>
+          <line x1="7" y1="17" x2="13" y2="17"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Recibo de sueldo</h3>
+        <p class="text-xs" style="color:var(--ink-muted)">Cargá un recibo para tu historial comparativo</p>
+      </div>
+    </div>
+
+    <div class="form-modern-body">
+      <!-- Tipo de recibo -->
+      <div class="form-section">
+        <label class="form-label">Tipo</label>
+        <div class="type-pills">
+          <label class="type-pill"><input type="radio" name="tipo_periodo" value="mensual" checked/><span>💼 Mensual</span></label>
+          <label class="type-pill"><input type="radio" name="tipo_periodo" value="aguinaldo"/><span>🎁 Aguinaldo</span></label>
+          <label class="type-pill"><input type="radio" name="tipo_periodo" value="bono"/><span>✨ Bono extra</span></label>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="form-section">
+          <label class="form-label">Empleador</label>
+          <input name="empleador" placeholder="Empresa S.A." class="input input-lg" />
+        </div>
+        <div class="form-section">
+          <label class="form-label">Período</label>
+          <input name="periodo_aplicacion" required type="month" class="input input-lg" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="form-section">
+          <label class="form-label">Fecha de cobro</label>
+          <input name="fecha" required type="date" class="input input-lg" />
+        </div>
+        <div class="form-section">
+          <label class="form-label">Cuenta acreditada</label>
+          <select name="cuenta_id" class="input input-lg">
+            <option value="">Sin cuenta</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Bruto -->
+      <div class="form-section">
+        <label class="form-label">Sueldo bruto</label>
+        <div class="input-with-prefix">
+          <span class="input-prefix">$</span>
+          <input name="sueldo_bruto" required type="number" step="0.01" placeholder="0" class="input input-lg" id="rec-bruto"/>
+        </div>
+      </div>
+
+      <!-- Descuentos detallados (collapsible) -->
+      <details class="form-collapse">
+        <summary>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Descuentos detallados <span style="color:var(--danger);font-weight:600;margin-left:auto" id="rec-desc-total">$0</span>
+        </summary>
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <div class="form-section">
+            <label class="form-label">Jubilación (11%)</label>
+            <div class="input-with-prefix"><span class="input-prefix">$</span><input name="desc_jubilacion" type="number" step="0.01" placeholder="0" class="input rec-desc-input"/></div>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Obra social (3%)</label>
+            <div class="input-with-prefix"><span class="input-prefix">$</span><input name="desc_obra_social" type="number" step="0.01" placeholder="0" class="input rec-desc-input"/></div>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Ley 19032 (3%)</label>
+            <div class="input-with-prefix"><span class="input-prefix">$</span><input name="desc_ley_19032" type="number" step="0.01" placeholder="0" class="input rec-desc-input"/></div>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Imp. ganancias</label>
+            <div class="input-with-prefix"><span class="input-prefix">$</span><input name="desc_impuesto_ganancias" type="number" step="0.01" placeholder="0" class="input rec-desc-input"/></div>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Sindicato</label>
+            <div class="input-with-prefix"><span class="input-prefix">$</span><input name="desc_sindicato" type="number" step="0.01" placeholder="0" class="input rec-desc-input"/></div>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Otros</label>
+            <div class="input-with-prefix"><span class="input-prefix">$</span><input name="desc_otros" type="number" step="0.01" placeholder="0" class="input rec-desc-input"/></div>
+          </div>
+        </div>
+        <button type="button" id="rec-auto-calcular" class="btn-secondary w-full text-xs mt-3">⚡ Calcular descuentos típicos (17%)</button>
+      </details>
+
+      <!-- Neto y bonos -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="form-section">
+          <label class="form-label">Sueldo NETO *</label>
+          <div class="input-with-prefix">
+            <span class="input-prefix">$</span>
+            <input name="sueldo_neto" required type="number" step="0.01" placeholder="0" class="input input-lg" id="rec-neto"/>
+          </div>
+        </div>
+        <div class="form-section">
+          <label class="form-label">Bonos / Extras</label>
+          <div class="input-with-prefix">
+            <span class="input-prefix">$</span>
+            <input name="bonos" type="number" step="0.01" placeholder="0" class="input input-lg"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recibo total a depositar -->
+      <div class="recibo-resumen" id="rec-resumen">
+        <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Total a acreditar en cuenta</p>
+        <p class="ff-display text-2xl font-bold text-glow-cyan mt-1" id="rec-total">$0</p>
+      </div>
+    </div>
+
+    <div class="form-modern-footer">
+      <button value="cancel" formnovalidate class="btn-secondary flex-1">Cancelar</button>
+      <button value="save" class="btn-primary flex-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Guardar recibo
       </button>
     </div>
   </form>

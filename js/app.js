@@ -145,10 +145,11 @@ const AJUSTES_DEFAULT = {
   ui: {
     tema: 'auto',
     color_primario: '#4f46e5',
-    widgets_visibles: ['estado_global','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
-    widgets_orden: ['estado_global','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
     widgets_tamanos: {
       estado_global: 'lg',
+      sueldo:        'lg',
       cuentas:       'md',
       tarjetas:      'md',
       simulacion_credito: 'md',
@@ -333,6 +334,7 @@ function computarEstadoGlobal() {
 /* ============ RENDER WIDGETS ============ */
 const RENDERERS = {
   estado_global:      renderEstado,
+  sueldo:             renderSueldo,
   cuentas:            renderCuentas,
   tarjetas:           renderTarjetas,
   simulacion_credito: renderCredito,
@@ -350,6 +352,7 @@ const RENDERERS = {
 
 const TPL = {
   estado_global:      'tpl-widget-estado',
+  sueldo:             'tpl-widget-sueldo',
   cuentas:            'tpl-widget-cuentas',
   tarjetas:           'tpl-widget-tarjetas',
   simulacion_credito: 'tpl-widget-credito',
@@ -1489,28 +1492,289 @@ function renderPrediccion(el) {
   }
 }
 
+/* ============ Sueldo (recibos) ============ */
+function renderSueldo(el) {
+  // Filtrar solo recibos de sueldo
+  const recibos = (state.ingresos || [])
+    .filter(i => !i.deleted && i.es_recibo_sueldo)
+    .sort((a,b) => (b.periodo_aplicacion || '').localeCompare(a.periodo_aplicacion || ''));
+
+  const ultimo   = recibos[0];
+  const anterior = recibos[1];
+
+  // KPI principal
+  const actEl  = el.querySelector('[data-bind="sueldo-actual"]');
+  const varEl  = el.querySelector('[data-bind="sueldo-variacion"]');
+  const perEl  = el.querySelector('[data-bind="sueldo-periodo"]');
+  if (actEl) actEl.textContent = ultimo ? FMT.format(ultimo.sueldo_neto || 0) : '$0';
+  if (perEl) perEl.textContent = ultimo
+    ? `${ultimo.empleador ? ultimo.empleador + ' · ' : ''}${ultimo.periodo_aplicacion || '—'}`
+    : 'Sin recibos cargados';
+  if (varEl) {
+    if (ultimo && anterior && anterior.sueldo_neto > 0) {
+      const variacion = ((ultimo.sueldo_neto - anterior.sueldo_neto) / anterior.sueldo_neto) * 100;
+      const arrow = variacion > 0 ? '↑' : variacion < 0 ? '↓' : '=';
+      const color = variacion > 0 ? 'var(--success)' : variacion < 0 ? 'var(--danger)' : 'var(--ink-muted)';
+      varEl.textContent = `${arrow} ${Math.abs(variacion).toFixed(1)}% vs ${anterior.periodo_aplicacion}`;
+      varEl.style.color = color;
+    } else {
+      varEl.textContent = '';
+    }
+  }
+
+  // KPIs secundarios
+  const mensuales = recibos.filter(r => (r.tipo_periodo || 'mensual') === 'mensual');
+  const ultimos3 = mensuales.slice(0, 3);
+  const promedio = ultimos3.length ? ultimos3.reduce((a,r)=>a+(r.sueldo_neto||0), 0) / ultimos3.length : 0;
+  const aguinaldos = recibos.filter(r => r.tipo_periodo === 'aguinaldo');
+  const ultimoAguinaldo = aguinaldos[0]?.sueldo_neto || 0;
+
+  el.querySelector('[data-bind="sueldo-prom"]').textContent      = FMT.format(promedio);
+  el.querySelector('[data-bind="sueldo-prox"]').textContent      = FMT.format(promedio);
+  el.querySelector('[data-bind="sueldo-aguinaldo"]').textContent = FMT.format(ultimoAguinaldo);
+
+  // Tabla histórica
+  const tbody = el.querySelector('[data-bind="recibos-rows"]');
+  const empty = el.querySelector('[data-bind="recibos-empty"]');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (recibos.length === 0) {
+    if (empty) empty.style.display = 'block';
+  } else {
+    if (empty) empty.style.display = 'none';
+    for (const r of recibos.slice(0, 6)) {
+      const tipo = r.tipo_periodo || 'mensual';
+      const desc = r.descuentos_detalle
+        ? Object.values(r.descuentos_detalle).reduce((a,v) => a + (v || 0), 0)
+        : ((r.sueldo_bruto || 0) - (r.sueldo_neto || 0));
+      const badgeCls = tipo === 'mensual' ? '' : tipo;
+      const badge = tipo !== 'mensual' ? `<span class="rec-tipo-badge ${badgeCls}">${tipo}</span>` : '';
+      tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td>${escapeHtml(r.periodo_aplicacion || '—')}${badge}</td>
+          <td>${FMT.format(r.sueldo_bruto || 0)}</td>
+          <td style="color:var(--danger)">-${FMT.format(desc)}</td>
+          <td style="color:var(--success)">${FMT.format(r.sueldo_neto || 0)}</td>
+          <td><button class="rec-delete" data-rec-del="${r.id}" title="Eliminar">✕</button></td>
+        </tr>`);
+    }
+    tbody.querySelectorAll('[data-rec-del]').forEach(b => {
+      b.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar este recibo?')) return;
+        await DB.softDelete('ingresos', b.dataset.recDel);
+        await reloadAll();
+        toast('Recibo eliminado');
+      });
+    });
+  }
+
+  // Botón "+ Cargar recibo"
+  el.querySelector('[data-action="add-recibo"]')?.addEventListener('click', () => abrirDialogoRecibo());
+}
+
+function abrirDialogoRecibo(reciboExistente = null) {
+  const dlg = document.getElementById('dlg-recibo');
+  if (!dlg) return;
+  const form = dlg.querySelector('form');
+  form.reset();
+  if (form.elements._editing_id) form.elements._editing_id.value = reciboExistente?.id || '';
+
+  // Poblar select de cuentas
+  const cuentas = (state.cuentas || []).filter(c => !c.deleted);
+  const sel = form.elements.cuenta_id;
+  if (sel) {
+    sel.innerHTML = `<option value="">Sin cuenta</option>` +
+      cuentas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  }
+
+  // Defaults
+  const hoy = new Date();
+  if (!form.elements.fecha.value)               form.elements.fecha.value = hoy.toISOString().slice(0,10);
+  if (!form.elements.periodo_aplicacion.value)  form.elements.periodo_aplicacion.value = hoy.toISOString().slice(0,7);
+
+  if (reciboExistente) {
+    form.elements.empleador.value         = reciboExistente.empleador || '';
+    form.elements.fecha.value             = reciboExistente.fecha || hoy.toISOString().slice(0,10);
+    form.elements.periodo_aplicacion.value= reciboExistente.periodo_aplicacion || hoy.toISOString().slice(0,7);
+    form.elements.sueldo_bruto.value      = reciboExistente.sueldo_bruto || '';
+    form.elements.sueldo_neto.value       = reciboExistente.sueldo_neto || '';
+    form.elements.bonos.value             = reciboExistente.bonos || '';
+    form.elements.cuenta_id.value         = reciboExistente.cuenta_id || '';
+    if (reciboExistente.tipo_periodo) {
+      const r = form.querySelector(`input[name="tipo_periodo"][value="${reciboExistente.tipo_periodo}"]`);
+      if (r) r.checked = true;
+    }
+    const dd = reciboExistente.descuentos_detalle || {};
+    for (const k of ['jubilacion','obra_social','ley_19032','impuesto_ganancias','sindicato','otros']) {
+      if (form.elements['desc_' + k]) form.elements['desc_' + k].value = dd[k] || '';
+    }
+  }
+
+  actualizarResumenRecibo();
+  dlg.showModal();
+}
+
+function actualizarResumenRecibo() {
+  const form = document.querySelector('#dlg-recibo form');
+  if (!form) return;
+  const neto = parseFloat(form.elements.sueldo_neto?.value) || 0;
+  const bonos= parseFloat(form.elements.bonos?.value) || 0;
+  const total = neto + bonos;
+  const totEl = document.getElementById('rec-total');
+  if (totEl) totEl.textContent = FMT.format(total);
+
+  // Suma de descuentos
+  let descTotal = 0;
+  for (const k of ['jubilacion','obra_social','ley_19032','impuesto_ganancias','sindicato','otros']) {
+    descTotal += parseFloat(form.elements['desc_' + k]?.value) || 0;
+  }
+  const descEl = document.getElementById('rec-desc-total');
+  if (descEl) descEl.textContent = '-' + FMT.format(descTotal);
+
+  // Auto-calcular neto si bruto - descuentos > 0 y neto está vacío
+  const bruto = parseFloat(form.elements.sueldo_bruto?.value) || 0;
+  const netoEl = form.elements.sueldo_neto;
+  if (bruto > 0 && descTotal > 0 && (!netoEl.value || netoEl.dataset.autoCalc === '1')) {
+    netoEl.value = (bruto - descTotal).toFixed(2);
+    netoEl.dataset.autoCalc = '1';
+  }
+}
+
+async function handleSubmitRecibo(form) {
+  const fd = new FormData(form);
+  const editingId = fd.get('_editing_id');
+  const base = editingId ? (await DB.get('ingresos', editingId) || {}) : {};
+
+  const descuentos_detalle = {
+    jubilacion:          parseFloat(fd.get('desc_jubilacion')||0),
+    obra_social:         parseFloat(fd.get('desc_obra_social')||0),
+    ley_19032:           parseFloat(fd.get('desc_ley_19032')||0),
+    impuesto_ganancias:  parseFloat(fd.get('desc_impuesto_ganancias')||0),
+    sindicato:           parseFloat(fd.get('desc_sindicato')||0),
+    otros:               parseFloat(fd.get('desc_otros')||0),
+  };
+  const descTotal = Object.values(descuentos_detalle).reduce((a,v)=>a+v, 0);
+
+  const r = {
+    ...base,
+    id: editingId || uuid(),
+    updated_at: nowTs(),
+    deleted: false,
+    es_recibo_sueldo: true,
+    tipo_periodo: fd.get('tipo_periodo') || 'mensual',
+    empleador: fd.get('empleador') || null,
+    fecha: fd.get('fecha'),
+    periodo_aplicacion: fd.get('periodo_aplicacion'),
+    sueldo_bruto: parseFloat(fd.get('sueldo_bruto')||0),
+    sueldo_neto: parseFloat(fd.get('sueldo_neto')||0),
+    bonos: parseFloat(fd.get('bonos')||0),
+    cuenta_id: fd.get('cuenta_id') || null,
+    descuentos_detalle,
+    descuentos: descTotal,
+    descripcion: fd.get('tipo_periodo') === 'aguinaldo' ? 'Aguinaldo' : (fd.get('tipo_periodo') === 'bono' ? 'Bono' : 'Sueldo'),
+  };
+  await DB.put('ingresos', r); notificarCambioLocal();
+  toast(editingId ? 'Recibo actualizado' : 'Recibo guardado');
+  await reloadAll();
+}
+
 function actualizarSidebar() {
-  // Saldo en sidebar
+  // ── Saldo líquido y proyectado ────────────────────────────
   const sbSaldo = document.getElementById('sb-saldo');
   if (sbSaldo && state.estado) {
     sbSaldo.textContent = FMT.format(state.estado.saldo_liquido);
     sbSaldo.style.color = state.estado.saldo_liquido >= 0 ? 'var(--ink)' : 'var(--danger)';
   }
+  const sbProy = document.getElementById('sb-saldo-proy');
+  if (sbProy && state.estado) {
+    sbProy.textContent = `Proyectado: ${FMT.format(state.estado.saldo_proyectado)}`;
+  }
 
-  // Próximo vencimiento
-  const sbProx = document.getElementById('sb-proximo');
-  if (sbProx) {
-    const prox = state.resumenes
-      .filter(r => r.dias_para_vencimiento >= 0)
-      .sort((a,b)=>a.dias_para_vencimiento - b.dias_para_vencimiento)[0];
-    if (prox) {
-      const t = state.tarjetas.find(t=>t.id===prox.tarjeta_id);
-      const color = prox.dias_para_vencimiento <= 2 ? 'var(--danger)' : prox.dias_para_vencimiento <= 7 ? 'var(--warning)' : 'var(--success)';
-      sbProx.textContent = `${t?.nombre||'Tarjeta'} — ${prox.dias_para_vencimiento}d`;
-      sbProx.style.color = color;
+  // ── Lista mini de cuentas bancarias ──────────────────────
+  const cuentasBox = document.getElementById('sb-cuentas-list');
+  if (cuentasBox) {
+    cuentasBox.innerHTML = '';
+    const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+    if (cuentas.length === 0) {
+      cuentasBox.innerHTML = `<div class="sidebar-mini-empty">Sin cuentas</div>`;
     } else {
-      sbProx.textContent = 'Sin vencimientos';
-      sbProx.style.color = 'var(--ink-muted)';
+      const ICONS = { caja_ahorro:'🏦', cuenta_corriente:'💼', billetera:'📱', efectivo:'💵', inversion:'📈', cripto:'₿' };
+      for (const c of cuentas) {
+        const saldo = calcularSaldoCuenta(c);
+        const color = c.color || 'var(--brand)';
+        const icon  = ICONS[c.tipo] || '🏦';
+        const html  = `
+          <div class="sidebar-mini-item" data-cuenta-id="${c.id}" style="--accent:${color}">
+            <div class="mi-head">
+              <span class="mi-icon">${icon}</span>
+              <span class="mi-nombre">${escapeHtml(c.nombre)}</span>
+            </div>
+            <span class="mi-saldo" style="color:${saldo >= 0 ? 'var(--success)' : 'var(--danger)'}">${FMT.format(saldo)}</span>
+            ${c.banco ? `<p class="mi-info">${escapeHtml(c.banco)}</p>` : ''}
+          </div>`;
+        cuentasBox.insertAdjacentHTML('beforeend', html);
+      }
+      cuentasBox.querySelectorAll('[data-cuenta-id]').forEach(el =>
+        el.addEventListener('click', () => abrirVistaCuentas())
+      );
+    }
+  }
+
+  // ── Lista mini de tarjetas con info completa ─────────────
+  const tarjBox = document.getElementById('sb-tarjetas-list');
+  if (tarjBox) {
+    tarjBox.innerHTML = '';
+    const tarjetas = (state.tarjetas || []).filter(t => !t.deleted && t.activa !== false);
+    if (tarjetas.length === 0) {
+      tarjBox.innerHTML = `<div class="sidebar-mini-empty">Sin tarjetas</div>`;
+    } else {
+      // Capacidad por tarjeta (de state.capacidad)
+      const cap = state.capacidad;
+      const mesesCortos = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      const fmtCorto = (iso) => {
+        if (!iso) return '—';
+        const d = new Date(iso + 'T12:00:00');
+        return `${d.getDate()} ${mesesCortos[d.getMonth()]}`;
+      };
+      for (const t of tarjetas) {
+        const r = state.resumenes.find(x => x.tarjeta_id === t.id);
+        const capT = cap?.por_tarjeta?.find(x => x.tarjeta_id === t.id);
+        const lim = (t.limite_un_pago||0) + (t.limite_cuotas||0);
+        const usado = r?.total_resumen || 0;
+        const disp  = Math.max(0, lim - usado);
+        const pct   = lim ? Math.min(100, Math.round(usado*100/lim)) : 0;
+        const diasC = r?.dias_para_cierre ?? 0;
+        const cuotasN = capT?.cuotas_pendientes?.length || 0;
+        const color  = t.color || 'var(--brand)';
+
+        let badgeCls, badgeTxt;
+        if (diasC <= 2)      { badgeCls = 'urgente'; badgeTxt = `${diasC}d`; }
+        else if (diasC <= 7) { badgeCls = 'warning'; badgeTxt = `${diasC}d`; }
+        else                 { badgeCls = 'ok';      badgeTxt = `${diasC}d`; }
+
+        tarjBox.insertAdjacentHTML('beforeend', `
+          <div class="sidebar-mini-item" data-tarjeta-id="${t.id}" style="--accent:${color}">
+            <div class="mi-head">
+              <span class="mi-icon">💳</span>
+              <span class="mi-nombre">${escapeHtml(t.nombre)}</span>
+              <span class="mi-badge ${badgeCls}">${badgeTxt}</span>
+            </div>
+            <span class="mi-saldo" style="color:${color}">${FMT.format(usado)}</span>
+            <div class="mi-progress"><div style="width:${pct}%"></div></div>
+            <div class="mi-row">
+              <span>Disp: <b style="color:var(--success)">${FMT.format(disp)}</b></span>
+              <span>${pct}%</span>
+            </div>
+            <div class="mi-row">
+              <span>🔒 ${fmtCorto(r?.fecha_cierre)}</span>
+              <span>💸 ${fmtCorto(r?.fecha_vencimiento)}</span>
+            </div>
+            ${cuotasN > 0 ? `<div class="mi-row"><span>📦 ${cuotasN} cuota${cuotasN!==1?'s':''} pendiente${cuotasN!==1?'s':''}</span></div>` : ''}
+          </div>`);
+      }
+      tarjBox.querySelectorAll('[data-tarjeta-id]').forEach(el =>
+        el.addEventListener('click', () => abrirDrawerTarjeta(el.dataset.tarjetaId))
+      );
     }
   }
 }
@@ -1849,8 +2113,13 @@ async function handleSubmitIngreso(form) {
 
 async function handleSubmitTarjeta(form) {
   const fd = new FormData(form);
+  const editingId = fd.get('_editing_id');
+  // Si estamos editando, traer la tarjeta existente para preservar
+  // cosas como cotizaciones_historico, ciclos_custom, etc.
+  const base = editingId ? (await DB.get('tarjetas', editingId) || {}) : {};
   const t = {
-    id: uuid(),
+    ...base,
+    id: editingId || uuid(),
     updated_at: nowTs(),
     deleted: false,
     nombre: fd.get('nombre'),
@@ -1861,10 +2130,11 @@ async function handleSubmitTarjeta(form) {
     dia_cierre:     parseInt(fd.get('dia_cierre')),
     dia_vencimiento: parseInt(fd.get('dia_vencimiento')),
     color: fd.get('color') || '#4f46e5',
-    activa: true,
+    activa: base.activa !== false,
+    ciclos_custom: Array.isArray(_ciclosCustomEditando) ? [..._ciclosCustomEditando] : (base.ciclos_custom || []),
   };
   await DB.put('tarjetas', t); notificarCambioLocal();
-  toast('Tarjeta guardada');
+  toast(editingId ? 'Tarjeta actualizada' : 'Tarjeta creada');
   await reloadAll();
 }
 
@@ -1892,8 +2162,11 @@ async function handleSubmitCuenta(form) {
 
 async function handleSubmitMeta(form) {
   const fd = new FormData(form);
+  const editingId = fd.get('_editing_id');
+  const base = editingId ? (await DB.get('metas', editingId) || {}) : {};
   const m = {
-    id: uuid(),
+    ...base,
+    id: editingId || uuid(),
     updated_at: nowTs(),
     deleted: false,
     nombre: fd.get('nombre'),
@@ -1904,7 +2177,7 @@ async function handleSubmitMeta(form) {
     es_emergencia: !!fd.get('es_emergencia'),
   };
   await DB.put('metas', m); notificarCambioLocal();
-  toast('Meta guardada');
+  toast(editingId ? 'Meta actualizada' : 'Meta creada');
   await reloadAll();
 }
 
@@ -1937,13 +2210,14 @@ function abrirSettings() {
   if (cont) {
     cont.innerHTML = '';
     const ICONS = {
-      estado_global: '💰', cuentas: '🏦', tarjetas: '💳', simulacion_credito: '📊',
+      estado_global: '💰', sueldo: '💼', cuentas: '🏦', tarjetas: '💳', simulacion_credito: '📊',
       ia_local: '🧠', metas: '🎯', grafico: '📈',
       resumen_anual: '📅', flujo_mensual: '🌊', categorias: '🍩',
       tipo_cambio: '💱', calculadora: '🧮', comparador: '⚖',
     };
     const LABELS = {
-      estado_global: 'Estado global', cuentas: 'Cuentas bancarias',
+      estado_global: 'Estado global', sueldo: 'Sueldo y recibos',
+      cuentas: 'Cuentas bancarias',
       tarjetas: 'Tarjetas',
       simulacion_credito: 'Capacidad crediticia', ia_local: 'Análisis IA',
       metas: 'Metas de ahorro', grafico: 'Evolución 6 meses',
@@ -3462,6 +3736,29 @@ async function init() {
     if (e.target.returnValue === 'save') handleSubmitMeta(e.target.querySelector('form'));
     _restaurarActivoHome();
   });
+  document.getElementById('dlg-recibo')?.addEventListener('close', async (e) => {
+    if (e.target.returnValue === 'save') await handleSubmitRecibo(e.target.querySelector('form'));
+  });
+
+  // Recalcular resumen del recibo en vivo
+  document.addEventListener('input', (e) => {
+    if (e.target.closest('#dlg-recibo')) {
+      if (e.target.name === 'sueldo_neto') e.target.dataset.autoCalc = '';
+      actualizarResumenRecibo();
+    }
+  });
+
+  // Botón "calcular descuentos típicos 17%"
+  document.getElementById('rec-auto-calcular')?.addEventListener('click', () => {
+    const form = document.querySelector('#dlg-recibo form');
+    const bruto = parseFloat(form.elements.sueldo_bruto?.value) || 0;
+    if (bruto <= 0) { toast('Ingresá el sueldo bruto primero', 2000); return; }
+    form.elements.desc_jubilacion.value         = (bruto * 0.11).toFixed(2);
+    form.elements.desc_obra_social.value        = (bruto * 0.03).toFixed(2);
+    form.elements.desc_ley_19032.value          = (bruto * 0.03).toFixed(2);
+    actualizarResumenRecibo();
+  });
+
   document.getElementById('dlg-settings').addEventListener('close', (e) => {
     if (e.target.returnValue === 'save') guardarSettings(e.target.querySelector('form'));
   });
@@ -4124,6 +4421,8 @@ async function editarTarjeta(id) {
   const dlg = document.getElementById('dlg-tarjeta');
   const form = dlg.querySelector('form');
   form.reset();
+  // CRÍTICO: marcar como edición para que handleSubmit preserve el ID
+  if (form.elements._editing_id) form.elements._editing_id.value = id;
   if (form.elements.nombre)          form.elements.nombre.value = t.nombre || '';
   if (form.elements.banco)           form.elements.banco.value = t.banco || '';
   if (form.elements.ultimos_4)       form.elements.ultimos_4.value = t.ultimos_4 || '';
@@ -4132,6 +4431,13 @@ async function editarTarjeta(id) {
   if (form.elements.dia_cierre)      form.elements.dia_cierre.value = t.dia_cierre || 15;
   if (form.elements.dia_vencimiento) form.elements.dia_vencimiento.value = t.dia_vencimiento || 5;
   if (form.elements.color)           form.elements.color.value = t.color || '#00f0ff';
+  // Refrescar la preview y el visualizador del ciclo
+  setTimeout(() => {
+    if (typeof updateCardPreview === 'function')  updateCardPreview();
+    if (typeof actualizarCicloVisual === 'function') actualizarCicloVisual();
+  }, 100);
+  // Cargar ciclos custom existentes
+  if (typeof cargarCiclosCustomEnDialog === 'function') cargarCiclosCustomEnDialog(t);
   dlg.showModal();
 }
 
@@ -4401,7 +4707,79 @@ function actualizarCicloVisual() {
 document.addEventListener('click', (e) => {
   if (e.target.closest('[data-action="add-card"], [data-sidebar-tab="tarjetas"], [data-tab="tarjetas"], #add-tarjeta-btn')) {
     setTimeout(actualizarCicloVisual, 100);
+    // Resetear lista de ciclos custom para tarjeta nueva
+    setTimeout(() => {
+      _ciclosCustomEditando = [];
+      renderCiclosCustomList();
+    }, 100);
   }
+});
+
+/* ============ Ciclos custom en dlg-tarjeta ============ */
+let _ciclosCustomEditando = [];
+
+function cargarCiclosCustomEnDialog(tarjeta) {
+  _ciclosCustomEditando = Array.isArray(tarjeta?.ciclos_custom) ? [...tarjeta.ciclos_custom] : [];
+  renderCiclosCustomList();
+}
+
+function renderCiclosCustomList() {
+  const cont  = document.getElementById('ciclos-custom-list');
+  const count = document.getElementById('ciclos-count');
+  if (!cont) return;
+  cont.innerHTML = '';
+  if (count) count.textContent = _ciclosCustomEditando.length;
+
+  if (_ciclosCustomEditando.length === 0) {
+    cont.innerHTML = `<p class="text-[11px] text-center py-2" style="color:var(--ink-muted)">Sin ciclos personalizados (se usa el día fijo)</p>`;
+    return;
+  }
+  const sorted = [..._ciclosCustomEditando].sort((a,b) => (a.inicio||'').localeCompare(b.inicio||''));
+  const fmtCorto = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso + 'T12:00:00');
+    const mn = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${d.getDate()}/${mn[d.getMonth()]}/${String(d.getFullYear()).slice(-2)}`;
+  };
+  sorted.forEach((c, realIdxFromSort) => {
+    const idx = _ciclosCustomEditando.indexOf(c);
+    cont.insertAdjacentHTML('beforeend', `
+      <div class="ciclo-custom-row">
+        <div class="ciclo-custom-row-info">
+          <span class="periodo">${c.periodo || '—'}</span>
+          <span class="dates">${fmtCorto(c.inicio)} → ${fmtCorto(c.fin)} · 💸 ${fmtCorto(c.vencimiento)}</span>
+        </div>
+        <button type="button" class="ciclo-custom-row-del" data-idx="${idx}" title="Eliminar">✕</button>
+      </div>`);
+  });
+  cont.querySelectorAll('[data-idx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.idx);
+      _ciclosCustomEditando.splice(i, 1);
+      renderCiclosCustomList();
+    });
+  });
+}
+
+// Botón "+ Agregar ciclo"
+document.addEventListener('click', (e) => {
+  if (e.target.id !== 'cc-add-btn') return;
+  const inicio = document.getElementById('cc-inicio')?.value;
+  const fin    = document.getElementById('cc-fin')?.value;
+  const venc   = document.getElementById('cc-venc')?.value;
+  if (!inicio || !fin || !venc) { toast('Completá las 3 fechas', 2000); return; }
+  if (inicio > fin) { toast('Inicio debe ser anterior al cierre', 2000); return; }
+  // El "periodo" del ciclo es YYYY-MM del cierre (el resumen)
+  const periodo = fin.slice(0, 7);
+  // Validar superposición
+  const overlap = _ciclosCustomEditando.find(c => !(c.fin < inicio || c.inicio > fin));
+  if (overlap) { toast('Las fechas se superponen con un ciclo existente', 2500); return; }
+  _ciclosCustomEditando.push({ periodo, inicio, fin, vencimiento: venc });
+  document.getElementById('cc-inicio').value = '';
+  document.getElementById('cc-fin').value = '';
+  document.getElementById('cc-venc').value = '';
+  renderCiclosCustomList();
+  toast('✓ Ciclo agregado');
 });
 
 // Sincronizar bank_quick → banco

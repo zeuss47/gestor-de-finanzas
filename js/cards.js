@@ -34,8 +34,36 @@ function toISO(d) {
   return `${y}-${m}-${dd}`;
 }
 
-/* ============ Cálculo de cierre/vencimiento ============ */
+/* ============ Cálculo de cierre/vencimiento ============
+ * La tarjeta puede tener:
+ *  - dia_cierre / dia_vencimiento (regla por defecto, mismo día cada mes)
+ *  - ciclos_custom: [{ periodo: 'YYYY-MM', inicio, fin, vencimiento }]
+ *    cuando el banco anuncia fechas distintas (feriados, cambios), agregás
+ *    un override y el motor usa esas fechas exactas para ese período.
+ */
 export function fechasCiclo(tarjeta, hoy = new Date()) {
+  // 1. ¿Hay un ciclo custom que contenga hoy?
+  const custom = (tarjeta.ciclos_custom || []).find(c => {
+    if (!c.inicio || !c.fin) return false;
+    const d = hoy.toISOString().slice(0,10);
+    return c.inicio <= d && d <= c.fin;
+  });
+  if (custom) {
+    const cierre = new Date(custom.fin + 'T12:00:00');
+    const venc   = custom.vencimiento
+      ? new Date(custom.vencimiento + 'T12:00:00')
+      : ajustarDia(cierre.getFullYear(), cierre.getMonth() + 1, tarjeta.dia_vencimiento || cierre.getDate());
+    return {
+      cierre,
+      vencimiento: venc,
+      periodo: custom.periodo || `${cierre.getFullYear()}-${String(cierre.getMonth() + 1).padStart(2, '0')}`,
+      diasParaCierre: diasEntre(hoy, cierre),
+      diasParaVencimiento: diasEntre(hoy, venc),
+      esCustom: true,
+    };
+  }
+
+  // 2. Regla por día fijo
   const Y = hoy.getFullYear(), M = hoy.getMonth() + 1, D = hoy.getDate();
   let cierre;
   if (D <= tarjeta.dia_cierre) {
@@ -57,11 +85,23 @@ export function fechasCiclo(tarjeta, hoy = new Date()) {
     periodo: `${cierre.getFullYear()}-${String(cierre.getMonth() + 1).padStart(2, '0')}`,
     diasParaCierre: diasEntre(hoy, cierre),
     diasParaVencimiento: diasEntre(hoy, venc),
+    esCustom: false,
   };
 }
 
 /* ============ ¿La compra cae en este período de cierre? ============ */
 export function cuotaEnPeriodo(fechaCompra, tarjeta, periodoY, periodoM) {
+  // 1. Si hay un ciclo custom que contenga esta fecha de compra → usar ese período
+  const custom = (tarjeta.ciclos_custom || []).find(c => {
+    if (!c.inicio || !c.fin) return false;
+    return c.inicio <= fechaCompra && fechaCompra <= c.fin;
+  });
+  if (custom && custom.periodo) {
+    const [cy, cm] = custom.periodo.split('-').map(Number);
+    return cy === periodoY && cm === periodoM;
+  }
+
+  // 2. Regla por día fijo
   const fc = new Date(fechaCompra + 'T00:00:00');
   let baseY, baseM;
   if (fc.getDate() <= tarjeta.dia_cierre) {

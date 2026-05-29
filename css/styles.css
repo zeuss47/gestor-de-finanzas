@@ -3218,3 +3218,208 @@ body.view-analisis #main-widgets::before {
   font-weight: 700;
   color: var(--brand);
 }
+
+/* ── Ciclos custom (override por mes) ────────────────────────── */
+.ciclo-custom-add {
+  padding: .75rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px dashed var(--brand);
+}
+.ciclo-custom-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .5rem;
+  align-items: center;
+  padding: .6rem .75rem;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--brand-soft);
+}
+.ciclo-custom-row-info { font-size: .7rem; color: var(--ink); }
+.ciclo-custom-row-info .periodo { font-weight: 700; color: var(--brand); margin-right: 6px; }
+.ciclo-custom-row-info .dates {
+  font-family: 'Space Grotesk', monospace; font-size: .65rem; color: var(--ink-2);
+}
+.ciclo-custom-row-del {
+  width: 24px; height: 24px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--ink-muted); border-radius: 6px; cursor: pointer;
+}
+.ciclo-custom-row-del:hover {
+  background: var(--danger-bg); color: var(--danger); border-color: var(--danger);
+}
+
+/* ── Sidebar Resumen expandido ───────────────────────────────── */
+.sidebar-resumen-wrap {
+  max-height: calc(100dvh - 380px);
+  overflow-y: auto;
+  padding-right: 6px !important;
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand-soft) transparent;
+}
+.sidebar-resumen-wrap::-webkit-scrollbar { width: 4px; }
+.sidebar-resumen-wrap::-webkit-scrollbar-thumb { background: var(--brand-soft); border-radius: 999px; }
+
+.sidebar-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.sidebar-mini-item {
+  padding: .55rem .65rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(0,240,255,0.03), rgba(255,0,234,0.02));
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all .15s;
+  position: relative;
+  overflow: hidden;
+}
+.sidebar-mini-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent, var(--brand));
+  border-radius: 3px 0 0 3px;
+  opacity: .7;
+}
+.sidebar-mini-item:hover {
+  background: linear-gradient(135deg, rgba(0,240,255,0.06), rgba(255,0,234,0.03));
+  border-color: var(--accent, var(--border-2));
+  transform: translateX(2px);
+}
+.sidebar-mini-item .mi-head {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  margin-bottom: .15rem;
+}
+.sidebar-mini-item .mi-icon { font-size: .85rem; flex-shrink: 0; }
+.sidebar-mini-item .mi-nombre {
+  font-size: .68rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.sidebar-mini-item .mi-saldo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: .8rem;
+  display: block;
+}
+.sidebar-mini-item .mi-info {
+  font-size: .55rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: .1rem;
+}
+.sidebar-mini-item .mi-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: .58rem;
+  color: var(--ink-2);
+  margin-top: .15rem;
+}
+.sidebar-mini-item .mi-row b { color: var(--ink); font-family: 'Space Grotesk', sans-serif; }
+.sidebar-mini-item .mi-progress {
+  height: 3px;
+  margin-top: .35rem;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.sidebar-mini-item .mi-progress > div {
+  height: 100%;
+  background: var(--accent, var(--brand));
+  border-radius: 999px;
+}
+.sidebar-mini-item .mi-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: .55rem;
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.sidebar-mini-item .mi-badge.urgente { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+.sidebar-mini-item .mi-badge.warning { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); }
+.sidebar-mini-item .mi-badge.ok      { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+.sidebar-mini-empty {
+  text-align: center;
+  font-size: .65rem;
+  color: var(--ink-muted);
+  padding: .65rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+}
+
+/* ── Widget Sueldo ──────────────────────────────────────────── */
+.sueldo-hero {
+  padding: 1rem;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(0,255,159,0.06), rgba(0,240,255,0.04));
+  border: 1px solid var(--success);
+}
+.sueldo-kpi-mini {
+  padding: .5rem .65rem;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.sueldo-kpi-mini .lbl {
+  font-size: .55rem; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink-muted); margin: 0;
+}
+.sueldo-kpi-mini .val {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700; font-size: .8rem; margin-top: 2px;
+  color: var(--ink);
+}
+
+.recibos-tabla-wrap {
+  border-radius: 8px; overflow: hidden; border: 1px solid var(--border);
+}
+.recibos-tabla {
+  width: 100%; border-collapse: collapse; font-size: .7rem;
+}
+.recibos-tabla th {
+  background: var(--surface-2); color: var(--ink-muted);
+  font-size: .58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  padding: .4rem .55rem; text-align: left; border-bottom: 1px solid var(--border);
+}
+.recibos-tabla th:nth-child(2), .recibos-tabla th:nth-child(3), .recibos-tabla th:nth-child(4) { text-align: right; }
+.recibos-tabla td {
+  padding: .4rem .55rem; border-bottom: 1px solid var(--border);
+  font-family: 'Space Grotesk', sans-serif; font-weight: 600;
+}
+.recibos-tabla td:nth-child(2), .recibos-tabla td:nth-child(3), .recibos-tabla td:nth-child(4) { text-align: right; }
+.recibos-tabla tbody tr:hover { background: var(--surface); }
+.recibos-tabla tbody tr:last-child td { border-bottom: none; }
+.recibos-tabla .rec-tipo-badge {
+  font-size: .5rem; padding: 1px 5px; border-radius: 999px;
+  background: var(--brand-soft); color: var(--brand); margin-left: 4px;
+}
+.recibos-tabla .rec-tipo-badge.aguinaldo { background: rgba(255,234,0,.15); color: var(--brand-3); }
+.recibos-tabla .rec-tipo-badge.bono      { background: rgba(255,0,234,.15); color: var(--neon-pink); }
+.recibos-tabla .rec-delete {
+  background: transparent; border: none; color: var(--ink-muted); cursor: pointer;
+  font-size: .65rem; padding: 0 4px;
+}
+.recibos-tabla .rec-delete:hover { color: var(--danger); }
+
+.recibo-resumen {
+  margin-top: .25rem;
+  padding: .85rem 1rem;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(0,240,255,0.08), rgba(0,255,159,0.04));
+  border: 1px solid var(--brand);
+}
