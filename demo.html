@@ -28,7 +28,7 @@
   <div class="bar-wrap"><div class="bar" id="bar"></div></div>
   <p class="status" id="status">Iniciando…</p>
   <p class="error" id="error"></p>
-  <button class="btn" id="btn" onclick="location.href='/'">Abrir la app →</button>
+  <button class="btn" id="btn" onclick="location.href='./'">Abrir la app →</button>
 
 <script>
 const DB_NAME    = 'gestor_finanzas_db';
@@ -339,7 +339,7 @@ async function loadDemo() {
 
     setBar(100, 'Listo — redirigiendo…');
     btn.style.display = 'block';
-    setTimeout(() => { location.href = '/'; }, 1200);
+    setTimeout(() => { location.href = './'; }, 1200);
 
   } catch(e) {
     errEl.textContent = 'Error: ' + e.message;

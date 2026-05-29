@@ -5,11 +5,25 @@
   <title>Redirigiendo…</title>
   <script>
     // GitHub Pages devuelve 404.html para rutas SPA inexistentes.
-    // Redirigir al index manteniendo el path. Como la app no usa
-    // routing por path (solo querystring), basta con ir al index.
-    const repoBase = location.pathname.split('/').slice(0, 2).join('/') + '/';
-    location.replace(repoBase + location.search + location.hash);
+    // Si el path tiene un segmento (probable repo name), redirigir al subpath.
+    // Si la raíz, redirigir a /gestor-de-finanzas/ explícitamente.
+    (function() {
+      const parts = location.pathname.split('/').filter(Boolean);
+      let repoBase;
+      if (parts.length >= 1) {
+        // Estamos en /<repo>/algo → ir a /<repo>/
+        repoBase = '/' + parts[0] + '/';
+      } else {
+        // Estamos en la raíz pura — asumir nuestro repo conocido
+        repoBase = '/gestor-de-finanzas/';
+      }
+      location.replace(repoBase + location.search + location.hash);
+    })();
   </script>
 </head>
-<body></body>
+<body>
+  <p style="font-family:sans-serif;text-align:center;padding:2rem">
+    Redirigiendo a <a href="/gestor-de-finanzas/">la app</a>…
+  </p>
+</body>
 </html>
