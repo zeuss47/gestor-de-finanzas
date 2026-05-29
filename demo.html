@@ -32,7 +32,7 @@
 
 <script>
 const DB_NAME    = 'gestor_finanzas_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // debe coincidir con db.js DB_VERSION
 const bar    = document.getElementById('bar');
 const status = document.getElementById('status');
 const errEl  = document.getElementById('error');
@@ -264,10 +264,28 @@ const ajustes = {
 async function loadDemo() {
   try {
     setBar(5, 'Abriendo base de datos…');
+
+    // Detectar versión actual de la DB para no chocar.
+    // Si la DB ya existe en una versión >= DB_VERSION, abrimos con esa.
+    // Si no existe o es vieja, abrimos con DB_VERSION (dispara upgradeneeded).
+    const versionExistente = await new Promise(res => {
+      if (!indexedDB.databases) { res(null); return; }
+      indexedDB.databases()
+        .then(dbs => {
+          const d = dbs.find(x => x.name === DB_NAME);
+          res(d?.version || null);
+        })
+        .catch(() => res(null));
+    });
+    const versionAUsar = versionExistente && versionExistente > DB_VERSION
+      ? versionExistente
+      : DB_VERSION;
+
     const db = await new Promise((res,rej) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const req = indexedDB.open(DB_NAME, versionAUsar);
       req.onupgradeneeded = ev => {
         const d = req.result;
+        const tx = ev.target.transaction;
         const schema = {
           gastos:    { keyPath:'id', indexes:['fecha','tarjeta_id','cuenta_id','categoria','updated_at'] },
           ingresos:  { keyPath:'id', indexes:['fecha','periodo_aplicacion','cuenta_id','categoria','updated_at'] },
@@ -278,13 +296,22 @@ async function loadDemo() {
           sync_queue:{ keyPath:'qid', autoIncrement:true },
         };
         for (const [name, def] of Object.entries(schema)) {
-          if (d.objectStoreNames.contains(name)) continue;
-          const s = d.createObjectStore(name, def.autoIncrement?{keyPath:def.keyPath,autoIncrement:true}:{keyPath:def.keyPath});
-          (def.indexes||[]).forEach(ix => s.createIndex(ix,ix,{unique:false}));
+          let store;
+          if (d.objectStoreNames.contains(name)) {
+            store = tx.objectStore(name);
+          } else {
+            store = d.createObjectStore(name, def.autoIncrement?{keyPath:def.keyPath,autoIncrement:true}:{keyPath:def.keyPath});
+          }
+          (def.indexes||[]).forEach(ix => {
+            if (!store.indexNames.contains(ix)) {
+              store.createIndex(ix,ix,{unique:false});
+            }
+          });
         }
       };
       req.onsuccess = () => res(req.result);
       req.onerror  = () => rej(req.error);
+      req.onblocked = () => rej(new Error('Cerrá las otras pestañas con la app abierta'));
     });
 
     const stores = { tarjetas, cuentas, ingresos, gastos, metas };
