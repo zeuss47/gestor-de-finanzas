@@ -1,6 +1,6 @@
 # 💹 Gestor de Finanzas Personales
 
-PWA cyberpunk para gestión financiera personal, **100% offline-first** con sincronización opcional a GitHub para usarlo en múltiples dispositivos.
+gestión financiera personal, **100% offline-first** con sincronización opcional a GitHub para usarlo en múltiples dispositivos.
 
 🔗 **App en vivo:** https://zeuss47.github.io/gestor-de-finanzas/
 
