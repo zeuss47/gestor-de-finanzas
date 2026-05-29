@@ -1,7 +1,7 @@
 ﻿{
     "version":  "1.0.4",
-    "build":  5,
-    "modified":  "2026-05-29T21:48:49Z",
-    "commit":  "M css/styles.css, M demo.html, M index.html, M js/app.js, M js/cards.js",
-    "notes":  "Auto-update 2026-05-29 18:48"
+    "build":  6,
+    "modified":  "2026-05-29T22:14:57Z",
+    "commit":  "M demo.html",
+    "notes":  "Auto-update 2026-05-29 19:14"
 }

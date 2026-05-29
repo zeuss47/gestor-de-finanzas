@@ -51,80 +51,170 @@ const ts = () => Math.floor(Date.now()/1000);
 // ── Demo data ────────────────────────────────────────────────────
 const tarjetas = [
   { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Visa Galicia',
-    banco: 'Galicia', ultimos_4: '4242', limite_un_pago: 600000, limite_cuotas: 400000,
+    banco: 'Galicia', ultimos_4: '4242', limite_un_pago: 800000, limite_cuotas: 600000,
     dia_cierre: 20, dia_vencimiento: 5, color: '#6366f1', activa: true },
   { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Mastercard Santander',
-    banco: 'Santander', ultimos_4: '9999', limite_un_pago: 350000, limite_cuotas: 200000,
+    banco: 'Santander', ultimos_4: '9999', limite_un_pago: 500000, limite_cuotas: 350000,
     dia_cierre: 15, dia_vencimiento: 30, color: '#f59e0b', activa: true },
 ];
 
+// Ingresos: 5 meses de sueldo + medio aguinaldo en mayo (junio queda como mes actual)
+// Bruto $1.560.000 - descuentos 17% = $1.300.000 neto + bonos variables
 const ingresos = [
+  // Enero 2026
   { id: uuid(), updated_at: ts(), deleted: false,
-    fecha: '2026-05-01', periodo_aplicacion: '2026-05',
-    descripcion: 'Sueldo Mayo', sueldo_bruto: 820000, descuentos: 180000,
-    bonos: 50000, sueldo_neto: 690000, es_recurrente: true },
+    fecha: '2026-01-05', periodo_aplicacion: '2026-01',
+    descripcion: 'Sueldo Enero', sueldo_bruto: 1560000, descuentos: 260000,
+    bonos: 0, sueldo_neto: 1300000, es_recurrente: true, es_recibo_sueldo: true,
+    tipo_periodo: 'mensual', empleador: 'Distribuidora del Sur SA',
+    descuentos_detalle: { jubilacion: 171600, obra_social: 46800, ley_19032: 46800, impuesto_ganancias: 0, sindicato: 0, otros: -5200 } },
+  // Febrero 2026
   { id: uuid(), updated_at: ts(), deleted: false,
-    fecha: '2026-04-01', periodo_aplicacion: '2026-04',
-    descripcion: 'Sueldo Abril', sueldo_bruto: 820000, descuentos: 180000,
-    bonos: 0, sueldo_neto: 640000, es_recurrente: true },
+    fecha: '2026-02-05', periodo_aplicacion: '2026-02',
+    descripcion: 'Sueldo Febrero', sueldo_bruto: 1560000, descuentos: 260000,
+    bonos: 0, sueldo_neto: 1300000, es_recurrente: true, es_recibo_sueldo: true,
+    tipo_periodo: 'mensual', empleador: 'Distribuidora del Sur SA',
+    descuentos_detalle: { jubilacion: 171600, obra_social: 46800, ley_19032: 46800, impuesto_ganancias: 0, sindicato: 0, otros: -5200 } },
+  // Marzo 2026
   { id: uuid(), updated_at: ts(), deleted: false,
-    fecha: '2026-03-01', periodo_aplicacion: '2026-03',
-    descripcion: 'Sueldo Marzo', sueldo_bruto: 780000, descuentos: 170000,
-    bonos: 0, sueldo_neto: 610000, es_recurrente: true },
+    fecha: '2026-03-05', periodo_aplicacion: '2026-03',
+    descripcion: 'Sueldo Marzo', sueldo_bruto: 1560000, descuentos: 260000,
+    bonos: 25000, sueldo_neto: 1300000, es_recurrente: true, es_recibo_sueldo: true,
+    tipo_periodo: 'mensual', empleador: 'Distribuidora del Sur SA',
+    descuentos_detalle: { jubilacion: 171600, obra_social: 46800, ley_19032: 46800, impuesto_ganancias: 0, sindicato: 0, otros: -5200 } },
+  // Abril 2026
+  { id: uuid(), updated_at: ts(), deleted: false,
+    fecha: '2026-04-04', periodo_aplicacion: '2026-04',
+    descripcion: 'Sueldo Abril', sueldo_bruto: 1560000, descuentos: 260000,
+    bonos: 0, sueldo_neto: 1300000, es_recurrente: true, es_recibo_sueldo: true,
+    tipo_periodo: 'mensual', empleador: 'Distribuidora del Sur SA',
+    descuentos_detalle: { jubilacion: 171600, obra_social: 46800, ley_19032: 46800, impuesto_ganancias: 0, sindicato: 0, otros: -5200 } },
+  // Mayo 2026 (último completo)
+  { id: uuid(), updated_at: ts(), deleted: false,
+    fecha: '2026-05-05', periodo_aplicacion: '2026-05',
+    descripcion: 'Sueldo Mayo', sueldo_bruto: 1560000, descuentos: 260000,
+    bonos: 50000, sueldo_neto: 1300000, es_recurrente: true, es_recibo_sueldo: true,
+    tipo_periodo: 'mensual', empleador: 'Distribuidora del Sur SA',
+    descuentos_detalle: { jubilacion: 171600, obra_social: 46800, ley_19032: 46800, impuesto_ganancias: 0, sindicato: 0, otros: -5200 } },
+  // Medio aguinaldo Junio (SAC)
+  { id: uuid(), updated_at: ts(), deleted: false,
+    fecha: '2026-06-30', periodo_aplicacion: '2026-06',
+    descripcion: 'Aguinaldo SAC 1', sueldo_bruto: 780000, descuentos: 130000,
+    bonos: 0, sueldo_neto: 650000, es_recurrente: false, es_recibo_sueldo: true,
+    tipo_periodo: 'aguinaldo', empleador: 'Distribuidora del Sur SA',
+    descuentos_detalle: { jubilacion: 85800, obra_social: 23400, ley_19032: 23400, impuesto_ganancias: 0, sindicato: 0, otros: -2600 } },
 ];
 
-const gastosMayo = [
-  { desc:'Alquiler Mayo',       monto:195000, fecha:'2026-05-01', cat:'hogar',       metodo:'transferencia', tipo:'unico' },
-  { desc:'Supermercado Coto',   monto:67500,  fecha:'2026-05-07', cat:'comida',       metodo:'debito',        tipo:'unico' },
-  { desc:'Netflix + Spotify',   monto:11200,  fecha:'2026-05-01', cat:'ocio',         metodo:'credito',       tipo:'recurrente', tid:tarjetas[0].id },
-  { desc:'YPF Combustible',     monto:32000,  fecha:'2026-05-10', cat:'combustible',  metodo:'debito',        tipo:'unico' },
-  { desc:'Farmacity',           monto:14800,  fecha:'2026-05-12', cat:'salud',        metodo:'efectivo',      tipo:'unico' },
-  { desc:'Restaurante',         monto:38500,  fecha:'2026-05-16', cat:'restaurante',  metodo:'credito',       tipo:'unico', tid:tarjetas[0].id },
-  { desc:'Internet Fibertel',   monto:9200,   fecha:'2026-05-01', cat:'servicios',    metodo:'debito',        tipo:'recurrente' },
-  { desc:'Ropa Zara',           monto:52000,  fecha:'2026-05-20', cat:'ropa',         metodo:'credito',       tipo:'unico', tid:tarjetas[1].id },
-  { desc:'Cine',                monto:8400,   fecha:'2026-05-22', cat:'ocio',         metodo:'efectivo',      tipo:'unico' },
-];
+// Patrón realista mensual (con variaciones).
+// Total mensual ~$1.080.000-$1.150.000 (margen $150-220k de ahorro sobre $1.300.000)
+function gastosDeMes(yyyy_mm, t0, t1, ajusteInflacion = 0) {
+  const [y, m] = yyyy_mm.split('-').map(Number);
+  const f = (d) => `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const i = ajusteInflacion; // factor multiplicativo
+  const r = (v) => Math.round(v * (1 + i));
+  return [
+    // ── Fijos del hogar
+    { desc:'Alquiler',                monto: r(350000), fecha: f(2),  cat:'hogar',       metodo:'transferencia', tipo:'unico' },
+    { desc:'Expensas',                monto: r(95000),  fecha: f(5),  cat:'hogar',       metodo:'debito',        tipo:'unico' },
+    // ── Servicios
+    { desc:'Luz Edesur',              monto: r(38000),  fecha: f(8),  cat:'servicios',   metodo:'debito',        tipo:'unico' },
+    { desc:'Agua AySA',               monto: r(16500),  fecha: f(10), cat:'servicios',   metodo:'debito',        tipo:'unico' },
+    { desc:'Gas Metrogas',            monto: r(28000),  fecha: f(12), cat:'servicios',   metodo:'debito',        tipo:'unico' },
+    { desc:'Internet Fibertel',       monto: r(28000),  fecha: f(3),  cat:'servicios',   metodo:'debito',        tipo:'recurrente' },
+    { desc:'Telefonía Personal',      monto: r(22000),  fecha: f(7),  cat:'servicios',   metodo:'debito',        tipo:'recurrente' },
+    // ── Supermercado (3 compras/mes)
+    { desc:'Supermercado Coto',       monto: r(65000),  fecha: f(6),  cat:'comida',      metodo:'debito',        tipo:'unico' },
+    { desc:'Supermercado Día',        monto: r(48000),  fecha: f(14), cat:'comida',      metodo:'debito',        tipo:'unico' },
+    { desc:'Supermercado Carrefour',  monto: r(72000),  fecha: f(22), cat:'comida',      metodo:'debito',        tipo:'unico' },
+    // ── Combustible (2 cargas)
+    { desc:'Combustible YPF',         monto: r(45000),  fecha: f(9),  cat:'combustible', metodo:'debito',        tipo:'unico' },
+    { desc:'Combustible Shell',       monto: r(42000),  fecha: f(23), cat:'combustible', metodo:'debito',        tipo:'unico' },
+    // ── Salud
+    { desc:'Farmacity',               monto: r(18000),  fecha: f(11), cat:'salud',       metodo:'efectivo',      tipo:'unico' },
+    // ── Ocio / Restaurantes con tarjeta
+    { desc:'Netflix',                 monto: r(8500),   fecha: f(1),  cat:'ocio',        metodo:'credito',       tipo:'recurrente', tid:t0.id },
+    { desc:'Spotify Premium',         monto: r(4500),   fecha: f(1),  cat:'ocio',        metodo:'credito',       tipo:'recurrente', tid:t0.id },
+    { desc:'Restaurante',             monto: r(48000),  fecha: f(16), cat:'restaurante', metodo:'credito',       tipo:'unico', tid:t0.id },
+    { desc:'Delivery PedidosYa',      monto: r(22000),  fecha: f(20), cat:'restaurante', metodo:'credito',       tipo:'unico', tid:t0.id },
+    // ── Transporte
+    { desc:'SUBE recarga',            monto: r(18000),  fecha: f(4),  cat:'transporte',  metodo:'efectivo',      tipo:'unico' },
+    // ── Pequeños
+    { desc:'Kiosco semana 1',         monto: r(5500),   fecha: f(4),  cat:'kiosco',      metodo:'efectivo',      tipo:'unico' },
+    { desc:'Kiosco semana 2',         monto: r(6800),   fecha: f(11), cat:'kiosco',      metodo:'efectivo',      tipo:'unico' },
+    { desc:'Kiosco semana 3',         monto: r(5200),   fecha: f(18), cat:'kiosco',      metodo:'efectivo',      tipo:'unico' },
+    { desc:'Café Starbucks',          monto: r(12000),  fecha: f(13), cat:'ocio',        metodo:'credito',       tipo:'unico', tid:t1.id },
+    // ── Cine ocasional
+    { desc:'Cine + pochoclos',        monto: r(11500),  fecha: f(17), cat:'ocio',        metodo:'credito',       tipo:'unico', tid:t1.id },
+  ];
+}
 
-const gastosAbril = [
-  { desc:'Alquiler Abril',     monto:195000, fecha:'2026-04-01', cat:'hogar',     metodo:'transferencia', tipo:'unico' },
-  { desc:'Supermercado',       monto:59000,  fecha:'2026-04-08', cat:'comida',    metodo:'debito',        tipo:'unico' },
-  { desc:'Nafta Shell',        monto:28000,  fecha:'2026-04-15', cat:'combustible',metodo:'debito',       tipo:'unico' },
-  { desc:'Farmacia',           monto:9800,   fecha:'2026-04-18', cat:'salud',     metodo:'efectivo',      tipo:'unico' },
+// Extras puntuales (no todos los meses)
+const extrasEnero = [
+  { desc:'Inscripción gimnasio',  monto: 65000,  fecha: '2026-01-15', cat:'salud',  metodo:'debito',  tipo:'unico' },
+  { desc:'Útiles escolares',      monto: 48000,  fecha: '2026-01-25', cat:'educacion', metodo:'credito', tipo:'unico', tid:tarjetas[0].id },
 ];
-
-const gastosMar = [
-  { desc:'Alquiler Marzo',     monto:185000, fecha:'2026-03-01', cat:'hogar',     metodo:'transferencia', tipo:'unico' },
-  { desc:'Supermercado',       monto:55000,  fecha:'2026-03-10', cat:'comida',    metodo:'debito',        tipo:'unico' },
-  { desc:'Nafta YPF',          monto:25000,  fecha:'2026-03-20', cat:'combustible',metodo:'debito',       tipo:'unico' },
+const extrasFebrero = [
+  { desc:'Ropa H&M',              monto: 78000,  fecha: '2026-02-12', cat:'ropa',   metodo:'credito', tipo:'unico', tid:tarjetas[1].id },
+];
+const extrasMarzo = [
+  { desc:'Curso online Udemy',    monto: 35000,  fecha: '2026-03-08', cat:'educacion', metodo:'credito', tipo:'unico', tid:tarjetas[0].id },
+  { desc:'Service auto',          monto: 145000, fecha: '2026-03-18', cat:'auto',   metodo:'transferencia', tipo:'unico' },
+];
+const extrasAbril = [
+  { desc:'Notebook Lenovo (12 cuotas)', monto:1080000, fecha:'2026-04-12', cat:'general', metodo:'credito', tipo:'cuotas', cuotas:12, tid:tarjetas[0].id },
+  { desc:'Cumpleaños amigo',     monto: 25000,  fecha: '2026-04-22', cat:'ocio',   metodo:'efectivo', tipo:'unico' },
+];
+const extrasMayo = [
+  { desc:'Zapatillas Adidas',    monto: 95000,  fecha: '2026-05-10', cat:'ropa',   metodo:'credito', tipo:'unico', tid:tarjetas[1].id },
+  { desc:'Mantenimiento auto',   monto: 38000,  fecha: '2026-05-20', cat:'auto',   metodo:'debito',  tipo:'unico' },
 ];
 
 function makeGasto(g) {
-  return { id:uuid(), updated_at:ts(), deleted:false,
+  const base = { id:uuid(), updated_at:ts(), deleted:false,
     fecha:g.fecha, monto:g.monto, descripcion:g.desc,
     categoria:g.cat, metodo_pago:g.metodo, tipo:g.tipo||'unico',
-    tarjeta_id:g.tid||null, cuotas_total:1, cuota_numero:1,
-    compartido:null, es_amortizacion_anual:false, adjunto_ref:null };
+    tarjeta_id:g.tid||null, cuotas_total: g.cuotas || 1, cuota_numero:1,
+    compartido:null, es_amortizacion_anual:false, adjunto_ref:null,
+    moneda: g.moneda || 'ARS',
+  };
+  return base;
 }
 
 const gastos = [
-  ...gastosMayo.map(makeGasto),
-  ...gastosAbril.map(makeGasto),
-  ...gastosMar.map(makeGasto),
+  // Enero (sin ajuste inflación = base)
+  ...gastosDeMes('2026-01', tarjetas[0], tarjetas[1], 0).map(makeGasto),
+  ...extrasEnero.map(makeGasto),
+  // Febrero (+3% inflación)
+  ...gastosDeMes('2026-02', tarjetas[0], tarjetas[1], 0.03).map(makeGasto),
+  ...extrasFebrero.map(makeGasto),
+  // Marzo (+5% acumulado)
+  ...gastosDeMes('2026-03', tarjetas[0], tarjetas[1], 0.05).map(makeGasto),
+  ...extrasMarzo.map(makeGasto),
+  // Abril (+7%)
+  ...gastosDeMes('2026-04', tarjetas[0], tarjetas[1], 0.07).map(makeGasto),
+  ...extrasAbril.map(makeGasto),
+  // Mayo (+9%)
+  ...gastosDeMes('2026-05', tarjetas[0], tarjetas[1], 0.09).map(makeGasto),
+  ...extrasMayo.map(makeGasto),
 ];
 
 const cuentas = [
-  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Galicia caja',  banco: 'Galicia',     tipo: 'caja_ahorro',     moneda: 'ARS', saldo_inicial: 250000, color: '#00ff9f', activa: true },
-  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Mercado Pago',  banco: 'MercadoPago', tipo: 'billetera',       moneda: 'ARS', saldo_inicial: 45000,  color: '#00f0ff', activa: true },
-  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Efectivo',      banco: '',            tipo: 'efectivo',        moneda: 'ARS', saldo_inicial: 12000,  color: '#ffea00', activa: true },
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Galicia caja',   banco: 'Galicia',     tipo: 'caja_ahorro',    moneda: 'ARS', saldo_inicial: 480000, color: '#00ff9f', activa: true },
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Mercado Pago',   banco: 'MercadoPago', tipo: 'billetera',      moneda: 'ARS', saldo_inicial: 125000, color: '#00f0ff', activa: true },
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Efectivo',       banco: '',            tipo: 'efectivo',       moneda: 'ARS', saldo_inicial: 35000,  color: '#ffea00', activa: true },
+  { id: uuid(), updated_at: ts(), deleted: false, nombre: 'Plazo Fijo BNA', banco: 'Nación',      tipo: 'inversion',      moneda: 'ARS', saldo_inicial: 850000, color: '#b537ff', activa: true },
 ];
 
 const metas = [
   { id:uuid(), updated_at:ts(), deleted:false,
-    nombre:'Fondo de Emergencia', monto_objetivo:1200000, monto_actual:340000,
-    fecha_objetivo:'2026-12-31', prioridad:1, es_emergencia:true },
+    nombre:'Fondo de Emergencia', monto_objetivo:3900000, monto_actual:850000,
+    fecha_objetivo:'2026-12-31', prioridad:5, es_emergencia:true },
   { id:uuid(), updated_at:ts(), deleted:false,
-    nombre:'Vacaciones Brasil', monto_objetivo:650000, monto_actual:95000,
-    fecha_objetivo:'2027-01-15', prioridad:2, es_emergencia:false },
+    nombre:'Vacaciones Brasil', monto_objetivo:1500000, monto_actual:280000,
+    fecha_objetivo:'2027-01-15', prioridad:4, es_emergencia:false },
+  { id:uuid(), updated_at:ts(), deleted:false,
+    nombre:'Auto nuevo (entrega)', monto_objetivo:6000000, monto_actual:120000,
+    fecha_objetivo:'2027-06-30', prioridad:3, es_emergencia:false },
 ];
 
 const ajustes = {
