@@ -222,7 +222,23 @@ async function loadAjustes() {
     await DB.put('ajustes', aj);
   }
   state.ajustes = aj;
+  await _migrarWidgetsNuevos(aj);
   return aj;
+}
+
+// Migración: cuando se agregan widgets nuevos al código (ej. prediccion,
+// balance), los appendea a widgets_orden y widgets_visibles del usuario para
+// que aparezcan por defecto. Un widget "nuevo" es el que NO estaba en el
+// orden guardado (así respetamos los que el usuario haya deseleccionado).
+async function _migrarWidgetsNuevos(aj) {
+  if (!aj.ui || !Array.isArray(aj.ui.widgets_orden)) return;
+  const nuevos = Object.keys(TPL).filter(k => !aj.ui.widgets_orden.includes(k));
+  if (!nuevos.length) return;
+  aj.ui.widgets_orden.push(...nuevos);
+  if (Array.isArray(aj.ui.widgets_visibles)) {
+    aj.ui.widgets_visibles.push(...nuevos.filter(k => !aj.ui.widgets_visibles.includes(k)));
+  }
+  try { await DB.put('ajustes', aj); } catch {}
 }
 async function saveAjustes(patch) {
   const prevPat = state.ajustes?.github?.pat;
@@ -405,9 +421,13 @@ const TPL = {
 function renderWidgets() {
   const root = document.getElementById('main-widgets');
   root.innerHTML = '';
-  const orden = state.ajustes?.ui?.widgets_orden?.length
+  const ordenGuardado = state.ajustes?.ui?.widgets_orden?.length
     ? state.ajustes.ui.widgets_orden
     : Object.keys(TPL);
+  // Agregar al final cualquier widget registrado que falte en el orden guardado.
+  // Esto cubre widgets NUEVOS (ej. prediccion, balance) que no estaban cuando el
+  // usuario guardó su orden: antes no se renderizaban aunque estuvieran visibles.
+  const orden = [...ordenGuardado, ...Object.keys(TPL).filter(k => !ordenGuardado.includes(k))];
   const visibles = new Set(state.ajustes?.ui?.widgets_visibles || Object.keys(TPL));
   for (const id of orden) {
     if (!visibles.has(id)) continue;
