@@ -692,6 +692,40 @@
   </article>
 </template>
 
+<!-- Balance general (rango personalizable + series toggleables) -->
+<template id="tpl-widget-balance">
+  <article class="widget card-glass p-5">
+    <header class="flex items-center justify-between mb-3">
+      <h2 class="ff-display text-sm font-semibold uppercase tracking-wider text-muted">📉 Balance general</h2>
+    </header>
+
+    <!-- Rango de fechas -->
+    <div class="balance-ranges" data-bind="balance-ranges">
+      <button type="button" class="balance-range-btn" data-range="30">30d</button>
+      <button type="button" class="balance-range-btn active" data-range="90">90d</button>
+      <button type="button" class="balance-range-btn" data-range="180">6m</button>
+      <button type="button" class="balance-range-btn" data-range="365">1 año</button>
+      <button type="button" class="balance-range-btn" data-range="custom">📅 Rango</button>
+    </div>
+    <!-- Rango custom (oculto por defecto) -->
+    <div class="balance-custom" data-bind="balance-custom" hidden>
+      <input type="date" class="input" data-bind="balance-from" />
+      <span style="color:var(--ink-muted)">→</span>
+      <input type="date" class="input" data-bind="balance-to" />
+    </div>
+
+    <!-- Chips de series (toggleables, con su color) -->
+    <div class="balance-series" data-bind="balance-series"></div>
+
+    <!-- KPIs del período -->
+    <div class="balance-kpis" data-bind="balance-kpis"></div>
+
+    <div style="height:180px;position:relative;margin-top:.5rem">
+      <canvas data-bind="balance-canvas"></canvas>
+    </div>
+  </article>
+</template>
+
 <!-- Resumen Anual -->
 <template id="tpl-widget-resumen_anual">
   <article class="widget card-glass p-5">
@@ -2377,10 +2411,6 @@
           </select>
         </fieldset>
 
-        <fieldset class="space-y-2 mt-4">
-          <legend>Saludo personal</legend>
-          <input name="nombre_usuario" class="input" placeholder="Tu nombre (opcional)" />
-        </fieldset>
       </div>
 
       <!-- TAB: WIDGETS (visibles + orden) -->

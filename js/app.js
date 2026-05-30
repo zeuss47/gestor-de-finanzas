@@ -99,7 +99,7 @@ let _movMesFiltro = '';
 
 const WIDGETS_ANALISIS = new Set([
   'prediccion', 'ia_local', 'comparador', 'flujo_mensual',
-  'categorias', 'resumen_anual', 'grafico',
+  'categorias', 'resumen_anual', 'grafico', 'balance',
 ]);
 
 function switchTab(tab) {
@@ -160,8 +160,8 @@ const AJUSTES_DEFAULT = {
   ui: {
     tema: 'auto',
     color_primario: '#4f46e5',
-    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
-    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
     widgets_tamanos: {
       estado_global: 'lg',
       sueldo:        'lg',
@@ -380,6 +380,7 @@ const RENDERERS = {
   calculadora:        renderCalculadora,
   comparador:         renderComparador,
   prediccion:         renderPrediccion,
+  balance:            renderBalance,
 };
 
 const TPL = {
@@ -398,6 +399,7 @@ const TPL = {
   calculadora:        'tpl-widget-calculadora',
   comparador:         'tpl-widget-comparador',
   prediccion:         'tpl-widget-prediccion',
+  balance:            'tpl-widget-balance',
 };
 
 function renderWidgets() {
@@ -416,11 +418,13 @@ function renderWidgets() {
     const tamano = state.ajustes?.ui?.widgets_tamanos?.[id] || 'md';
     node.dataset.size = tamano;
 
-    // Aplicar span/row guardados (drag resize)
+    // Aplicar ancho (columnas) y alto (px explícito) guardados por el drag resize.
+    // Usamos altura en px en vez de grid-row span porque con grid-auto-rows
+    // minmax(80px,auto) el span no achicaba (la altura la mandaba el contenido).
     const span    = state.ajustes?.ui?.widgets_spans?.[id];
-    const rowSpan = state.ajustes?.ui?.widgets_rows?.[id];
-    if (span)    node.style.gridColumn = `span ${span}`;
-    if (rowSpan) node.style.gridRow    = `span ${rowSpan}`;
+    const altura  = state.ajustes?.ui?.widgets_alturas?.[id];
+    if (span)   node.style.gridColumn = `span ${span}`;
+    if (altura) { node.style.height = altura + 'px'; node.style.alignSelf = 'start'; }
 
     root.appendChild(node);
     RENDERERS[id]?.(node);
@@ -446,11 +450,12 @@ function renderWidgets() {
         } else if (b.dataset.action === 'reset-size') {
           b.addEventListener('click', async (e) => {
             e.stopPropagation();
-            // Limpiar spans custom y restablecer tamaño "md"
-            if (!state.ajustes.ui.widgets_spans) state.ajustes.ui.widgets_spans = {};
-            if (!state.ajustes.ui.widgets_rows)  state.ajustes.ui.widgets_rows  = {};
+            // Limpiar spans/altura custom y restablecer tamaño "md"
+            if (!state.ajustes.ui.widgets_spans)   state.ajustes.ui.widgets_spans = {};
+            if (!state.ajustes.ui.widgets_alturas) state.ajustes.ui.widgets_alturas = {};
             delete state.ajustes.ui.widgets_spans[id];
-            delete state.ajustes.ui.widgets_rows[id];
+            delete state.ajustes.ui.widgets_alturas[id];
+            if (state.ajustes.ui.widgets_rows) delete state.ajustes.ui.widgets_rows[id];
             await DB.put('ajustes', state.ajustes);
             renderWidgets();
             toast('Tamaño restaurado');
@@ -479,7 +484,7 @@ function renderWidgets() {
 
 /* ============ Drag resize libre desde la esquina ============ */
 function iniciarDragResize(handle, widgetNode, widgetId) {
-  let startX, startY, startCols, startRows, tooltip, gridColsTotal;
+  let startX, startY, startCols, startHeight, tooltip, gridColsTotal;
 
   handle.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -493,7 +498,6 @@ function iniciarDragResize(handle, widgetNode, widgetId) {
     const tplCols   = gridStyle.gridTemplateColumns.split(' ').length || 6;
     gridColsTotal   = tplCols;
 
-    // Span actual del widget (en columnas del grid)
     const rect = widgetNode.getBoundingClientRect();
     const gridRect = grid.getBoundingClientRect();
     const gap = parseFloat(gridStyle.gap) || 16;
@@ -501,14 +505,17 @@ function iniciarDragResize(handle, widgetNode, widgetId) {
 
     startX = e.clientX;
     startY = e.clientY;
-    startCols = Math.max(1, Math.round((rect.width + gap) / (colWidth + gap)));
-    startRows = Math.max(1, Math.round(rect.height / 80));
+    // Columnas: arrancamos del valor LÓGICO guardado (no del pixel medido,
+    // que con el contenido inflaba el cálculo). Fallback: estimar del ancho.
+    startCols = state.ajustes?.ui?.widgets_spans?.[widgetId]
+      || Math.max(1, Math.round((rect.width + gap) / (colWidth + gap)));
+    // Alto: la altura real en px del widget en este momento.
+    startHeight = rect.height;
 
-    // Tooltip flotante
     tooltip = document.createElement('div');
     tooltip.className = 'resize-tooltip';
     document.body.appendChild(tooltip);
-    actualizarTooltip(e.clientX, e.clientY, startCols, startRows);
+    actualizarTooltip(e.clientX, e.clientY, startCols, Math.round(startHeight));
   });
 
   handle.addEventListener('pointermove', (e) => {
@@ -522,15 +529,18 @@ function iniciarDragResize(handle, widgetNode, widgetId) {
     const colWidth = (gridRect.width - gap * (gridColsTotal - 1)) / gridColsTotal;
 
     const dxCols = Math.round((e.clientX - startX) / (colWidth + gap));
-    const dyRows = Math.round((e.clientY - startY) / 80);
+    const dyPx   = e.clientY - startY;
 
-    const newCols = Math.max(1, Math.min(gridColsTotal, startCols + dxCols));
-    const newRows = Math.max(1, Math.min(12, startRows + dyRows));
+    const newCols   = Math.max(1, Math.min(gridColsTotal, startCols + dxCols));
+    // Altura explícita en px: arrastrar para arriba achica, para abajo agranda.
+    const newHeight = Math.max(120, Math.min(1400, startHeight + dyPx));
 
     widgetNode.style.gridColumn = `span ${newCols}`;
-    widgetNode.style.gridRow    = `span ${newRows}`;
+    widgetNode.style.gridRow    = '';            // ya no usamos row span
+    widgetNode.style.height     = newHeight + 'px';
+    widgetNode.style.alignSelf  = 'start';
 
-    actualizarTooltip(e.clientX, e.clientY, newCols, newRows);
+    actualizarTooltip(e.clientX, e.clientY, newCols, Math.round(newHeight));
   });
 
   const finalize = async (e) => {
@@ -539,34 +549,30 @@ function iniciarDragResize(handle, widgetNode, widgetId) {
     if (tooltip) { tooltip.remove(); tooltip = null; }
     try { handle.releasePointerCapture(e.pointerId); } catch {}
 
-    // Persistir span/row finales
     const colMatch = widgetNode.style.gridColumn.match(/span (\d+)/);
-    const rowMatch = widgetNode.style.gridRow.match(/span (\d+)/);
-    const cols = colMatch ? parseInt(colMatch[1]) : null;
-    const rows = rowMatch ? parseInt(rowMatch[1]) : null;
+    const cols   = colMatch ? parseInt(colMatch[1]) : null;
+    const altura = parseInt(widgetNode.style.height) || null;
 
-    if (!state.ajustes.ui.widgets_spans) state.ajustes.ui.widgets_spans = {};
-    if (!state.ajustes.ui.widgets_rows)  state.ajustes.ui.widgets_rows  = {};
-    if (cols) state.ajustes.ui.widgets_spans[widgetId] = cols;
-    if (rows) state.ajustes.ui.widgets_rows[widgetId]  = rows;
+    if (!state.ajustes.ui.widgets_spans)   state.ajustes.ui.widgets_spans = {};
+    if (!state.ajustes.ui.widgets_alturas) state.ajustes.ui.widgets_alturas = {};
+    if (cols)   state.ajustes.ui.widgets_spans[widgetId]   = cols;
+    if (altura) state.ajustes.ui.widgets_alturas[widgetId] = altura;
+    // Limpiar el formato viejo de filas si existía
+    if (state.ajustes.ui.widgets_rows) delete state.ajustes.ui.widgets_rows[widgetId];
     await DB.put('ajustes', state.ajustes);
 
-    // Forzar re-render de Chart.js para que ajuste el canvas
+    // Re-render del chart para que el canvas se ajuste a la nueva altura
     setTimeout(() => {
-      const tpl = document.getElementById(TPL[widgetId]);
-      if (tpl && RENDERERS[widgetId]) {
-        // Re-renderizar solo este widget para refrescar charts
-        RENDERERS[widgetId](widgetNode);
-      }
+      if (RENDERERS[widgetId]) RENDERERS[widgetId](widgetNode);
     }, 100);
   };
 
   handle.addEventListener('pointerup', finalize);
   handle.addEventListener('pointercancel', finalize);
 
-  function actualizarTooltip(x, y, cols, rows) {
+  function actualizarTooltip(x, y, cols, px) {
     if (!tooltip) return;
-    tooltip.textContent = `${cols} × ${rows}`;
+    tooltip.textContent = `${cols} col · ${px}px`;
     tooltip.style.left = (x + 14) + 'px';
     tooltip.style.top  = (y + 14) + 'px';
   }
@@ -576,14 +582,19 @@ async function cambiarTamanoWidget(widgetId, size) {
   if (!state.ajustes.ui) state.ajustes.ui = {};
   if (!state.ajustes.ui.widgets_tamanos) state.ajustes.ui.widgets_tamanos = {};
   state.ajustes.ui.widgets_tamanos[widgetId] = size;
-  // Al elegir tamaño preset, limpiamos cualquier span/row custom
-  if (state.ajustes.ui.widgets_spans) delete state.ajustes.ui.widgets_spans[widgetId];
-  if (state.ajustes.ui.widgets_rows)  delete state.ajustes.ui.widgets_rows[widgetId];
+  // Al elegir tamaño preset, limpiamos cualquier ancho/alto custom
+  if (state.ajustes.ui.widgets_spans)   delete state.ajustes.ui.widgets_spans[widgetId];
+  if (state.ajustes.ui.widgets_alturas) delete state.ajustes.ui.widgets_alturas[widgetId];
+  if (state.ajustes.ui.widgets_rows)    delete state.ajustes.ui.widgets_rows[widgetId];
   await DB.put('ajustes', state.ajustes);
   // Re-renderizar solo el widget afectado sin perder otros estados
   const node = document.querySelector(`[data-widget="${widgetId}"]`);
   if (node) {
     node.dataset.size = size;
+    node.style.height = '';      // limpiar altura custom del drag
+    node.style.alignSelf = '';
+    node.style.gridColumn = '';
+    node.style.gridRow = '';
     // Actualizar botones activos
     node.querySelectorAll('.wsize-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.size === size);
@@ -1070,6 +1081,155 @@ function abrirSaludFinanciera() {
   });
 
   dlg.showModal();
+}
+
+/* ── WIDGET: Balance general (rango personalizable + series toggleables) ── */
+const _balanceState = {
+  range: 90,                 // días o 'custom'
+  from: null, to: null,      // ISO para custom
+  series: { ingresos: true, gastos: true, balance: true },
+  chart: null,
+};
+const _BAL_SERIES = {
+  ingresos: { label: 'Ingresos', color: '#00ff9f' },
+  gastos:   { label: 'Gastos',   color: '#ff2d6e' },
+  balance:  { label: 'Balance acumulado', color: '#00f0ff' },
+};
+
+function _balanceRango() {
+  const hoy = new Date();
+  if (_balanceState.range === 'custom' && _balanceState.from && _balanceState.to) {
+    return { desde: new Date(_balanceState.from + 'T00:00:00'), hasta: new Date(_balanceState.to + 'T23:59:59') };
+  }
+  const dias = Number(_balanceState.range) || 90;
+  const desde = new Date(hoy.getTime() - dias * 86400000);
+  return { desde, hasta: hoy };
+}
+
+function renderBalance(el) {
+  const { desde, hasta } = _balanceRango();
+  const diasRango = Math.max(1, Math.round((hasta - desde) / 86400000));
+  // Bucket: diario / semanal / mensual según el rango
+  const modo = diasRango <= 35 ? 'dia' : diasRango <= 120 ? 'semana' : 'mes';
+
+  const enRango = (iso) => { if (!iso) return false; const d = new Date(iso + 'T12:00:00'); return d >= desde && d <= hasta; };
+  const gastoEf = (g) => { let m = g.monto || 0; if (g.compartido) m *= (1 - (g.compartido.porcentaje_otro || 0)/100); return m; };
+
+  // Clave de bucket para una fecha
+  const bucketKey = (d) => {
+    if (modo === 'dia')    return d.toISOString().slice(0, 10);
+    if (modo === 'semana') { const t = new Date(d); t.setDate(t.getDate() - t.getDay()); return t.toISOString().slice(0, 10); }
+    return d.toISOString().slice(0, 7);
+  };
+  const bucketLabel = (k) => {
+    if (modo === 'mes') { const [y, m] = k.split('-'); return `${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m)-1]} ${y.slice(2)}`; }
+    const [y, m, dd] = k.split('-'); return `${dd}/${m}`;
+  };
+
+  // Generar buckets ordenados del rango
+  const buckets = [];
+  const seen = new Set();
+  const cursor = new Date(desde);
+  while (cursor <= hasta) {
+    const k = bucketKey(cursor);
+    if (!seen.has(k)) { seen.add(k); buckets.push(k); }
+    cursor.setDate(cursor.getDate() + (modo === 'mes' ? 28 : modo === 'semana' ? 7 : 1));
+  }
+  // Asegurar el bucket del último día
+  const kLast = bucketKey(hasta); if (!seen.has(kLast)) buckets.push(kLast);
+
+  const ingMap = new Map(), gasMap = new Map();
+  for (const i of state.ingresos || []) {
+    if (i.deleted || !enRango(i.fecha)) continue;
+    const k = bucketKey(new Date(i.fecha + 'T12:00:00'));
+    ingMap.set(k, (ingMap.get(k) || 0) + ((i.sueldo_neto || 0) + (i.bonos || 0)));
+  }
+  for (const g of state.gastos || []) {
+    if (g.deleted || !enRango(g.fecha)) continue;
+    const k = bucketKey(new Date(g.fecha + 'T12:00:00'));
+    gasMap.set(k, (gasMap.get(k) || 0) + gastoEf(g));
+  }
+
+  const datIng = buckets.map(k => Math.round(ingMap.get(k) || 0));
+  const datGas = buckets.map(k => Math.round(gasMap.get(k) || 0));
+  let acum = 0;
+  const datBal = buckets.map((k, i) => { acum += (datIng[i] - datGas[i]); return Math.round(acum); });
+
+  const totalIng = datIng.reduce((a, b) => a + b, 0);
+  const totalGas = datGas.reduce((a, b) => a + b, 0);
+  const neto = totalIng - totalGas;
+
+  // ── Rango: botones + custom ──
+  el.querySelectorAll('.balance-range-btn').forEach(b => {
+    b.classList.toggle('active', String(_balanceState.range) === b.dataset.range);
+    b.onclick = () => {
+      _balanceState.range = b.dataset.range === 'custom' ? 'custom' : Number(b.dataset.range);
+      const cw = el.querySelector('[data-bind="balance-custom"]');
+      if (cw) cw.hidden = _balanceState.range !== 'custom';
+      if (_balanceState.range === 'custom') {
+        const f = el.querySelector('[data-bind="balance-from"]'); const t = el.querySelector('[data-bind="balance-to"]');
+        if (f && !f.value) f.value = new Date(Date.now() - 90*86400000).toISOString().slice(0,10);
+        if (t && !t.value) t.value = new Date().toISOString().slice(0,10);
+        _balanceState.from = f?.value; _balanceState.to = t?.value;
+      }
+      renderBalance(el);
+    };
+  });
+  const cw = el.querySelector('[data-bind="balance-custom"]');
+  if (cw) cw.hidden = _balanceState.range !== 'custom';
+  ['from','to'].forEach(k => {
+    const inp = el.querySelector(`[data-bind="balance-${k}"]`);
+    if (inp) { if (_balanceState[k]) inp.value = _balanceState[k]; inp.onchange = () => { _balanceState[k] = inp.value; renderBalance(el); }; }
+  });
+
+  // ── Chips de series (toggle) ──
+  const chipsBox = el.querySelector('[data-bind="balance-series"]');
+  if (chipsBox) {
+    chipsBox.innerHTML = Object.entries(_BAL_SERIES).map(([id, s]) => `
+      <button type="button" class="balance-chip ${_balanceState.series[id] ? 'on' : ''}" data-serie="${id}">
+        <span class="balance-chip-dot" style="background:${s.color}"></span>${s.label}
+      </button>`).join('');
+    chipsBox.querySelectorAll('.balance-chip').forEach(b => {
+      b.onclick = () => { _balanceState.series[b.dataset.serie] = !_balanceState.series[b.dataset.serie]; renderBalance(el); };
+    });
+  }
+
+  // ── KPIs ──
+  const kpisBox = el.querySelector('[data-bind="balance-kpis"]');
+  if (kpisBox) {
+    kpisBox.innerHTML = `
+      <div class="balance-kpi"><span class="lbl">Ingresos</span><span class="val" style="color:var(--success)">${FMT.format(totalIng)}</span></div>
+      <div class="balance-kpi"><span class="lbl">Gastos</span><span class="val" style="color:var(--danger)">${FMT.format(totalGas)}</span></div>
+      <div class="balance-kpi"><span class="lbl">Balance</span><span class="val" style="color:${neto>=0?'var(--success)':'var(--danger)'}">${neto>=0?'+':''}${FMT.format(neto)}</span></div>`;
+  }
+
+  // ── Chart ──
+  const canvas = el.querySelector('[data-bind="balance-canvas"]');
+  if (!canvas) return;
+  if (_balanceState.chart) { try { _balanceState.chart.destroy(); } catch {} }
+  const c = _resolverColoresChart();
+  const labels = buckets.map(bucketLabel);
+  const ctx = canvas.getContext('2d');
+
+  const datasets = [];
+  const mkGrad = (hex) => { const g = ctx.createLinearGradient(0,0,0,180); g.addColorStop(0, hex+'40'); g.addColorStop(1, hex+'05'); return g; };
+  if (_balanceState.series.ingresos) datasets.push({ label:'Ingresos', data:datIng, borderColor:_BAL_SERIES.ingresos.color, backgroundColor:mkGrad(_BAL_SERIES.ingresos.color), tension:.3, fill:true, pointRadius:0, borderWidth:1.8 });
+  if (_balanceState.series.gastos)   datasets.push({ label:'Gastos',   data:datGas, borderColor:_BAL_SERIES.gastos.color,   backgroundColor:mkGrad(_BAL_SERIES.gastos.color),   tension:.3, fill:true, pointRadius:0, borderWidth:1.8 });
+  if (_balanceState.series.balance)  datasets.push({ label:'Balance acumulado', data:datBal, borderColor:_BAL_SERIES.balance.color, backgroundColor:mkGrad(_BAL_SERIES.balance.color), tension:.25, fill:false, pointRadius:0, borderWidth:2.2 });
+
+  _balanceState.chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: c.inkMuted, font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
+        y: { ticks: { color: c.inkMuted, font: { size: 10 }, callback: (v) => Math.abs(v)>=1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: c.grid } },
+      },
+    },
+  });
 }
 
 function renderMetas(el) {
@@ -2535,6 +2695,7 @@ function abrirSettings() {
       ia_local: '🧠', metas: '🎯', grafico: '📈',
       resumen_anual: '📅', flujo_mensual: '🌊', categorias: '🍩',
       tipo_cambio: '💱', calculadora: '🧮', comparador: '⚖',
+      prediccion: '🔮', balance: '📉',
     };
     const LABELS = {
       estado_global: 'Estado global', sueldo: 'Sueldo y recibos',
@@ -2545,6 +2706,7 @@ function abrirSettings() {
       resumen_anual: 'Resumen anual', flujo_mensual: 'Flujo mensual',
       categorias: 'Gastos por categoría', tipo_cambio: 'Tipo de cambio',
       calculadora: 'Calculadora', comparador: 'Comparador mensual',
+      prediccion: 'Predicción de gasto', balance: 'Balance general',
     };
     for (const id of Object.keys(TPL)) {
       const checked = (aj.ui?.widgets_visibles || []).includes(id);
@@ -5659,20 +5821,23 @@ function posicionarPopover(popover, target) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  // Horizontal: alinear al inicio del target, pero no salir del viewport
-  let left = targetRect.left;
-  if (left + popRect.width > vw - 8) {
-    left = Math.max(8, vw - popRect.width - 8);
+  // Posición DESEADA en coordenadas de viewport
+  let leftVp = targetRect.left;
+  if (leftVp + popRect.width > vw - 8) {
+    leftVp = Math.max(8, vw - popRect.width - 8);
+  }
+  let topVp = targetRect.bottom + 6;
+  if (topVp + popRect.height > vh - 8) {
+    topVp = Math.max(8, targetRect.top - popRect.height - 6);
   }
 
-  // Vertical: debajo del target. Si no entra, ponerlo encima.
-  let top = targetRect.bottom + 6;
-  if (top + popRect.height > vh - 8) {
-    top = Math.max(8, targetRect.top - popRect.height - 6);
-  }
-
-  popover.style.left = left + 'px';
-  popover.style.top  = top + 'px';
+  // CRÍTICO: cuando el popover se agrega DENTRO de un <dialog> (top-layer),
+  // el dialog actúa como bloque contenedor de `position:fixed`, así que las
+  // coordenadas son relativas al dialog, NO al viewport. Restamos el offset
+  // del dialog para que aparezca donde corresponde (antes se iba de pantalla).
+  const hostRect = (host === document.body) ? { left: 0, top: 0 } : host.getBoundingClientRect();
+  popover.style.left = (leftVp - hostRect.left) + 'px';
+  popover.style.top  = (topVp - hostRect.top) + 'px';
 }
 
 function cerrarAlClickearFuera(popover) {
