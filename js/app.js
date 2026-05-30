@@ -3626,6 +3626,18 @@ function _hdSetKPIs(items) {
   }
 }
 
+// Chart.js no resuelve CSS variables — hay que pasarle colores hex/rgba reales.
+// Leemos las CSS vars del :root al momento del render para que respete el tema activo.
+function _resolverColoresChart() {
+  const root = getComputedStyle(document.documentElement);
+  const get = (k, fallback) => (root.getPropertyValue(k) || '').trim() || fallback;
+  return {
+    ink:        get('--ink',        '#e8f5ff'),
+    inkMuted:   get('--ink-muted',  '#94a3b8'),
+    grid:       'rgba(127,127,127,.18)',
+  };
+}
+
 function _hdRenderChartCustom({ labels, datasets }) {
   const canvas = document.getElementById('hd-chart');
   if (!canvas) return;
@@ -3633,15 +3645,16 @@ function _hdRenderChartCustom({ labels, datasets }) {
   const statsEl = document.getElementById('hd-chart-stats');
   if (statsEl) statsEl.innerHTML = '';
   const ctx = canvas.getContext('2d');
+  const c = _resolverColoresChart();
   _hdState.chart = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: datasets.length > 1, labels: { color: 'var(--ink)', boxWidth: 10 } } },
+      plugins: { legend: { display: datasets.length > 1, labels: { color: c.ink, boxWidth: 10 } } },
       scales: {
-        x: { ticks: { color: 'var(--ink-muted)' }, grid: { display: false } },
-        y: { ticks: { color: 'var(--ink-muted)', callback: (v) => Math.abs(v)>=1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(127,127,127,.1)' } },
+        x: { ticks: { color: c.inkMuted, font: { size: 11 } }, grid: { display: false }, border: { color: c.grid } },
+        y: { ticks: { color: c.inkMuted, font: { size: 11 }, callback: (v) => Math.abs(v)>=1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: c.grid }, border: { display: false } },
       },
     },
   });
