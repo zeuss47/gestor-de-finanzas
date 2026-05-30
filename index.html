@@ -300,6 +300,15 @@
       </svg>
       Análisis
     </button>
+
+    <button class="sidebar-nav-item" id="sb-docs">
+      <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <path d="M12 18v-6M9 15l3-3 3 3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Cargar PDF
+    </button>
   </nav>
 
   <hr style="border-color:var(--border);margin:1rem .75rem">
@@ -489,6 +498,15 @@
         <line x1="21" y1="12" x2="23" y2="12"/>
       </svg>
       <span>Metas</span>
+    </button>
+
+    <button id="nav-docs" class="nav-btn" title="Cargar PDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <path d="M12 18v-6M9 15l3-3 3 3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Cargar PDF</span>
     </button>
   </nav>
 
@@ -1714,18 +1732,6 @@
     </div>
 
     <div class="form-modern-body">
-      <!-- Importación automática desde PDF -->
-      <div class="form-section">
-        <button type="button" id="rec-import-pdf" class="btn-secondary w-full text-sm"
-                style="border-color:var(--brand);color:var(--brand)">
-          📄 Importar desde PDF (autocompletar campos)
-        </button>
-        <input type="file" id="rec-import-file" accept="application/pdf,.pdf" hidden />
-        <p class="text-[10px] mt-1" style="color:var(--ink-muted)">
-          Subí tu PDF de recibo y los campos se rellenan solos. Procesado 100% local en tu navegador.
-        </p>
-      </div>
-
       <!-- Tipo de recibo -->
       <div class="form-section">
         <label class="form-label">Tipo</label>
@@ -1844,6 +1850,55 @@
 </dialog>
 
 <!-- ===== DIÁLOGO: IMPORTAR RESUMEN BANCARIO PDF ============= -->
+<!-- ===== CARGAR DOCUMENTOS (PDF) ============================= -->
+<dialog id="dlg-documentos">
+  <div class="form-modern" style="min-width:min(94vw,520px);max-width:560px">
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--brand),var(--neon-purple))">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <path d="M12 18v-6M9 15l3-3 3 3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Cargar documentos</h3>
+        <p class="text-xs" style="color:var(--ink-muted)">Subí recibos de sueldo o resúmenes de tarjeta en PDF</p>
+      </div>
+      <button type="button" id="docs-close-x"
+        style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
+        title="Cerrar">✕</button>
+    </div>
+
+    <div class="form-modern-body">
+      <button type="button" id="docs-recibo" class="docs-card">
+        <span class="docs-card-icon" style="background:linear-gradient(135deg,var(--success),var(--brand))">💼</span>
+        <div class="docs-card-text">
+          <span class="docs-card-title">Recibo de sueldo</span>
+          <span class="docs-card-desc">Importá tu recibo en PDF y los campos se completan solos</span>
+        </div>
+        <span class="docs-card-arrow">›</span>
+      </button>
+
+      <button type="button" id="docs-resumen" class="docs-card">
+        <span class="docs-card-icon" style="background:linear-gradient(135deg,var(--brand),var(--neon-purple))">💳</span>
+        <div class="docs-card-text">
+          <span class="docs-card-title">Resumen de tarjeta</span>
+          <span class="docs-card-desc">Cotejá uno o varios resúmenes y cargá los gastos que falten</span>
+        </div>
+        <span class="docs-card-arrow">›</span>
+      </button>
+
+      <p class="text-[10px] mt-1" style="color:var(--ink-muted);text-align:center">
+        Todo el procesamiento es 100% local en tu dispositivo. Los PDF no salen de tu navegador.
+      </p>
+
+      <!-- File input para recibo (se dispara desde la tarjeta de arriba) -->
+      <input type="file" id="rec-import-file" accept="application/pdf,.pdf" hidden />
+    </div>
+  </div>
+</dialog>
+
 <dialog id="dlg-resumen-bancario">
   <div class="form-modern" style="min-width:min(96vw,780px);max-width:820px">
 
@@ -2067,9 +2122,6 @@
     <div class="widget-drawer-footer" style="flex-wrap:wrap;gap:.5rem">
       <button type="button" id="td-add-gasto" class="btn-primary flex-1">+ Cargar gasto en esta tarjeta</button>
       <button type="button" id="td-close-2"  class="btn-secondary flex-1">Cerrar</button>
-      <button type="button" id="td-import-resumen" class="btn-secondary text-sm" style="width:100%;flex-basis:100%">
-        📄 Cotejar resumen bancario (PDF)
-      </button>
     </div>
   </div>
 </dialog>

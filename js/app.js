@@ -4691,20 +4691,36 @@ async function init() {
     actualizarResumenRecibo();
   });
 
-  // Botón "Importar desde PDF" + handler del file input
-  document.getElementById('rec-import-pdf')?.addEventListener('click', () => {
-    document.getElementById('rec-import-file')?.click();
+  // ── Centro de carga de PDF (Documentos) ──────────────────────
+  const abrirDocumentos = () => document.getElementById('dlg-documentos')?.showModal();
+  document.getElementById('nav-docs')?.addEventListener('click', abrirDocumentos);
+  document.getElementById('sb-docs')?.addEventListener('click', abrirDocumentos);
+  document.getElementById('docs-close-x')?.addEventListener('click', () => document.getElementById('dlg-documentos')?.close());
+
+  // Tarjeta "Recibo de sueldo": abre el form de recibo y dispara el selector de PDF
+  document.getElementById('docs-recibo')?.addEventListener('click', () => {
+    document.getElementById('dlg-documentos')?.close();
+    abrirDialogoRecibo();
+    setTimeout(() => document.getElementById('rec-import-file')?.click(), 150);
   });
 
+  // Tarjeta "Resumen de tarjeta": abre el flujo de cotejo de resúmenes
+  document.getElementById('docs-resumen')?.addEventListener('click', () => {
+    document.getElementById('dlg-documentos')?.close();
+    abrirImportResumen('');
+  });
+
+  // File input del recibo (parsea y rellena el form ya abierto)
   document.getElementById('rec-import-file')?.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const btn = document.getElementById('rec-import-pdf');
-    const txtOriginal = btn?.textContent;
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Procesando PDF…'; }
+    toast('⏳ Procesando recibo…', 1500);
     try {
       const { parsearRecibo } = await import('./pdf-import.js');
       const datos = await parsearRecibo(file);
+      // Asegurar que el form de recibo esté abierto antes de rellenar
+      const dlgRec = document.getElementById('dlg-recibo');
+      if (dlgRec && !dlgRec.open) abrirDialogoRecibo();
       rellenarFormularioRecibo(datos);
       const detectados = [];
       if (datos.sueldo_neto)        detectados.push('neto');
@@ -4715,11 +4731,12 @@ async function init() {
       toast(`✓ Importado (${detectados.join(', ')}). Revisá los campos.`, 3500);
     } catch (err) {
       console.error('[pdf-import] error:', err);
+      const dlgRec = document.getElementById('dlg-recibo');
+      if (dlgRec && !dlgRec.open) abrirDialogoRecibo();
       alert('No se pudo procesar el PDF:\n\n' + (err?.message || err) +
             '\n\nProbá completar los campos manualmente.');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = txtOriginal; }
-      e.target.value = ''; // reset para permitir re-subir el mismo archivo
+      e.target.value = ''; // permitir re-subir el mismo archivo
     }
   });
 
@@ -6202,12 +6219,8 @@ function _rsbRenderStatements() {
  * Se llama una sola vez durante el init de la app.
  */
 function iniciarModuloResumenBancario() {
-  // ── Botón en drawer de tarjeta ────────────────────────────
-  document.getElementById('td-import-resumen')?.addEventListener('click', () => {
-    const tarjetaId = _drawerTarjetaIdActual || '';
-    document.getElementById('dlg-tarjeta-detalle')?.close();
-    abrirImportResumen(tarjetaId);
-  });
+  // El acceso al cotejo de resúmenes ahora está centralizado en el diálogo
+  // "Cargar documentos" (nav → Cargar PDF). Ver handlers de #docs-resumen.
 
   // ── Drop zone: click y drag-and-drop ────────────────────
   const dropzone = document.getElementById('rsb-dropzone');
