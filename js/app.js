@@ -4146,6 +4146,10 @@ function abrirHistorialWidget(widgetId) {
   if (filtros) filtros.style.display = '';
   const chartWrap = document.getElementById('hd-chart-wrap');
   if (chartWrap) chartWrap.style.display = '';
+  // Restaurar selector de modo del chart (líneas/acumulado/barras) — solo aplica
+  // al renderer genérico de movimientos. Los renderers custom lo ocultan después.
+  const chartModes = document.querySelector('.hd-chart-modes');
+  if (chartModes) chartModes.style.display = '';
   // Restaurar labels KPI
   const kpiTotal = document.getElementById('hd-kpi-total');
   if (kpiTotal && kpiTotal.previousElementSibling) kpiTotal.previousElementSibling.textContent = 'Total';
@@ -4201,6 +4205,11 @@ function abrirHistorialWidget(widgetId) {
     // así que aunque cierres con filtros ocultos, la próxima apertura los repone.
     const filtros2 = document.querySelector('.widget-drawer-filters');
     if (filtros2) filtros2.style.display = 'none';
+    // Ocultar selector líneas/acumulado/barras: los renderers custom arman su
+    // propio chart (líneas con datos específicos del widget) y los otros modos
+    // no aplican (ej. "saldo acumulado" no tiene sentido para cotizaciones).
+    const chartModes2 = document.querySelector('.hd-chart-modes');
+    if (chartModes2) chartModes2.style.display = 'none';
     try { _widgetRenderers[widgetId](); }
     catch (e) {
       console.error('[historial widget] renderer custom falló para', widgetId, e);
@@ -5665,9 +5674,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 100);
 });
 
-// Selector de modo del chart en historial
+// Selector de modo del chart en historial — solo aplica al renderer genérico
+// (estado_global, grafico, resumen_anual, flujo_mensual). Para widgets con
+// renderer custom el botón está oculto, pero hacemos el handler defensivo
+// para no romper el chart custom si alguien fuerza el click.
 document.addEventListener('click', (e) => {
   if (!e.target.matches('.hd-chart-mode')) return;
+  if (_widgetRenderers[_hdState.widget]) return;
   document.querySelectorAll('.hd-chart-mode').forEach(b => b.classList.remove('active'));
   e.target.classList.add('active');
   _hdState.chartMode = e.target.dataset.mode;
