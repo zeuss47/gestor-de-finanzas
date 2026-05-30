@@ -1604,10 +1604,23 @@
         title="Cerrar">✕</button>
     </div>
     <div class="form-modern-body">
+      <!-- Sección USD (solo si el ciclo tiene consumos en dólares) -->
+      <div class="form-section pc-usd-box" id="pc-usd-wrap" hidden>
+        <div class="flex items-center justify-between mb-1">
+          <span class="form-label" style="margin:0">💵 Saldo en USD del ciclo</span>
+          <span class="ff-display font-bold" id="pc-usd-saldo" style="color:var(--success)">US$ 0</span>
+        </div>
+        <label class="form-label">Cotización USD al pagar</label>
+        <div class="input-with-prefix"><span class="input-prefix">$</span>
+          <input type="number" id="pc-usd-cotiz" class="input" step="0.01" placeholder="0" /></div>
+        <p class="text-[10px] mt-1" id="pc-usd-equiv" style="color:var(--ink-muted)"></p>
+      </div>
+
       <div class="form-section">
         <label class="form-label">Total a pagar</label>
         <div class="input-with-prefix"><span class="input-prefix">$</span>
           <input type="number" id="pc-monto" class="input input-lg" step="0.01" placeholder="0" /></div>
+        <p class="text-[10px] mt-1" id="pc-total-detalle" style="color:var(--ink-muted)"></p>
       </div>
       <div class="form-section">
         <label class="form-label">¿Descontar de una cuenta?</label>

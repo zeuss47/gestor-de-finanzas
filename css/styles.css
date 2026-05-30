@@ -3266,6 +3266,22 @@ body.view-analisis #main-widgets::before {
 .td-ciclo-monto { font-size: .8rem; font-weight: 600; text-align: right; min-width: 80px; font-family: 'Space Grotesk',sans-serif; }
 .td-ciclo-badge { font-size: .6rem; font-weight: 700; letter-spacing: .05em; min-width: 80px; text-align: center; }
 
+/* Caja USD en el diálogo de pago */
+.pc-usd-box {
+  border: 1px solid var(--success);
+  border-radius: 12px;
+  padding: .85rem;
+  background: linear-gradient(135deg, rgba(0,255,159,0.05), rgba(0,240,255,0.03));
+}
+/* Saldo USD en el detalle del ciclo */
+.td-ciclo-usd {
+  font-size: .68rem; color: var(--ink-2);
+  padding: .4rem .55rem; margin-top: .5rem;
+  background: rgba(0,255,159,.06); border: 1px solid rgba(0,255,159,.25);
+  border-radius: 8px;
+}
+.td-ciclo-usd b { color: var(--success); font-family: 'Space Grotesk', sans-serif; }
+
 /* Detalle expandible del ciclo */
 .td-ciclo-detalle {
   border: 1px solid var(--brand); border-top: none;

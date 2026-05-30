@@ -15,7 +15,7 @@
  */
 
 import { DB, uuid, nowTs } from './db.js';
-import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto } from './cards.js';
+import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto, cuotaEnPeriodo } from './cards.js';
 import { calcularCapacidad, simularCompra, cuotasPendientes } from './credito.js';
 import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
@@ -3354,11 +3354,14 @@ function _renderCicloDetalle(resumenMes) {
     .filter(g => ids.has(g.id) && !g.deleted)
     .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
+  const usdNominal = resumenMes.monedas_extranjeras?.USD || 0;
+  const usdPendiente = (resumenMes.pendientes_cierre_usd || 0) > 0;
+
   const filas = gastos.length ? gastos.map(g => {
     const icon = CAT_ICON[g.categoria] || '📌';
     const cuota = g.tipo === 'cuotas' ? ` · cuota ${g.cuota_numero || 1}/${g.cuotas_total}` : '';
     const montoFmt = (g.moneda && g.moneda !== 'ARS')
-      ? `${g.moneda} ${(g.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+      ? `${g.moneda} ${(g.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}${g.cotizacion_al_pagar ? ` ×$${g.cotizacion_al_pagar}` : ''}`
       : FMT.format(g.monto);
     return `
       <div class="td-ciclo-gasto">
@@ -3375,6 +3378,11 @@ function _renderCicloDetalle(resumenMes) {
         · 💸 se paga el <b>${_ddmm(r.fecha_vencimiento)}</b> (vencimiento)
       </div>
       <div class="td-ciclo-gastos">${filas}</div>
+      ${usdNominal > 0 ? `
+      <div class="td-ciclo-usd">
+        💵 Saldo en USD: <b>US$ ${usdNominal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</b>
+        ${usdPendiente ? '<span style="color:var(--warning)"> · cotización pendiente (se fija al pagar)</span>' : '<span style="color:var(--success)"> · cotización aplicada ✓</span>'}
+      </div>` : ''}
       <div class="td-ciclo-totales">
         <span>Un pago <b>${FMT.format(r.total_un_pago || 0)}</b></span>
         <span>Cuotas <b>${FMT.format(r.total_cuotas || 0)}</b></span>
@@ -3484,11 +3492,47 @@ let _pagoCicloCtx = null;
 function abrirPagoCiclo(tarjetaId, periodo, total) {
   const t = state.tarjetas.find(x => x.id === tarjetaId);
   if (!t) return;
-  _pagoCicloCtx = { tarjetaId, periodo, total };
   const [y, m] = periodo.split('-');
   const mesLabel = `${_CICLO_MESES[parseInt(m, 10) - 1]} ${y}`;
   document.getElementById('pc-subtitulo').textContent = `${t.nombre} · ${mesLabel}`;
-  document.getElementById('pc-monto').value = Math.round(total) || '';
+
+  // Computar el resumen de ESE ciclo para separar pesos vs USD
+  const resumenMes = resumenTarjeta(t, state.gastos, new Date(parseInt(y), parseInt(m) - 1, 1));
+  const usdNominal = resumenMes.monedas_extranjeras?.USD || 0;
+  const usdArs     = resumenMes.monedas_extranjeras_ars?.USD || 0;
+  const arsConsumos = Math.max(0, (resumenMes.total_resumen || 0) - usdArs); // parte pura en pesos
+
+  _pagoCicloCtx = { tarjetaId, periodo, arsConsumos, usdNominal };
+
+  const usdWrap = document.getElementById('pc-usd-wrap');
+  const cotizInp = document.getElementById('pc-usd-cotiz');
+  const montoInp = document.getElementById('pc-monto');
+  const detalle  = document.getElementById('pc-total-detalle');
+
+  if (usdNominal > 0) {
+    usdWrap.hidden = false;
+    document.getElementById('pc-usd-saldo').textContent = `US$ ${usdNominal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+    // Cotización sugerida: dólar tarjeta > blue > oficial
+    const cam = state.ajustes?.tipos_cambio || {};
+    const cotizSug = cam.USD_TARJETA?.valor || cam.USD_BLUE?.valor || cam.USD?.valor || 0;
+    cotizInp.value = cotizSug ? Math.round(cotizSug) : '';
+    const recompute = () => {
+      const cz = parseFloat(cotizInp.value) || 0;
+      const totalUsdArs = usdNominal * cz;
+      const totalPagar = arsConsumos + totalUsdArs;
+      montoInp.value = Math.round(totalPagar) || '';
+      document.getElementById('pc-usd-equiv').textContent = cz > 0
+        ? `US$ ${usdNominal.toFixed(2)} × $${cz} = ${FMT.format(totalUsdArs)}`
+        : 'Ingresá la cotización para calcular el total en pesos';
+      detalle.textContent = `Consumos en pesos ${FMT.format(arsConsumos)} + USD ${FMT.format(totalUsdArs)}`;
+    };
+    cotizInp.oninput = recompute;
+    recompute();
+  } else {
+    usdWrap.hidden = true;
+    montoInp.value = Math.round(total) || '';
+    detalle.textContent = '';
+  }
 
   // Poblar cuentas
   const sel = document.getElementById('pc-cuenta');
@@ -3501,11 +3545,35 @@ function abrirPagoCiclo(tarjetaId, periodo, total) {
 
 async function confirmarPagoCiclo() {
   if (!_pagoCicloCtx) return;
-  const { tarjetaId, periodo } = _pagoCicloCtx;
+  const { tarjetaId, periodo, usdNominal } = _pagoCicloCtx;
   const t = state.tarjetas.find(x => x.id === tarjetaId);
   if (!t) return;
   const cuentaId = document.getElementById('pc-cuenta')?.value || '';
   const monto = parseFloat(document.getElementById('pc-monto')?.value) || 0;
+  const cotizUSD = parseFloat(document.getElementById('pc-usd-cotiz')?.value) || 0;
+
+  // Si el ciclo tiene consumos en USD, fijamos la cotización al pagar en todos
+  // los gastos USD del período. Así el resumen los convierte a pesos con ESA
+  // cotización y el análisis de gasto por tarjeta queda exacto.
+  let usdAplicados = 0;
+  if (usdNominal > 0 && cotizUSD > 0) {
+    const [py, pm] = periodo.split('-').map(Number);
+    for (const g of state.gastos) {
+      if (g.deleted || g.tarjeta_id !== tarjetaId) continue;
+      if (!g.moneda || g.moneda === 'ARS') continue;
+      if (!cuotaEnPeriodo(g.fecha, t, py, pm)) continue;
+      g.cotizacion_al_pagar = cotizUSD;
+      g.updated_at = nowTs();
+      await DB.put('gastos', g);
+      usdAplicados++;
+    }
+    // Histórico de cotizaciones de la tarjeta
+    if (!t.cotizaciones_historico) t.cotizaciones_historico = [];
+    t.cotizaciones_historico.push({
+      periodo, moneda: 'USD', cotizacion: cotizUSD,
+      fecha_aplicada: new Date().toISOString(), gastos_aplicados: usdAplicados, total_moneda: usdNominal,
+    });
+  }
 
   if (!t.ciclos_pagados) t.ciclos_pagados = [];
   if (!t.ciclos_pagados.includes(periodo)) t.ciclos_pagados.push(periodo);
@@ -3531,15 +3599,15 @@ async function confirmarPagoCiclo() {
       updated_at: Math.floor(Date.now() / 1000),
     };
     await DB.put('gastos', g);
-    t.ciclos_pagos[periodo] = { cuenta_id: cuentaId, gasto_id: g.id, monto, fecha: g.fecha };
+    t.ciclos_pagos[periodo] = { cuenta_id: cuentaId, gasto_id: g.id, monto, fecha: g.fecha, cotiz_usd: cotizUSD || null };
   } else {
-    t.ciclos_pagos[periodo] = { cuenta_id: null, monto, fecha: new Date().toISOString().slice(0, 10) };
+    t.ciclos_pagos[periodo] = { cuenta_id: null, monto, fecha: new Date().toISOString().slice(0, 10), cotiz_usd: cotizUSD || null };
   }
 
   await DB.put('tarjetas', t);
   notificarCambioLocal();
   document.getElementById('dlg-pago-ciclo')?.close();
-  toast(`✓ Pago registrado${cuentaId ? ' y descontado de la cuenta' : ''}`);
+  toast(`✓ Pago registrado${cuentaId ? ' y descontado de la cuenta' : ''}${usdAplicados ? ` · USD a $${cotizUSD}` : ''}`);
   await reloadAll();
   abrirDrawerTarjeta(tarjetaId);
 }
