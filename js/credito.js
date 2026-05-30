@@ -91,7 +91,7 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
     .filter(i => !i.deleted && (i.periodo_aplicacion === mesActual || i.fecha?.startsWith(mesActual)))
     .reduce((a, i) => a + (i.sueldo_neto || 0) + (i.bonos || 0), 0);
 
-  // 2. Gastos fijos del mes (sin tarjeta, ya impactados o por impactar)
+  // 2. Gastos fijos del mes en curso (sin tarjeta) — para el saldo líquido real
   const gastosFijosMes = gastos
     .filter(g => !g.deleted && !g.tarjeta_id && g.fecha?.startsWith(mesActual))
     .reduce((a, g) => {
@@ -101,6 +101,24 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
       return a + m;
     }, 0);
 
+  // 2b. Gastos HABITUALES: promedio mensual de gastos no-tarjeta de los últimos
+  //     3 meses. Es la base realista del "costo de vida" para tasar la capacidad
+  //     de crédito (no depende de un mes puntual con gastos atípicos).
+  const mesesRef = [];
+  for (let k = 0; k < 3; k++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1);
+    mesesRef.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  const sumaHabituales = gastos
+    .filter(g => !g.deleted && !g.tarjeta_id && mesesRef.some(mm => g.fecha?.startsWith(mm)))
+    .reduce((a, g) => {
+      let m = g.monto;
+      if (g.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0)/100);
+      if (g.tipo === 'amortizacion') m = m / 12;
+      return a + m;
+    }, 0);
+  const gastosHabituales = sumaHabituales / 3;
+
   // 3. Compromisos de tarjetas: suma de resumenes activos
   const compromisoTarjetas = (resumenes || []).reduce((a, r) => a + (r.total_resumen || 0), 0);
 
@@ -108,18 +126,24 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
   const pendientes = cuotasPendientes(gastos, tarjetas, hoy);
   const cuotasMensualesProyectadas = pendientes.reduce((a, p) => a + p.monto_cuota, 0);
 
-  // 5. Regla 30%: cuota segura mensual
+  // 5. LÍMITE FINANCIERO tasado con el ingreso:
+  //    - Regla clásica 30% del ingreso para servicio de deuda (cuotas)…
+  //    - …pero acotado a lo que realmente queda libre tras los gastos habituales.
+  //    De ese modo, si tus gastos de vida consumen casi todo el ingreso, el
+  //    límite baja aunque el 30% diera más.
   const cuotaSegura30 = ingresoMes * 0.30;
+  const disponibleTrasHabituales = Math.max(0, ingresoMes - gastosHabituales);
+  const limiteFinanciero = Math.max(0, Math.min(cuotaSegura30, disponibleTrasHabituales));
 
-  // 6. Capacidad libre real = cuota segura - compromisos ya existentes
-  const capacidadLibre = Math.max(0, cuotaSegura30 - cuotasMensualesProyectadas - compromisoTarjetas);
+  // 6. Capacidad libre real = límite financiero - compromisos ya existentes
+  const capacidadLibre = Math.max(0, limiteFinanciero - cuotasMensualesProyectadas - compromisoTarjetas);
 
-  // 7. Saldo líquido proyectado (lo que te queda en mano)
+  // 7. Saldo líquido proyectado (lo que te queda en mano este mes)
   const saldoLiquidoProyectado = ingresoMes - gastosFijosMes - compromisoTarjetas;
 
-  // 8. Ratio de uso del ingreso
+  // 8. Ratio de uso del ingreso (basado en gastos habituales para ser estable)
   const ratioUsoIngreso = ingresoMes > 0
-    ? (gastosFijosMes + compromisoTarjetas + cuotasMensualesProyectadas) / ingresoMes
+    ? (gastosHabituales + compromisoTarjetas + cuotasMensualesProyectadas) / ingresoMes
     : 0;
 
   // 9. Estado del semáforo
@@ -167,6 +191,8 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
   return {
     ingreso_mes: ingresoMes,
     gastos_fijos_mes: gastosFijosMes,
+    gastos_habituales: gastosHabituales,
+    limite_financiero: limiteFinanciero,
     compromiso_tarjetas: compromisoTarjetas,
     cuotas_mensuales_proyectadas: cuotasMensualesProyectadas,
     cuota_segura_30: cuotaSegura30,

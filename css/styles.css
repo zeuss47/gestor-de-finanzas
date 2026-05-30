@@ -3249,16 +3249,64 @@ body.view-analisis #main-widgets::before {
 }
 
 /* ── Ciclos de tarjeta ─────────────────────────────────────────── */
+.td-ciclo-wrap { margin-bottom: .4rem; }
 .td-ciclo-row {
   display: flex; align-items: center; gap: .5rem;
   padding: .6rem .75rem; border-radius: 10px;
-  border: 1px solid var(--border); margin-bottom: .4rem;
+  border: 1px solid var(--border);
   flex-wrap: wrap;
 }
+.td-ciclo-clickable { cursor: pointer; transition: background .15s, border-color .15s; }
+.td-ciclo-clickable:hover { background: var(--surface-2); border-color: var(--brand); }
+.td-ciclo-clickable.expanded { border-color: var(--brand); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.td-ciclo-caret { font-size: .7rem; color: var(--ink-muted); width: 12px; flex-shrink: 0; transition: transform .15s; }
 .td-ciclo-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .td-ciclo-mes  { font-size: .8rem; font-weight: 700; font-family: 'Space Grotesk',sans-serif; }
+.td-ciclo-venc { font-size: .68rem; color: var(--ink-muted); }
 .td-ciclo-monto { font-size: .8rem; font-weight: 600; text-align: right; min-width: 80px; font-family: 'Space Grotesk',sans-serif; }
 .td-ciclo-badge { font-size: .6rem; font-weight: 700; letter-spacing: .05em; min-width: 80px; text-align: center; }
+
+/* Detalle expandible del ciclo */
+.td-ciclo-detalle {
+  border: 1px solid var(--brand); border-top: none;
+  border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.td-ciclo-detalle-inner { padding: .6rem .75rem; }
+.td-ciclo-rango {
+  font-size: .68rem; color: var(--ink-2); line-height: 1.5;
+  padding: .4rem .55rem; margin-bottom: .5rem;
+  background: var(--surface-2); border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.td-ciclo-rango b { color: var(--brand); }
+.td-ciclo-gastos { display: flex; flex-direction: column; gap: .25rem; }
+.td-ciclo-gasto {
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: center; gap: .5rem;
+  padding: .3rem .4rem; border-radius: 6px;
+  font-size: .72rem;
+}
+.td-ciclo-gasto:nth-child(odd) { background: rgba(127,127,127,.04); }
+.td-ciclo-gasto-fecha { color: var(--ink-muted); font-size: .65rem; white-space: nowrap; }
+.td-ciclo-gasto-desc {
+  color: var(--ink); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.td-ciclo-gasto-monto {
+  font-family: 'Space Grotesk',sans-serif; font-weight: 600;
+  text-align: right; white-space: nowrap; color: var(--ink);
+}
+.td-ciclo-empty { font-size: .72rem; color: var(--ink-muted); text-align: center; padding: .6rem; }
+.td-ciclo-totales {
+  display: flex; flex-wrap: wrap; gap: .25rem .9rem;
+  margin-top: .55rem; padding-top: .5rem;
+  border-top: 1px solid var(--border);
+  font-size: .68rem; color: var(--ink-muted);
+}
+.td-ciclo-totales b { color: var(--ink); font-family: 'Space Grotesk',sans-serif; }
+.td-ciclo-total-final b { color: var(--brand); }
 
 /* ── Tarjetas mobile ───────────────────────────────────────────── */
 #sec-tarjetas-mobile { padding-top: env(safe-area-inset-top, 0); }

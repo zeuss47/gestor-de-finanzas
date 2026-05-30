@@ -2758,7 +2758,17 @@ function abrirDrawerTarjeta(tarjetaId) {
     document.getElementById('td-recomendado').textContent   = FMT.format(capTarjeta.recomendado_seguro);
     document.getElementById('td-recomendado').style.color   = sem.color;
     document.getElementById('td-disp-tarjeta').textContent  = FMT.format(capTarjeta.disponible_tarjeta);
-    document.getElementById('td-sugerencia').textContent    = cap.sugerencia;
+
+    // Desglose: cómo se tasó la capacidad (ingreso − gastos habituales → límite financiero)
+    const sug = document.getElementById('td-sugerencia');
+    sug.innerHTML = `
+      <span style="display:flex;flex-wrap:wrap;gap:.15rem .8rem;margin-bottom:.4rem;font-size:.66rem;color:var(--ink-muted)">
+        <span>Ingreso <b style="color:var(--success)">${FMT.format(cap.ingreso_mes)}</b></span>
+        <span>Gastos habituales <b style="color:var(--ink)">${FMT.format(cap.gastos_habituales)}</b></span>
+        <span>Límite financiero <b style="color:var(--brand)">${FMT.format(cap.limite_financiero)}</b></span>
+        <span>Cuotas+tarjetas <b style="color:var(--warning)">${FMT.format(cap.compromiso_tarjetas + cap.cuotas_mensuales_proyectadas)}</b></span>
+      </span>
+      <span style="color:var(--ink-2)">${escapeHtml(cap.sugerencia)}</span>`;
   }
 
   // Cuotas pendientes
@@ -2881,6 +2891,58 @@ function renderHistoricoCotizaciones(tarjeta) {
 }
 
 /* ── FEATURE A: Ciclos de facturación ─────────────────────────── */
+const _CICLO_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const _ddmm = (iso) => iso ? iso.split('-').reverse().join('/') : '—';
+
+// Inicio del ciclo: día siguiente al cierre del mes anterior.
+function _inicioCiclo(cierreISO) {
+  if (!cierreISO) return '—';
+  const c = new Date(cierreISO + 'T12:00:00');
+  const prev = new Date(c);
+  prev.setMonth(prev.getMonth() - 1);
+  prev.setDate(prev.getDate() + 1);
+  return `${String(prev.getDate()).padStart(2,'0')}/${String(prev.getMonth()+1).padStart(2,'0')}`;
+}
+
+// Detalle expandible de un ciclo: rango (acotado al cierre), pago (vencimiento)
+// y la lista de gastos que caen en ese ciclo de facturación.
+function _renderCicloDetalle(resumenMes) {
+  const r = resumenMes;
+  const ids = new Set(r.movimientos_ids || []);
+  const gastos = (state.gastos || [])
+    .filter(g => ids.has(g.id) && !g.deleted)
+    .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+
+  const filas = gastos.length ? gastos.map(g => {
+    const icon = CAT_ICON[g.categoria] || '📌';
+    const cuota = g.tipo === 'cuotas' ? ` · cuota ${g.cuota_numero || 1}/${g.cuotas_total}` : '';
+    const montoFmt = (g.moneda && g.moneda !== 'ARS')
+      ? `${g.moneda} ${(g.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+      : FMT.format(g.monto);
+    return `
+      <div class="td-ciclo-gasto">
+        <span class="td-ciclo-gasto-fecha">${_ddmm(g.fecha)}</span>
+        <span class="td-ciclo-gasto-desc">${icon} (${escapeHtml(g.categoria || 'general')}) ${escapeHtml(g.descripcion || '')}${cuota}</span>
+        <span class="td-ciclo-gasto-monto">${montoFmt}</span>
+      </div>`;
+  }).join('') : `<p class="td-ciclo-empty">Sin gastos en este ciclo.</p>`;
+
+  return `
+    <div class="td-ciclo-detalle-inner">
+      <div class="td-ciclo-rango">
+        📆 Consumos del <b>${_inicioCiclo(r.fecha_cierre)}</b> al <b>${_ddmm(r.fecha_cierre)}</b> (cierre)
+        · 💸 se paga el <b>${_ddmm(r.fecha_vencimiento)}</b> (vencimiento)
+      </div>
+      <div class="td-ciclo-gastos">${filas}</div>
+      <div class="td-ciclo-totales">
+        <span>Un pago <b>${FMT.format(r.total_un_pago || 0)}</b></span>
+        <span>Cuotas <b>${FMT.format(r.total_cuotas || 0)}</b></span>
+        <span>Recurrentes <b>${FMT.format(r.total_recurrentes || 0)}</b></span>
+        <span class="td-ciclo-total-final">Total <b>${FMT.format(r.total_resumen || 0)}</b></span>
+      </div>
+    </div>`;
+}
+
 function renderCiclosTarjeta(tarjeta, resumenActual) {
   const cont = document.getElementById('td-ciclos-lista');
   if (!cont) return;
@@ -2893,39 +2955,73 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
     const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
     const resumenMes = resumenTarjeta(tarjeta, state.gastos, d);
     const periodo = resumenMes.periodo;
-    const esPagado = pagados.has(periodo);
-    const esFuturo = d > new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const esActual = periodo === resumenActual.periodo;
-    ciclos.push({ periodo, resumenMes, esPagado, esFuturo, esActual });
+    ciclos.push({
+      periodo, resumenMes,
+      esPagado: pagados.has(periodo),
+      esFuturo: d > new Date(hoy.getFullYear(), hoy.getMonth(), 1),
+      esActual: periodo === resumenActual.periodo,
+    });
   }
+  ciclos.reverse(); // más reciente primero
 
-  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-  cont.innerHTML = ciclos.reverse().map(c => {
+  cont.innerHTML = ciclos.map((c, idx) => {
     const [y, m] = c.periodo.split('-');
-    const label = `${MESES[parseInt(m, 10) - 1]} ${y}`;
+    const label = `${_CICLO_MESES[parseInt(m, 10) - 1]} ${y}`;
     const estado = c.esFuturo ? 'proximo' : c.esPagado ? 'pagado' : 'pendiente';
     const colorMap = { pagado: 'var(--success)', pendiente: 'var(--warning)', proximo: 'var(--ink-muted)' };
     const badgeMap = { pagado: '✓ PAGADO', pendiente: '⏳ PENDIENTE', proximo: '📅 PRÓXIMO' };
-    const colorEstado = colorMap[estado];
-    const badgeEstado = badgeMap[estado];
     const total = c.resumenMes.total_resumen;
-    const venc = c.resumenMes.fecha_vencimiento;
     const actualBadge = c.esActual ? '<span style="color:var(--brand);font-size:.6rem;margin-left:.25rem">● actual</span>' : '';
+    const nGastos = (c.resumenMes.movimientos_ids || []).length;
 
-    return `<div class="td-ciclo-row" data-periodo="${c.periodo}">
-      <div class="td-ciclo-info">
-        <span class="td-ciclo-mes">${label}${actualBadge}</span>
-        <span class="td-ciclo-venc" style="color:var(--ink-muted);font-size:.7rem">Vence: ${venc || '—'}</span>
-      </div>
-      <div class="td-ciclo-monto">${FMT.format(total)}</div>
-      <div class="td-ciclo-badge" style="color:${colorEstado}">${badgeEstado}</div>
-      ${!c.esFuturo && !c.esPagado ? `<button class="td-ciclo-pagar btn-secondary text-xs" data-periodo="${c.periodo}" data-tarjeta="${tarjeta.id}" style="border-color:var(--success);color:var(--success)">✓ Pagar</button>` : ''}
-    </div>`;
+    return `
+      <div class="td-ciclo-wrap" data-idx="${idx}">
+        <div class="td-ciclo-row td-ciclo-clickable" data-idx="${idx}" role="button" tabindex="0">
+          <span class="td-ciclo-caret">▸</span>
+          <div class="td-ciclo-info">
+            <span class="td-ciclo-mes">${label}${actualBadge}</span>
+            <span class="td-ciclo-venc">Cierra ${_ddmm(c.resumenMes.fecha_cierre)} · Vence ${_ddmm(c.resumenMes.fecha_vencimiento)} · ${nGastos} gasto${nGastos === 1 ? '' : 's'}</span>
+          </div>
+          <div class="td-ciclo-monto">${FMT.format(total)}</div>
+          <div class="td-ciclo-badge" style="color:${colorMap[estado]}">${badgeMap[estado]}</div>
+          ${!c.esFuturo && !c.esPagado ? `<button class="td-ciclo-pagar btn-secondary text-xs" data-periodo="${c.periodo}" data-tarjeta="${tarjeta.id}" style="border-color:var(--success);color:var(--success)">✓ Pagar</button>` : ''}
+        </div>
+        <div class="td-ciclo-detalle" data-idx="${idx}" hidden></div>
+      </div>`;
   }).join('');
 
+  // Expandir/colapsar detalle al hacer click en la fila
+  const toggle = (idx) => {
+    const det = cont.querySelector(`.td-ciclo-detalle[data-idx="${idx}"]`);
+    const row = cont.querySelector(`.td-ciclo-row[data-idx="${idx}"]`);
+    const caret = row?.querySelector('.td-ciclo-caret');
+    if (!det) return;
+    if (det.hidden) {
+      det.innerHTML = _renderCicloDetalle(ciclos[idx].resumenMes);
+      det.hidden = false;
+      if (caret) caret.textContent = '▾';
+      row?.classList.add('expanded');
+    } else {
+      det.hidden = true;
+      if (caret) caret.textContent = '▸';
+      row?.classList.remove('expanded');
+    }
+  };
+
+  cont.querySelectorAll('.td-ciclo-clickable').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.td-ciclo-pagar')) return;  // el botón pagar no expande
+      toggle(parseInt(row.dataset.idx, 10));
+    });
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(parseInt(row.dataset.idx, 10)); }
+    });
+  });
+
+  // Botón "Pagar"
   cont.querySelectorAll('.td-ciclo-pagar').forEach(btn => {
-    btn.onclick = async () => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const t = state.tarjetas.find(x => x.id === btn.dataset.tarjeta);
       if (!t) return;
       if (!t.ciclos_pagados) t.ciclos_pagados = [];
@@ -2936,7 +3032,7 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
         toast(`✓ ${btn.dataset.periodo} marcado como pagado`);
         abrirDrawerTarjeta(t.id);
       }
-    };
+    });
   });
 }
 
@@ -4148,21 +4244,30 @@ const _widgetRenderers = {
 
   // ── SIMULACIÓN CRÉDITO: capacidad de endeudamiento ──────────────
   simulacion_credito: () => {
-    const ingresos = (state.ingresos || []).filter(i => !i.deleted);
-    const ingresoMes = ingresos.length ? ingresos.reduce((a,i) => a + ((i.sueldo_neto||0)+(i.bonos||0)), 0) / Math.max(1, ingresos.length) : 0;
-    const capacidadMax = ingresoMes * 0.3;
-    const cuotasActuales = (state.gastos || []).filter(g => !g.deleted && g.tipo === 'cuotas').reduce((a,g) => a + ((g.monto||0) / (g.cuotas_total || 1)), 0);
-    const disponible = capacidadMax - cuotasActuales;
-    const pctUsado = capacidadMax ? Math.round((cuotasActuales / capacidadMax) * 100) : 0;
+    // Usar la capacidad ya calculada (gastos habituales + límite financiero por ingresos)
+    const cap = state.capacidad || {};
+    const limiteFinanciero = cap.limite_financiero || 0;
+    const cuotasActuales   = cap.cuotas_mensuales_proyectadas || 0;
+    const compromisoTarj   = cap.compromiso_tarjetas || 0;
+    const disponible       = cap.capacidad_libre || 0;
+    const usado            = cuotasActuales + compromisoTarj;
+    const pctUsado = limiteFinanciero ? Math.round((usado / limiteFinanciero) * 100) : 0;
     _hdSetKPIs([
-      { label: 'Disponible',  value: FMT.format(disponible), color: disponible>0?'var(--success)':'var(--danger)' },
-      { label: 'Cap. máxima', value: FMT.format(capacidadMax), color: 'var(--brand)' },
-      { label: 'Usado',       value: `${pctUsado}%`, color: pctUsado>70?'var(--danger)':'var(--warning)' },
+      { label: 'Disponible',      value: FMT.format(disponible), color: disponible>0?'var(--success)':'var(--danger)' },
+      { label: 'Límite financ.',  value: FMT.format(limiteFinanciero), color: 'var(--brand)' },
+      { label: 'Usado',           value: `${pctUsado}%`, color: pctUsado>70?'var(--danger)':'var(--warning)' },
     ]);
     _hdRenderChartCustom({
-      labels: ['Disponible', 'Usado en cuotas'],
+      labels: ['Ingreso', 'Gastos habituales', 'Límite financiero', 'Compromiso', 'Disponible'],
       datasets: [{
-        label: 'Distribución capacidad', data: [Math.max(0,Math.round(disponible)), Math.round(cuotasActuales)],
+        label: 'Capacidad crediticia',
+        data: [
+          Math.round(cap.ingreso_mes || 0),
+          Math.round(cap.gastos_habituales || 0),
+          Math.round(limiteFinanciero),
+          Math.round(usado),
+          Math.max(0, Math.round(disponible)),
+        ],
         borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.25)', tension: 0, fill: true,
       }],
     });

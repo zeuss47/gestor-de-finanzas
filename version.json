@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.17",
-    "build":  34,
-    "modified":  "2026-05-30T13:28:31Z",
-    "commit":  "M css/styles.css, M index.html, M js/app.js",
-    "notes":  "Auto-update 2026-05-30 10:28"
+    "version":  "1.18",
+    "build":  35,
+    "modified":  "2026-05-30T13:46:48Z",
+    "commit":  "M css/styles.css, M js/app.js, M js/credito.js",
+    "notes":  "Auto-update 2026-05-30 10:46"
 }
