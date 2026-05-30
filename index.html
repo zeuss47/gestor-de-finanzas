@@ -1717,6 +1717,18 @@
     </div>
 
     <div class="form-modern-body">
+      <!-- Importación automática desde PDF -->
+      <div class="form-section">
+        <button type="button" id="rec-import-pdf" class="btn-secondary w-full text-sm"
+                style="border-color:var(--brand);color:var(--brand)">
+          📄 Importar desde PDF (autocompletar campos)
+        </button>
+        <input type="file" id="rec-import-file" accept="application/pdf,.pdf" hidden />
+        <p class="text-[10px] mt-1" style="color:var(--ink-muted)">
+          Subí tu PDF de recibo y los campos se rellenan solos. Procesado 100% local en tu navegador.
+        </p>
+      </div>
+
       <!-- Tipo de recibo -->
       <div class="form-section">
         <label class="form-label">Tipo</label>

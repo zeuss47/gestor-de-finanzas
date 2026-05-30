@@ -1615,6 +1615,49 @@ function abrirDialogoRecibo(reciboExistente = null) {
   dlg.showModal();
 }
 
+/**
+ * Rellena los campos del formulario de recibo con los datos extraídos del PDF.
+ * Solo escribe campos que vinieron con datos no vacíos. Si el bruto NO se detectó
+ * pero sí el neto + descuentos, deja al usuario que ajuste.
+ */
+function rellenarFormularioRecibo(datos) {
+  const form = document.querySelector('#dlg-recibo form');
+  if (!form || !datos) return;
+
+  const set = (name, val) => {
+    const el = form.elements[name];
+    if (!el) return;
+    if (val === undefined || val === null || val === '' || val === 0) return;
+    el.value = typeof val === 'number' ? val.toFixed(2) : val;
+  };
+
+  set('empleador',          datos.empleador);
+  set('periodo_aplicacion', datos.periodo_aplicacion);
+  set('fecha',              datos.fecha);
+  set('sueldo_bruto',       datos.sueldo_bruto);
+  set('sueldo_neto',        datos.sueldo_neto);
+  set('bonos',              datos.bonos);
+
+  if (datos.descuentos) {
+    set('desc_jubilacion',  datos.descuentos.jubilacion);
+    set('desc_ley_19032',   datos.descuentos.ley_19032);
+    set('desc_obra_social', datos.descuentos.obra_social);
+    set('desc_sindicato',   datos.descuentos.sindicato);
+  }
+
+  // El neto vino directo del PDF, no queremos que actualizarResumenRecibo lo pise
+  const netoEl = form.elements.sueldo_neto;
+  if (netoEl && datos.sueldo_neto) netoEl.dataset.autoCalc = '';
+
+  // Abrir el <details> de descuentos si encontramos algún descuento
+  const dEl = form.querySelector('details.form-collapse');
+  const hayDescuentos = datos.descuentos && Object.values(datos.descuentos).some(v => v > 0);
+  if (dEl && hayDescuentos) dEl.open = true;
+
+  // Refrescar resumen total
+  actualizarResumenRecibo();
+}
+
 function actualizarResumenRecibo() {
   const form = document.querySelector('#dlg-recibo form');
   if (!form) return;
@@ -4314,6 +4357,38 @@ async function init() {
     form.elements.desc_obra_social.value        = (bruto * 0.03).toFixed(2);
     form.elements.desc_ley_19032.value          = (bruto * 0.03).toFixed(2);
     actualizarResumenRecibo();
+  });
+
+  // Botón "Importar desde PDF" + handler del file input
+  document.getElementById('rec-import-pdf')?.addEventListener('click', () => {
+    document.getElementById('rec-import-file')?.click();
+  });
+
+  document.getElementById('rec-import-file')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const btn = document.getElementById('rec-import-pdf');
+    const txtOriginal = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Procesando PDF…'; }
+    try {
+      const { parsearRecibo } = await import('./pdf-import.js');
+      const datos = await parsearRecibo(file);
+      rellenarFormularioRecibo(datos);
+      const detectados = [];
+      if (datos.sueldo_neto)        detectados.push('neto');
+      if (datos.sueldo_bruto)       detectados.push('bruto');
+      if (datos.periodo_aplicacion) detectados.push('período');
+      if (datos.fecha)              detectados.push('fecha');
+      if (datos.empleador)          detectados.push('empleador');
+      toast(`✓ Importado (${detectados.join(', ')}). Revisá los campos.`, 3500);
+    } catch (err) {
+      console.error('[pdf-import] error:', err);
+      alert('No se pudo procesar el PDF:\n\n' + (err?.message || err) +
+            '\n\nProbá completar los campos manualmente.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = txtOriginal; }
+      e.target.value = ''; // reset para permitir re-subir el mismo archivo
+    }
   });
 
   document.getElementById('dlg-settings').addEventListener('close', (e) => {
