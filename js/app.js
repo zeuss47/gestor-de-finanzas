@@ -5884,23 +5884,23 @@ document.addEventListener('click', (e) => {
  * tarjeta preseleccionada.
  * @param {string} [tarjetaIdPreseleccionado]
  */
+// Estado del módulo de resumen bancario: lista de resúmenes procesados.
+// Cada item: { resultado, tarjetaId, movimientos, aplicarFechas }
+let _rsbStatements = [];
+let _rsbBiasTarjeta = '';
+
 function abrirImportResumen(tarjetaIdPreseleccionado) {
   const dlg = document.getElementById('dlg-resumen-bancario');
   if (!dlg) return;
 
-  // Poblar select con tarjetas activas
-  const sel = document.getElementById('rsb-tarjeta-sel');
-  sel.innerHTML = state.tarjetas
-    .filter(t => !t.deleted && t.activa !== false)
-    .map(t => `<option value="${t.id}" ${t.id === tarjetaIdPreseleccionado ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`)
-    .join('');
+  _rsbBiasTarjeta = tarjetaIdPreseleccionado || '';
+  _rsbStatements = [];
 
   // Reset pasos
   document.getElementById('rsb-paso-0').hidden = false;
   document.getElementById('rsb-paso-1').hidden = true;
   document.getElementById('rsb-paso-2').hidden = true;
 
-  // Limpiar file input para permitir re-subir el mismo archivo
   const fileInput = document.getElementById('rsb-file');
   if (fileInput) fileInput.value = '';
 
@@ -5908,102 +5908,155 @@ function abrirImportResumen(tarjetaIdPreseleccionado) {
 }
 
 /**
- * Renderiza el paso 2 con los movimientos cotejados.
- * @param {{periodo:string, banco:string, movimientos:Array, totalResumen:number}} resultado
- * @param {string} tarjetaId
+ * Adivina a qué tarjeta corresponde un resumen según el banco detectado.
+ * Prioriza la tarjeta cuyo `banco`/`nombre` contenga la keyword del banco.
+ * Si no hay match, usa la tarjeta del drawer (bias) o la primera activa.
  */
-function _rsbRenderCotejo(resultado, tarjetaId) {
-  const { periodo, banco, movimientos, saldoTotal, pagoMinimo, fechaCierre, fechaVencimiento, totalConsumos } = resultado;
-
-  // ── Cabecera ──────────────────────────────────────────────
-  const headerEl = document.getElementById('rsb-resumen-header');
-  const [anio, mes] = (periodo || '').split('-');
-  const mesesNombres = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const periodoLabel = (anio && mes) ? `${mesesNombres[parseInt(mes,10)] || mes} ${anio}` : (periodo || '—');
-  const ddmm = (iso) => iso ? iso.split('-').reverse().join('/') : '—';
-
-  const nExacto   = movimientos.filter(m => m.confianza === 'exacto').length;
-  const nProbable = movimientos.filter(m => m.confianza === 'probable').length;
-  const nFaltante = movimientos.filter(m => m.confianza === 'no_encontrado').length;
-
-  headerEl.innerHTML = `
-    <div class="rsb-resumen-kpi">
-      <span class="rsb-resumen-kpi-label">${escapeHtml(banco || 'Banco')} · Período</span>
-      <span class="rsb-resumen-kpi-val">${escapeHtml(periodoLabel)}</span>
-    </div>
-    <div class="rsb-resumen-kpi">
-      <span class="rsb-resumen-kpi-label">Cierre → Vencimiento</span>
-      <span class="rsb-resumen-kpi-val">${ddmm(fechaCierre)} → ${ddmm(fechaVencimiento)}</span>
-    </div>
-    ${saldoTotal ? `
-    <div class="rsb-resumen-kpi">
-      <span class="rsb-resumen-kpi-label">Saldo a pagar</span>
-      <span class="rsb-resumen-kpi-val brand">${FMT.format(saldoTotal)}</span>
-    </div>` : ''}
-    ${pagoMinimo ? `
-    <div class="rsb-resumen-kpi">
-      <span class="rsb-resumen-kpi-label">Pago mínimo</span>
-      <span class="rsb-resumen-kpi-val">${FMT.format(pagoMinimo)}</span>
-    </div>` : ''}
-    <div class="rsb-stats">
-      <span class="rsb-stat-pill exacto">✓ ${nExacto} ya cargados</span>
-      ${nProbable ? `<span class="rsb-stat-pill probable">⚠ ${nProbable} probables</span>` : ''}
-      <span class="rsb-stat-pill faltante">➕ ${nFaltante} faltantes</span>
-    </div>
-  `;
-
-  // ── Lista de movimientos ────────────────────────────────
-  const listaEl = document.getElementById('rsb-lista-movimientos');
-
-  if (!movimientos.length) {
-    listaEl.innerHTML = `<div class="rsb-empty">No se detectaron movimientos en el PDF.<br>Verificá que sea un resumen de tarjeta estándar.</div>`;
-    return;
+function _rsbAutoCard(banco) {
+  const norm = s => (s || '').toUpperCase();
+  const b = norm(banco);
+  const tarjetas = state.tarjetas.filter(t => !t.deleted && t.activa !== false);
+  const KEYS = ['MACRO', 'BBVA', 'GALICIA', 'SANTANDER', 'NACION', 'ICBC', 'HSBC', 'NARANJA', 'BRUBANK', 'UALA', 'CREDICOOP'];
+  const key = KEYS.find(k => b.includes(k));
+  if (key) {
+    const m = tarjetas.find(t => norm(t.banco).includes(key) || norm(t.nombre).includes(key));
+    if (m) return m.id;
   }
+  return _rsbBiasTarjeta || tarjetas[0]?.id || '';
+}
 
-  listaEl.innerHTML = movimientos.map((mov, idx) => {
-    const fechaFmt = mov.fecha
-      ? mov.fecha.split('-').reverse().join('/')
-      : '—';
-    const montoFmt = mov.moneda && mov.moneda !== 'ARS'
-      ? `${mov.moneda} ${mov.monto.toLocaleString('es-AR', {minimumFractionDigits:2})}`
-      : FMT.format(mov.monto);
+/**
+ * Aplica las fechas reales de cierre/vencimiento del resumen a la tarjeta.
+ * - Actualiza dia_cierre / dia_vencimiento (para futuros ciclos).
+ * - Agrega/actualiza un ciclo_custom para el período exacto del resumen.
+ */
+async function _rsbAplicarFechasTarjeta(tarjetaId, resultado) {
+  const t = state.tarjetas.find(x => x.id === tarjetaId);
+  if (!t || !resultado.fechaCierre) return false;
 
-    const esExacto   = mov.confianza === 'exacto';
-    const esProbable = mov.confianza === 'probable';
-    const esFaltante = mov.confianza === 'no_encontrado';
+  t.dia_cierre = parseInt(resultado.fechaCierre.slice(8, 10), 10);
+  if (resultado.fechaVencimiento) {
+    t.dia_vencimiento = parseInt(resultado.fechaVencimiento.slice(8, 10), 10);
+  }
+  if (!Array.isArray(t.ciclos_custom)) t.ciclos_custom = [];
+  const ciclo = {
+    periodo: resultado.periodo,
+    fin: resultado.fechaCierre,
+    vencimiento: resultado.fechaVencimiento || null,
+  };
+  const idx = t.ciclos_custom.findIndex(c => c.periodo === resultado.periodo);
+  if (idx >= 0) t.ciclos_custom[idx] = { ...t.ciclos_custom[idx], ...ciclo };
+  else t.ciclos_custom.push(ciclo);
 
-    // El checkbox solo es funcional para los no encontrados; para exactos/probables es display-only
-    const checkHtml = esFaltante
-      ? `<input type="checkbox" class="rsb-mov-check" data-idx="${idx}" checked title="Seleccionado para cargar">`
-      : `<span style="display:inline-block;width:16px"></span>`;
+  await DB.put('tarjetas', t);
+  return true;
+}
 
-    const badge = esExacto
-      ? `<span class="rsb-mov-badge exacto">✓ Ya cargado</span>`
-      : esProbable
-        ? `<span class="rsb-mov-badge probable">⚠ Probable</span>`
-        : `<span class="rsb-mov-badge faltante">➕ Cargar</span>`;
+const _RSB_MESES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const _rsbDdmm = (iso) => iso ? iso.split('-').reverse().join('/') : '—';
 
-    const matchHint = esProbable && mov.match
-      ? `<span class="rsb-mov-fecha" title="Match probable con: ${escapeHtml(mov.match.descripcion)}">↔ ${escapeHtml(mov.match.descripcion.slice(0,30))}</span>`
-      : '';
+/**
+ * Renderiza todos los resúmenes apilados en el paso 2 (scroll único).
+ */
+function _rsbRenderStatements() {
+  const cont = document.getElementById('rsb-statements');
+  if (!cont) return;
 
-    const cuotaTag = mov.cuotasTotal
-      ? `<span class="rsb-mov-cuota" title="Compra en cuotas">cuota ${mov.cuotaActual}/${mov.cuotasTotal}</span>`
-      : '';
+  const tarjetasOpts = state.tarjetas.filter(t => !t.deleted && t.activa !== false);
+
+  cont.innerHTML = _rsbStatements.map((st, sidx) => {
+    const r = st.resultado;
+    const [anio, mes] = (r.periodo || '').split('-');
+    const periodoLabel = (anio && mes) ? `${_RSB_MESES[parseInt(mes, 10)] || mes} ${anio}` : (r.periodo || '—');
+
+    const nExacto   = st.movimientos.filter(m => m.confianza === 'exacto').length;
+    const nProbable = st.movimientos.filter(m => m.confianza === 'probable').length;
+    const nFaltante = st.movimientos.filter(m => m.confianza === 'no_encontrado').length;
+
+    const opciones = tarjetasOpts.map(t =>
+      `<option value="${t.id}" ${t.id === st.tarjetaId ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`
+    ).join('');
+
+    const filas = st.movimientos.length ? st.movimientos.map((mov, idx) => {
+      const fechaFmt = _rsbDdmm(mov.fecha);
+      const montoFmt = (mov.moneda && mov.moneda !== 'ARS')
+        ? `${mov.moneda} ${mov.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+        : FMT.format(mov.monto);
+      const esFaltante = mov.confianza === 'no_encontrado';
+      const checkHtml = esFaltante
+        ? `<input type="checkbox" class="rsb-mov-check" data-sidx="${sidx}" data-idx="${idx}" checked title="Seleccionado para cargar">`
+        : `<span style="display:inline-block;width:16px"></span>`;
+      const badge = mov.confianza === 'exacto'
+        ? `<span class="rsb-mov-badge exacto">✓ Ya cargado</span>`
+        : mov.confianza === 'probable'
+          ? `<span class="rsb-mov-badge probable">⚠ Probable</span>`
+          : `<span class="rsb-mov-badge faltante">➕ Cargar</span>`;
+      const cuotaTag = mov.cuotasTotal
+        ? `<span class="rsb-mov-cuota" title="Compra en cuotas">cuota ${mov.cuotaActual}/${mov.cuotasTotal}</span>`
+        : '';
+      return `
+        <div class="rsb-mov-row" data-confianza="${mov.confianza}">
+          ${checkHtml}
+          <div class="rsb-mov-info">
+            <span class="rsb-mov-fecha">${escapeHtml(fechaFmt)}${cuotaTag}</span>
+            <span class="rsb-mov-desc" title="${escapeHtml(mov.descripcion)}">${escapeHtml(mov.descripcion)}</span>
+          </div>
+          <span class="rsb-mov-monto">${escapeHtml(montoFmt)}</span>
+          ${badge}
+        </div>`;
+    }).join('') : `<div class="rsb-empty">No se detectaron consumos en este PDF.</div>`;
 
     return `
-      <div class="rsb-mov-row" data-idx="${idx}" data-confianza="${mov.confianza}">
-        ${checkHtml}
-        <div class="rsb-mov-info">
-          <span class="rsb-mov-fecha">${escapeHtml(fechaFmt)}${cuotaTag}</span>
-          <span class="rsb-mov-desc" title="${escapeHtml(mov.descripcion)}">${escapeHtml(mov.descripcion)}</span>
-          ${matchHint}
+      <div class="rsb-statement" data-sidx="${sidx}">
+        <div class="rsb-statement-head">
+          <div class="rsb-statement-titlebar">
+            <div class="rsb-statement-bank">
+              <span class="rsb-statement-bankname">${escapeHtml(r.banco || 'Banco')}</span>
+              <span class="rsb-statement-period">${escapeHtml(periodoLabel)}</span>
+            </div>
+            <select class="input rsb-statement-cardsel" data-sidx="${sidx}" title="Tarjeta asociada">
+              ${opciones || '<option value="">Sin tarjetas</option>'}
+            </select>
+          </div>
+          <div class="rsb-statement-meta">
+            <span title="Cierre → Vencimiento">📅 ${_rsbDdmm(r.fechaCierre)} → ${_rsbDdmm(r.fechaVencimiento)}</span>
+            ${r.saldoTotal ? `<span title="Saldo a pagar" class="brand">💳 ${FMT.format(r.saldoTotal)}</span>` : ''}
+            ${r.pagoMinimo ? `<span title="Pago mínimo">mín ${FMT.format(r.pagoMinimo)}</span>` : ''}
+          </div>
+          <label class="rsb-statement-fechas">
+            <input type="checkbox" class="rsb-aplicar-fechas" data-sidx="${sidx}" ${st.aplicarFechas ? 'checked' : ''}>
+            Actualizar fechas de cierre/vencimiento de la tarjeta con este resumen
+          </label>
+          <div class="rsb-stats">
+            <span class="rsb-stat-pill exacto">✓ ${nExacto} ya cargados</span>
+            ${nProbable ? `<span class="rsb-stat-pill probable">⚠ ${nProbable} probables</span>` : ''}
+            <span class="rsb-stat-pill faltante">➕ ${nFaltante} faltantes</span>
+          </div>
         </div>
-        <span class="rsb-mov-monto">${escapeHtml(montoFmt)}</span>
-        ${badge}
-      </div>
-    `;
+        <div class="rsb-statement-list">${filas}</div>
+      </div>`;
   }).join('');
+
+  // Re-cotejar al cambiar la tarjeta asociada
+  cont.querySelectorAll('.rsb-statement-cardsel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const sidx = parseInt(sel.dataset.sidx, 10);
+      const st = _rsbStatements[sidx];
+      if (!st) return;
+      st.tarjetaId = sel.value;
+      const { matchearConGastos } = await import('./pdf-statement-parser.js');
+      st.movimientos = matchearConGastos(st.resultado.movimientos, state.gastos, st.tarjetaId);
+      _rsbRenderStatements();
+    });
+  });
+
+  // Toggle de aplicar fechas
+  cont.querySelectorAll('.rsb-aplicar-fechas').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const sidx = parseInt(cb.dataset.sidx, 10);
+      if (_rsbStatements[sidx]) _rsbStatements[sidx].aplicarFechas = cb.checked;
+    });
+  });
 }
 
 /**
@@ -6011,12 +6064,8 @@ function _rsbRenderCotejo(resultado, tarjetaId) {
  * Se llama una sola vez durante el init de la app.
  */
 function iniciarModuloResumenBancario() {
-  // Variable de closure para mantener los movimientos parseados entre pasos
-  let _movimientosCotejados = [];
-
   // ── Botón en drawer de tarjeta ────────────────────────────
   document.getElementById('td-import-resumen')?.addEventListener('click', () => {
-    // _drawerTarjetaIdActual es la variable de closure del módulo de drawers
     const tarjetaId = _drawerTarjetaIdActual || '';
     document.getElementById('dlg-tarjeta-detalle')?.close();
     abrirImportResumen(tarjetaId);
@@ -6030,47 +6079,42 @@ function iniciarModuloResumenBancario() {
   dropzone?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput?.click(); }
   });
-
-  dropzone?.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropzone.classList.add('drag-over');
-  });
+  dropzone?.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); });
   dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
   dropzone?.addEventListener('drop', (e) => {
     e.preventDefault();
     dropzone.classList.remove('drag-over');
-    const file = e.dataTransfer?.files?.[0];
-    if (file && file.type === 'application/pdf') {
-      _rsbProcesarArchivo(file);
-    } else {
-      toast('Por favor arrastrá un archivo PDF', 2500);
-    }
+    const files = [...(e.dataTransfer?.files || [])].filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+    if (files.length) _rsbProcesarArchivos(files);
+    else toast('Por favor arrastrá uno o más archivos PDF', 2500);
   });
 
   // ── File input change ────────────────────────────────────
   fileInput?.addEventListener('change', (e) => {
-    const file = e.target.files?.[0];
-    if (file) _rsbProcesarArchivo(file);
+    const files = [...(e.target.files || [])];
+    if (files.length) _rsbProcesarArchivos(files);
   });
 
-  // ── Botones del paso 2 ───────────────────────────────────
+  // ── Botón "Cargar faltantes" (de todos los resúmenes) ────
   document.getElementById('rsb-cargar-faltantes')?.addEventListener('click', async () => {
-    const tarjetaId = document.getElementById('rsb-tarjeta-sel')?.value;
-    if (!tarjetaId) { toast('Seleccioná una tarjeta', 2000); return; }
-
-    // Recopilar los movimientos seleccionados (no_encontrado con checkbox marcado)
-    const listaEl = document.getElementById('rsb-lista-movimientos');
-    const seleccionados = [];
-    listaEl?.querySelectorAll('.rsb-mov-check').forEach(cb => {
-      if (cb.checked) {
-        const idx = parseInt(cb.dataset.idx, 10);
-        const mov = _movimientosCotejados[idx];
-        if (mov && mov.confianza === 'no_encontrado') seleccionados.push(mov);
+    const cont = document.getElementById('rsb-statements');
+    // Recopilar movimientos seleccionados por statement
+    const aCargar = []; // { mov, tarjetaId }
+    cont?.querySelectorAll('.rsb-mov-check').forEach(cb => {
+      if (!cb.checked) return;
+      const sidx = parseInt(cb.dataset.sidx, 10);
+      const idx  = parseInt(cb.dataset.idx, 10);
+      const st = _rsbStatements[sidx];
+      const mov = st?.movimientos?.[idx];
+      if (st && mov && mov.confianza === 'no_encontrado') {
+        aCargar.push({ mov, tarjetaId: st.tarjetaId });
       }
     });
 
-    if (!seleccionados.length) {
-      toast('No hay gastos faltantes seleccionados', 2000);
+    const aplicarFechas = _rsbStatements.filter(s => s.aplicarFechas && s.tarjetaId);
+
+    if (!aCargar.length && !aplicarFechas.length) {
+      toast('Nada para cargar ni fechas para actualizar', 2500);
       return;
     }
 
@@ -6078,9 +6122,10 @@ function iniciarModuloResumenBancario() {
     btn.disabled = true;
     btn.textContent = '⏳ Guardando…';
 
-    let guardados = 0;
+    let guardados = 0, fechasOk = 0;
     try {
-      for (const mov of seleccionados) {
+      for (const { mov, tarjetaId } of aCargar) {
+        if (!tarjetaId) continue;
         const esCuota = !!mov.cuotasTotal;
         const g = {
           id: uuid(),
@@ -6094,23 +6139,29 @@ function iniciarModuloResumenBancario() {
           tarjeta_id: tarjetaId,
           updated_at: Math.floor(Date.now() / 1000),
         };
-        if (esCuota) {
-          g.cuotas_total = mov.cuotasTotal;
-          g.cuota_numero = mov.cuotaActual || 1;
-        }
+        if (esCuota) { g.cuotas_total = mov.cuotasTotal; g.cuota_numero = mov.cuotaActual || 1; }
         await DB.put('gastos', g);
         guardados++;
       }
+      // Aplicar fechas de ciclo a las tarjetas marcadas
+      for (const st of aplicarFechas) {
+        if (await _rsbAplicarFechasTarjeta(st.tarjetaId, st.resultado)) fechasOk++;
+      }
+
       notificarCambioLocal();
       await reloadAll();
-      toast(`✓ ${guardados} gasto${guardados > 1 ? 's' : ''} cargado${guardados > 1 ? 's' : ''} correctamente`, 3000);
+
+      const partes = [];
+      if (guardados) partes.push(`${guardados} gasto${guardados > 1 ? 's' : ''} cargado${guardados > 1 ? 's' : ''}`);
+      if (fechasOk)  partes.push(`${fechasOk} tarjeta${fechasOk > 1 ? 's' : ''} con fechas actualizadas`);
+      toast('✓ ' + (partes.join(' · ') || 'Listo'), 3500);
       document.getElementById('dlg-resumen-bancario')?.close();
     } catch (err) {
       console.error('[rsb] Error al guardar:', err);
       toast('Error al guardar: ' + (err?.message || err), 3500);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Cargar gastos no encontrados';
+      btn.textContent = 'Cargar faltantes seleccionados';
     }
   });
 
@@ -6121,47 +6172,51 @@ function iniciarModuloResumenBancario() {
     document.getElementById('dlg-resumen-bancario')?.close();
   });
 
-  // ── Función interna de procesamiento ────────────────────
-  async function _rsbProcesarArchivo(file) {
-    const tarjetaId = document.getElementById('rsb-tarjeta-sel')?.value;
-    if (!tarjetaId) {
-      toast('Seleccioná una tarjeta antes de cargar el PDF', 2500);
-      return;
-    }
-
-    // Ir al paso 1
+  // ── Procesar uno o varios PDFs ──────────────────────────
+  async function _rsbProcesarArchivos(files) {
     document.getElementById('rsb-paso-0').hidden = true;
     document.getElementById('rsb-paso-1').hidden = false;
     document.getElementById('rsb-paso-2').hidden = true;
 
     const progresoTxt = document.getElementById('rsb-progreso-txt');
+    _rsbStatements = [];
 
     try {
-      progresoTxt.textContent = 'Leyendo PDF…';
       const { parsearResumenTarjeta, matchearConGastos } = await import('./pdf-statement-parser.js');
 
-      progresoTxt.textContent = 'Extrayendo movimientos…';
-      const resultado = await parsearResumenTarjeta(file);
+      for (let i = 0; i < files.length; i++) {
+        progresoTxt.textContent = files.length > 1
+          ? `Procesando resumen ${i + 1} de ${files.length}…`
+          : 'Extrayendo movimientos…';
+        try {
+          const resultado = await parsearResumenTarjeta(files[i]);
+          const tarjetaId = _rsbAutoCard(resultado.banco);
+          const movimientos = matchearConGastos(resultado.movimientos, state.gastos, tarjetaId);
+          _rsbStatements.push({ resultado, tarjetaId, movimientos, aplicarFechas: !!resultado.fechaCierre });
+        } catch (errFile) {
+          console.error(`[rsb] Error en ${files[i].name}:`, errFile);
+          toast(`No se pudo leer ${files[i].name}`, 3000);
+        }
+      }
 
-      progresoTxt.textContent = 'Cotejando con gastos registrados…';
-      _movimientosCotejados = matchearConGastos(resultado.movimientos, state.gastos, tarjetaId);
+      if (!_rsbStatements.length) {
+        document.getElementById('rsb-paso-1').hidden = true;
+        document.getElementById('rsb-paso-0').hidden = false;
+        toast('No se pudo procesar ningún PDF. Verificá que sean resúmenes de tarjeta.', 4000);
+        return;
+      }
 
-      // Pasar al paso 2
       document.getElementById('rsb-paso-1').hidden = true;
       document.getElementById('rsb-paso-2').hidden = false;
+      _rsbRenderStatements();
 
-      _rsbRenderCotejo({ ...resultado, movimientos: _movimientosCotejados }, tarjetaId);
-
-      // Resetear file input para permitir re-subir
       const fi = document.getElementById('rsb-file');
       if (fi) fi.value = '';
-
     } catch (err) {
-      console.error('[rsb] Error procesando PDF:', err);
-      // Volver al paso 0 con mensaje de error
+      console.error('[rsb] Error procesando PDFs:', err);
       document.getElementById('rsb-paso-1').hidden = true;
       document.getElementById('rsb-paso-0').hidden = false;
-      toast('No se pudo procesar el PDF: ' + (err?.message || String(err)), 4000);
+      toast('No se pudo procesar: ' + (err?.message || String(err)), 4000);
       const fi = document.getElementById('rsb-file');
       if (fi) fi.value = '';
     }

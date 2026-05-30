@@ -3567,11 +3567,84 @@ body.view-analisis #main-widgets::before {
 }
 .rsb-resumen-kpi-val.brand { color: var(--brand); }
 
+/* CRÍTICO: el atributo `hidden` debe ganar al display:flex de las clases
+   .form-modern-body / .rsb-paso-2-layout. Sin esto los pasos 0/1/2 se
+   muestran superpuestos al cambiar de paso. */
+#dlg-resumen-bancario [hidden] { display: none !important; }
+
 .rsb-paso-2-layout {
   display: flex;
   flex-direction: column;
-  max-height: 80dvh;
+  /* El alto lo limita .form-modern (90dvh). min-height:0 permite que el hijo
+     scrolleable encoja correctamente dentro del flex. */
+  min-height: 0;
+  flex: 1;
   overflow: hidden;
+}
+
+/* Contenedor de scroll ÚNICO del paso 2: evita scroll anidado/chaining. */
+.rsb-statements-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;      /* no propaga el scroll al dialog/página */
+  -webkit-overflow-scrolling: touch; /* scroll suave en iOS */
+  touch-action: pan-y;               /* gesto vertical limpio en mobile */
+  padding: .9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Bloque de un resumen (puede haber varios apilados) */
+.rsb-statement {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 14px);
+  overflow: hidden;
+  background: var(--surface);
+  /* CRÍTICO: en el flex column scrolleable, no permitir que los bloques se
+     encojan — deben mantener su altura natural para que el contenedor scrollee. */
+  flex-shrink: 0;
+}
+.rsb-statement-head {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  padding: .85rem 1rem;
+  background: linear-gradient(135deg, rgba(0,240,255,0.04), rgba(181,55,255,0.03));
+  border-bottom: 1px solid var(--border);
+}
+.rsb-statement-titlebar {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+.rsb-statement-bank { display: flex; flex-direction: column; gap: .1rem; min-width: 0; flex: 1; }
+.rsb-statement-bankname {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700; font-size: 1rem; color: var(--ink);
+}
+.rsb-statement-period {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted);
+}
+.rsb-statement-cardsel {
+  width: auto; min-width: 150px; max-width: 60%;
+  padding: .35rem .6rem; font-size: .8rem;
+}
+.rsb-statement-meta {
+  display: flex; gap: 1rem; flex-wrap: wrap;
+  font-size: .75rem; color: var(--ink-2);
+}
+.rsb-statement-meta .brand { color: var(--brand); font-weight: 600; }
+.rsb-statement-fechas {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .72rem; color: var(--ink-muted); cursor: pointer;
+}
+.rsb-statement-fechas input { accent-color: var(--brand); width: 15px; height: 15px; flex-shrink: 0; }
+.rsb-statement-list {
+  display: flex; flex-direction: column; gap: .35rem;
+  padding: .6rem .75rem;
 }
 
 /* Estadísticas de cotejo */

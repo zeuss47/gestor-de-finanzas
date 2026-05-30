@@ -1867,14 +1867,9 @@
         title="Cerrar">✕</button>
     </div>
 
-    <!-- Paso 0: selección de tarjeta + drop zone -->
+    <!-- Paso 0: drop zone (acepta varios PDFs) -->
     <div id="rsb-paso-0" class="form-modern-body">
-      <div class="rsb-field-group">
-        <label class="form-label" for="rsb-tarjeta-sel">¿A qué tarjeta corresponde este resumen?</label>
-        <select id="rsb-tarjeta-sel" class="input w-full"></select>
-      </div>
-
-      <div id="rsb-dropzone" class="rsb-dropzone" role="button" tabindex="0" title="Click o arrastrá el PDF">
+      <div id="rsb-dropzone" class="rsb-dropzone" role="button" tabindex="0" title="Click o arrastrá los PDF">
         <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5"
              class="rsb-dropzone-icon" aria-hidden="true">
           <rect x="8" y="4" width="28" height="38" rx="3" stroke="currentColor"/>
@@ -1882,10 +1877,10 @@
           <path d="M18 28l6-6 6 6M24 22v14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M16 36h16" stroke="currentColor" stroke-linecap="round"/>
         </svg>
-        <p class="rsb-dropzone-label">Arrastrá el PDF o <span class="rsb-dropzone-link">hacé click para elegir</span></p>
-        <p class="rsb-dropzone-hint">Solo archivos .pdf · procesado 100% en tu dispositivo</p>
+        <p class="rsb-dropzone-label">Arrastrá los PDF o <span class="rsb-dropzone-link">hacé click para elegir</span></p>
+        <p class="rsb-dropzone-hint">Podés subir varios resúmenes a la vez · cada uno se asocia a su tarjeta automáticamente · 100% local</p>
       </div>
-      <input type="file" id="rsb-file" accept="application/pdf,.pdf" hidden />
+      <input type="file" id="rsb-file" accept="application/pdf,.pdf" multiple hidden />
     </div>
 
     <!-- Paso 1: progreso -->
@@ -1894,14 +1889,11 @@
       <p id="rsb-progreso-txt" class="rsb-progreso-txt">Leyendo PDF…</p>
     </div>
 
-    <!-- Paso 2: cotejo de movimientos -->
+    <!-- Paso 2: cotejo (uno o varios resúmenes apilados, scroll único) -->
     <div id="rsb-paso-2" class="rsb-paso-2-layout" hidden>
-      <div id="rsb-resumen-header" class="rsb-resumen-header form-modern-body" style="padding-bottom:.5rem"></div>
-
-      <div id="rsb-lista-movimientos" class="rsb-lista-movimientos form-modern-body" style="overflow-y:auto;flex:1;padding-top:.25rem"></div>
-
+      <div id="rsb-statements" class="rsb-statements-scroll"></div>
       <div class="form-modern-footer">
-        <button type="button" id="rsb-cargar-faltantes" class="btn-primary flex-1">Cargar gastos no encontrados</button>
+        <button type="button" id="rsb-cargar-faltantes" class="btn-primary flex-1">Cargar faltantes seleccionados</button>
         <button type="button" id="rsb-cancelar" class="btn-secondary flex-1">Cerrar</button>
       </div>
     </div>
