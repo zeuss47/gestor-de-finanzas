@@ -19,7 +19,7 @@
  *     una ruta de acción, la pasa por la querystring.
  */
 
-const VERSION = 'v3.2.0-pages';
+const VERSION = 'v3.3.0-pages';
 const SHELL_CACHE = `shell-${VERSION}`;
 
 // Base scope dinámico: el SW se registra en su propio directorio,
@@ -31,6 +31,7 @@ const SHELL_FILES = [
   BASE + 'index.html',
   BASE + 'manifest.json',
   BASE + 'css/styles.css',
+  BASE + 'css/tailwind.css',
   BASE + 'js/app.js',
   BASE + 'js/db.js',
   BASE + 'js/cards.js',
@@ -41,7 +42,6 @@ const SHELL_FILES = [
   BASE + 'icons/icon-192.png',
   BASE + 'icons/icon-512.png',
   // CDN externos (cache-first del navegador):
-  'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
 ];
 

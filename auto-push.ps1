@@ -14,6 +14,18 @@ $REPO = "c:\Users\pc\Documents\vs codec\app finanzas\frontend"
 if (-not (Test-Path "$REPO\.git")) { exit 0 }
 Set-Location $REPO
 
+# ─── 0. Rebuild Tailwind CSS si index.html o JS cambiaron ────────
+$twConfig = "$REPO\tailwind.config.js"
+$twInput  = "$REPO\css\tailwind-input.css"
+$twOutput = "$REPO\css\tailwind.css"
+if ((Test-Path $twConfig) -and (Test-Path $twInput)) {
+    # Solo rebuild si hay archivos HTML/JS modificados o tailwind.css no existe
+    $hayHtmlJs = (& git status --porcelain 2>$null) -match '\.(html|js)$'
+    if ($hayHtmlJs -or -not (Test-Path $twOutput)) {
+        & npx tailwindcss -c $twConfig -i $twInput -o $twOutput --minify 2>$null
+    }
+}
+
 # ¿Hay cambios?
 $status = & git status --porcelain 2>$null
 if (-not $status) { exit 0 }
