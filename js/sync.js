@@ -388,7 +388,7 @@ let _autoSyncState = {
   callbacks: null,
   inflightPromise: null,
   intervalMs: 5 * 60_000, // 5 minutos default
-  debounceMs: 30_000,     // 30 segundos
+  debounceMs: 3_000,      // 3 segundos: corto para que mobile no suspenda JS antes de pushear
 };
 
 /**

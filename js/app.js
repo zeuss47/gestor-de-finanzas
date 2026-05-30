@@ -1562,6 +1562,7 @@ function renderSueldo(el) {
       b.addEventListener('click', async () => {
         if (!confirm('¿Eliminar este recibo?')) return;
         await DB.softDelete('ingresos', b.dataset.recDel);
+        notificarCambioLocal();
         await reloadAll();
         toast('Recibo eliminado');
       });
@@ -1959,6 +1960,7 @@ function renderMovimientos() {
     btn.onclick = async () => {
       if (!confirm('¿Eliminar este gasto?')) return;
       await DB.softDelete('gastos', btn.dataset.delGas);
+      notificarCambioLocal();
       toast('Gasto eliminado');
       await reloadAll();
     };
@@ -1967,6 +1969,7 @@ function renderMovimientos() {
     btn.onclick = async () => {
       if (!confirm('¿Eliminar este ingreso?')) return;
       await DB.softDelete('ingresos', btn.dataset.delIng);
+      notificarCambioLocal();
       toast('Ingreso eliminado');
       await reloadAll();
     };
@@ -2369,7 +2372,7 @@ function reiniciarAutoSync() {
   if (cfg?.pat && cfg?.owner && cfg?.repo) {
     startAutoSync(cfg, syncCallbacks, {
       intervalMs: 5 * 60_000,
-      debounceMs: 30_000,
+      debounceMs: 3_000,
       syncAlInicio: true,
     });
     setSyncIndicator('idle');
@@ -3314,6 +3317,7 @@ function _hdRenderItems() {
       if (!confirm('¿Eliminar este movimiento?')) return;
       const [tipo, id] = btn.dataset.hdDel.split(':');
       await DB.softDelete(tipo === 'ingreso' ? 'ingresos' : 'gastos', id);
+      notificarCambioLocal();
       toast('✓ Eliminado');
       await reloadAll();
       _hdRenderItems();
@@ -4403,6 +4407,7 @@ function renderCuentasSettings() {
   cont.querySelectorAll('[data-action="del"]').forEach(b => b.onclick = async () => {
     if (!confirm('¿Eliminar esta cuenta? Los movimientos asociados no se borran.')) return;
     await DB.softDelete('cuentas', b.dataset.id);
+    notificarCambioLocal();
     await reloadAll();
     renderCuentasSettings();
     toast('Cuenta eliminada');
@@ -4456,6 +4461,7 @@ function renderTarjetasSettings() {
   cont.querySelectorAll('[data-action="del"]').forEach(b => b.onclick = async () => {
     if (!confirm('¿Eliminar esta tarjeta? Los gastos asociados no se borran pero quedarán huérfanos.')) return;
     await DB.softDelete('tarjetas', b.dataset.id);
+    notificarCambioLocal();
     await reloadAll();
     renderTarjetasSettings();
     toast('Tarjeta eliminada');
