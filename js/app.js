@@ -6084,9 +6084,11 @@ function _rsbRenderStatements() {
 
     const filas = st.movimientos.length ? st.movimientos.map((mov, idx) => {
       const fechaFmt = _rsbDdmm(mov.fecha);
-      const montoFmt = (mov.moneda && mov.moneda !== 'ARS')
+      const baseFmt = (mov.moneda && mov.moneda !== 'ARS')
         ? `${mov.moneda} ${mov.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
         : FMT.format(mov.monto);
+      // En cuotas, el resumen muestra la cuota mensual → lo marcamos como "/mes"
+      const montoFmt = mov.cuotasTotal ? `${baseFmt}<small style="color:var(--ink-muted);font-weight:400">/mes</small>` : baseFmt;
       const esFaltante = mov.confianza === 'no_encontrado';
       const checkHtml = esFaltante
         ? `<input type="checkbox" class="rsb-mov-check" data-sidx="${sidx}" data-idx="${idx}" checked title="Seleccionado para cargar">`
@@ -6106,7 +6108,7 @@ function _rsbRenderStatements() {
             <span class="rsb-mov-fecha">${escapeHtml(fechaFmt)}${cuotaTag}</span>
             <span class="rsb-mov-desc" title="${escapeHtml(mov.descripcion)}">${escapeHtml(mov.descripcion)}</span>
           </div>
-          <span class="rsb-mov-monto">${escapeHtml(montoFmt)}</span>
+          <span class="rsb-mov-monto">${montoFmt}</span>
           ${badge}
         </div>`;
     }).join('') : `<div class="rsb-empty">No se detectaron consumos en este PDF.</div>`;
@@ -6235,7 +6237,9 @@ function iniciarModuloResumenBancario() {
         const g = {
           id: uuid(),
           fecha: mov.fecha,
-          monto: mov.monto,
+          // El resumen muestra la CUOTA MENSUAL; el modelo guarda el TOTAL y lo
+          // reparte entre los meses. Reconstruimos: total = cuota mensual × cantidad.
+          monto: esCuota ? mov.monto * mov.cuotasTotal : mov.monto,
           moneda: mov.moneda || 'ARS',
           descripcion: mov.descripcion,
           categoria: 'general',

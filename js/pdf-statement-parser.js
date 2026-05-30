@@ -350,7 +350,12 @@ export function matchearConGastos(movimientos, gastos, tarjetaId) {
       if (usados.has(g.id)) continue;
       let score = 0;
       // El MONTO es la señal primaria en una conciliación bancaria.
-      const montoCoincide = Math.abs((g.monto || 0) - mov.monto) <= 1;
+      // OJO con cuotas: el resumen muestra la CUOTA MENSUAL, mientras que el
+      // gasto guarda el TOTAL. Para comparar, usamos el monto mensual del gasto.
+      const montoGastoComparable = (g.tipo === 'cuotas' && g.cuotas_total)
+        ? (g.monto || 0) / g.cuotas_total
+        : (g.monto || 0);
+      const montoCoincide = Math.abs(montoGastoComparable - mov.monto) <= 1;
       if (montoCoincide) score += 0.6;
       // La fecha confirma; sola no alcanza para "probable".
       if (g.fecha === mov.fecha) score += 0.3;
