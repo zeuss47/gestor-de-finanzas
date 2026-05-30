@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.13",
-    "build":  30,
-    "modified":  "2026-05-30T07:19:55Z",
-    "commit":  "M .gitignore, M auto-push.ps1, M index.html, M package.json, M sw.js, M tailwind.config.js, css/t...",
-    "notes":  "Auto-update 2026-05-30 04:19"
+    "version":  "1.14",
+    "build":  31,
+    "modified":  "2026-05-30T10:18:21Z",
+    "commit":  "M css/styles.css, M css/tailwind.css, M index.html",
+    "notes":  "Auto-update 2026-05-30 07:18"
 }

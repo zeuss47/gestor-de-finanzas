@@ -570,11 +570,17 @@ select.input {
 #bottom-nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
+  /* display:grid + columns explícito para que el Tailwind base reset no rompa el layout */
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr);
   background: rgba(7,9,15,0.85);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
   border-top: 1px solid var(--border);
   z-index: 30;
+  /* Seguridad adicional: altura fija de la barra */
+  height: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 html.light #bottom-nav { background: rgba(240,244,255,0.85); }
 
