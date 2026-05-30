@@ -2358,12 +2358,21 @@
 
         <fieldset class="space-y-2 mt-4">
           <legend>Zona peligrosa</legend>
-          <p class="text-xs mb-2" style="color:var(--ink-muted)">
-            Borra gastos, ingresos, tarjetas, cuentas y metas — local y en el repo de GitHub si tenés Sync configurada. <strong>Mantiene</strong> tu PAT y la configuración de Sync para que no tengas que reconectar.
+
+          <p class="text-xs mb-1" style="color:var(--ink-muted)">
+            <strong>Borrar solo movimientos:</strong> elimina todos los gastos e ingresos pero <strong>mantiene</strong> tus tarjetas, cuentas, categorías y metas (vacías, listas para volver a cargar).
+          </p>
+          <button type="button" id="btn-clear-records" class="btn-secondary w-full text-sm mb-3"
+                  style="color:var(--warning);border-color:var(--warning)">
+            📋 Borrar solo movimientos (gastos e ingresos)
+          </button>
+
+          <p class="text-xs mb-1" style="color:var(--ink-muted)">
+            <strong>Borrar todo:</strong> elimina gastos, ingresos, tarjetas, cuentas y metas. Mantiene tu PAT y la config de GitHub Sync para no reconectar.
           </p>
           <button type="button" id="btn-clear-data" class="btn-secondary w-full text-sm"
                   style="color:var(--danger);border-color:var(--danger)">
-            🗑 Resetear datos — arrancar en cero
+            🗑 Borrar TODO — arrancar en cero
           </button>
         </fieldset>
 

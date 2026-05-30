@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.19",
-    "build":  36,
-    "modified":  "2026-05-30T13:55:19Z",
-    "commit":  "M js/app.js, M js/pdf-statement-parser.js",
-    "notes":  "Auto-update 2026-05-30 10:55"
+    "version":  "1.20",
+    "build":  37,
+    "modified":  "2026-05-30T14:06:30Z",
+    "commit":  "M index.html, M js/app.js, M js/sync.js",
+    "notes":  "Auto-update 2026-05-30 11:06"
 }

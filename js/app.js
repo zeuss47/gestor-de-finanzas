@@ -4546,9 +4546,13 @@ async function init() {
     }
   }
 
+  // Si venimos de un reset, NO hacer pull inicial: evita que el merge LWW
+  // restaure datos del repo antes de que el usuario lo decida.
+  const _vieneDeReset = new URLSearchParams(location.search).has('reset');
+
   // Pull inicial + arrancar auto-sync si hay config GitHub
   const cfg = state.ajustes?.github;
-  if (cfg?.pat) {
+  if (cfg?.pat && !_vieneDeReset) {
     try { await pullAll(cfg); } catch (e) { console.warn('Pull inicial falló', e); }
   }
 
@@ -4575,8 +4579,14 @@ async function init() {
     }
   }, 15 * 60 * 1000);
 
-  // Iniciar auto-sync (cada 5min + al volver online + al ocultar pestaña)
-  reiniciarAutoSync();
+  // Iniciar auto-sync (cada 5min + al volver online + al ocultar pestaña).
+  // Si venimos de un reset, NO arrancamos auto-sync automáticamente para no
+  // re-bajar datos; el usuario puede sincronizar manualmente cuando quiera.
+  if (!_vieneDeReset) {
+    reiniciarAutoSync();
+  } else {
+    toast('Datos reseteados. La sincronización automática está pausada hasta que sincronices manualmente.', 4000);
+  }
   actualizarTimestampSync();
 
   // Chequeo de tarjetas + IA + margen disponible tras render
@@ -4869,62 +4879,83 @@ async function init() {
   });
 
   // Resetear datos — local + remoto en GitHub, SIN tocar la config de Sync
-  document.getElementById('btn-clear-data')?.addEventListener('click', async () => {
-    if (!confirm('¿Resetear todos los datos?\n\nVas a perder: gastos, ingresos, tarjetas, cuentas y metas (acá y en el repo de GitHub si tenés Sync configurada).\n\nSE MANTIENE: tu PAT y la configuración de GitHub Sync, para que no tengas que reconectar.\n\nEsta acción NO se puede deshacer.')) return;
-    if (!confirm('Última confirmación: vas a arrancar de cero con la app vacía. ¿Continuar?')) return;
+  /**
+   * Ejecuta un reset de datos.
+   * @param {'todo'|'movimientos'} modo
+   *   'todo' → borra gastos, ingresos, tarjetas, cuentas, metas (reset global).
+   *   'movimientos' → borra solo gastos e ingresos, mantiene el resto.
+   */
+  async function ejecutarReset(modo) {
+    const esTodo = modo === 'todo';
+    const stores = esTodo
+      ? ['gastos', 'ingresos', 'tarjetas', 'cuentas', 'metas']
+      : ['gastos', 'ingresos'];
 
     try {
-      // 1. Detener auto-sync para que no re-baje datos del repo mientras borramos
+      // 1. Detener auto-sync para que no re-baje datos durante el borrado
       stopAutoSync();
 
-      // 2. Leer config de GitHub ANTES de tocar nada
+      // 2. Config de GitHub
       const aj = (await DB.get('ajustes', 'ajustes_globales')) || null;
       const cfg = aj?.github || null;
+      const haySync = !!(cfg && cfg.pat && cfg.owner && cfg.repo);
 
-      // 3. PRIMERO vaciar remoto en GitHub (si hay sync configurada).
-      //    Si esto falla, NO tocamos local: el usuario puede reintentar sin
-      //    quedar en un estado inconsistente.
-      if (cfg && cfg.pat && cfg.owner && cfg.repo) {
-        try {
-          toast('Borrando datos en GitHub…');
-          await wipeRemoto(cfg);
-        } catch (e) {
-          console.error('Error borrando datos remotos:', e);
-          alert('No se pudo borrar los datos en GitHub:\n\n' + (e?.message || e) +
-                '\n\nNo se tocó nada en local. Probá de nuevo en unos segundos ' +
-                '(suele ser cache del CDN de GitHub) o desactivá Sync antes de resetear ' +
-                'para borrar solo local.');
-          return;
-        }
-      }
-
-      // 4. Vaciar stores de datos en local (NO tocamos `ajustes`)
-      const storesDatos = ['gastos', 'ingresos', 'tarjetas', 'cuentas', 'metas', 'sync_queue'];
-      for (const s of storesDatos) {
+      // 3. Vaciar LOCAL siempre (esto arregla el bug de "no borró nada"
+      //    cuando el remoto fallaba). Limpiamos también la cola de sync.
+      for (const s of [...stores, 'sync_queue']) {
         try { await DB.clear(s); } catch (e) { console.warn('No se pudo limpiar', s, e); }
       }
 
-      // 5. Resetear el _sync_state dentro de ajustes (sin tocar github/pat/etc.)
-      if (aj) {
-        delete aj._sync_state;
-        await DB.put('ajustes', aj);
-      }
+      // 4. Resetear el _sync_state (sin tocar github/pat)
+      if (aj) { delete aj._sync_state; await DB.put('ajustes', aj); }
 
-      // 6. Limpiar localStorage de caches (NO tocar nada de auth)
-      const keysApp = ['_cotiz_cache', 'app_last_build', 'app_last_version', 'cotiz_manual'];
-      for (const k of keysApp) {
+      // 5. Limpiar caches de localStorage (no toca auth)
+      for (const k of ['_cotiz_cache', 'app_last_build', 'app_last_version', 'cotiz_manual']) {
         try { localStorage.removeItem(k); } catch { /* noop */ }
       }
 
-      // 7. Recargar con bust de caché
-      toast('Datos reseteados. Recargando…');
-      setTimeout(() => {
-        location.href = './?reset=' + Date.now();
-      }, 800);
+      // 6. Vaciar REMOTO best-effort. 'todo' marca reset global; 'movimientos'
+      //    solo vacía gastos.json + ingresos.json (sin tocar tarjetas/cuentas).
+      let remotoOk = true, remotoMsg = '';
+      if (haySync) {
+        try {
+          toast('Borrando datos en GitHub…');
+          await wipeRemoto(cfg, { stores, marcarReset: esTodo });
+        } catch (e) {
+          remotoOk = false;
+          remotoMsg = e?.message || String(e);
+          console.error('Error borrando datos remotos:', e);
+        }
+      }
+
+      // 7. Avisar y recargar. El parámetro ?reset evita el pull/sync inicial
+      //    que podría restaurar los datos antes de que el usuario sincronice.
+      if (haySync && !remotoOk) {
+        alert('Se borró todo en este dispositivo ✓\n\n' +
+              'Pero NO se pudo borrar en GitHub:\n' + remotoMsg + '\n\n' +
+              'La sincronización quedó en pausa. Cuando tengas conexión, sincronizá ' +
+              'manualmente desde Ajustes → Sync para propagar el borrado (o reintentá el reset).');
+      } else {
+        toast('✓ Datos borrados. Recargando…');
+      }
+      setTimeout(() => { location.href = './?reset=' + Date.now(); }, 900);
     } catch (e) {
       console.error('Error reseteando datos:', e);
-      alert('No se pudo resetear: ' + (e?.message || e) + '\n\nProbá cerrar otras pestañas de la app y reintentar.');
+      alert('No se pudo resetear: ' + (e?.message || e) + '\n\nProbá cerrar otras pestañas y reintentar.');
     }
+  }
+
+  // Botón: borrar TODO
+  document.getElementById('btn-clear-data')?.addEventListener('click', async () => {
+    if (!confirm('¿Borrar TODO?\n\nVas a perder: gastos, ingresos, tarjetas, cuentas y metas (acá y en GitHub si tenés Sync).\n\nSE MANTIENE: tu PAT y la config de Sync.\n\nNo se puede deshacer.')) return;
+    if (!confirm('Última confirmación: vas a arrancar de cero con la app vacía. ¿Continuar?')) return;
+    await ejecutarReset('todo');
+  });
+
+  // Botón: borrar solo movimientos (mantener tarjetas/cuentas/categorías/metas)
+  document.getElementById('btn-clear-records')?.addEventListener('click', async () => {
+    if (!confirm('¿Borrar solo los movimientos?\n\nVas a perder TODOS los gastos e ingresos.\n\nSE MANTIENEN: tarjetas, cuentas, categorías y metas (vacías, listas para volver a cargar).\n\nNo se puede deshacer.')) return;
+    await ejecutarReset('movimientos');
   });
 
   // ── DRAWER DE TARJETA handlers ────────────────────────────────

@@ -320,26 +320,39 @@ async function _pushIdempotente(cfg, archivo, items, mensaje, maxRetries = 5, sh
   throw lastErr || new Error(`No se pudo escribir ${archivo} tras ${maxRetries} intentos`);
 }
 
-export async function wipeRemoto(cfg, { onProgress } = {}) {
+/**
+ * Vacía archivos en el repo remoto.
+ * @param {Object} cfg
+ * @param {Object} opts
+ * @param {string[]} [opts.stores]  Stores a vaciar (claves de ARCHIVOS). Default: todos.
+ * @param {boolean} [opts.marcarReset]  Si escribe _meta.last_reset_at (reset global
+ *   que hace que otros dispositivos vacíen TODO). Default: true.
+ *   Para "borrar solo movimientos" usar false (no queremos que otros borren tarjetas).
+ */
+export async function wipeRemoto(cfg, { onProgress, stores, marcarReset = true } = {}) {
   if (!cfg?.pat || !cfg?.owner || !cfg?.repo) {
     throw new Error('Configurá GitHub PAT/owner/repo antes de borrar remoto.');
   }
   const ahora = Math.floor(Date.now() / 1000);
   const resultados = {};
 
-  // 1. PRIMERO escribir _meta.json con last_reset_at. Si después fallan algunos
-  //    push de archivos, los otros dispositivos ya saben del reset y vaciarán
-  //    sus locales en su próximo sync (la app re-pushea archivos vacíos).
-  onProgress?.('Subiendo marker de reset (_meta.json)…');
-  await escribirMetaRemoto(cfg, { last_reset_at: ahora, schema_version: 1 });
+  // 1. (Opcional) marker de reset global en _meta.json. Si después fallan algunos
+  //    push, los otros dispositivos ya saben del reset y vaciarán sus locales.
+  if (marcarReset) {
+    onProgress?.('Subiendo marker de reset (_meta.json)…');
+    await escribirMetaRemoto(cfg, { last_reset_at: ahora, schema_version: 1 });
+    resultados._meta = { last_reset_at: ahora };
+  }
 
-  // 2. Vaciar los 5 archivos de datos
-  for (const [, archivo] of Object.entries(ARCHIVOS)) {
+  // 2. Vaciar los archivos pedidos (o todos)
+  const aVaciar = stores && stores.length
+    ? stores.filter(s => ARCHIVOS[s]).map(s => ARCHIVOS[s])
+    : Object.values(ARCHIVOS);
+  for (const archivo of aVaciar) {
     onProgress?.(`Borrando remoto ${archivo}…`);
     const nuevoSha = await _pushIdempotente(cfg, archivo, [], `reset(${archivo}) vaciado desde app`);
     resultados[archivo] = nuevoSha;
   }
-  resultados._meta = { last_reset_at: ahora };
   return resultados;
 }
 
