@@ -114,6 +114,28 @@ export const Notif = {
       data: { kind: 'ia', diagnostico: diag },
     });
   },
+
+  /**
+   * Alerta de margen disponible bajo. Se dispara cuando el saldo proyectado del
+   * mes (ingresos - gastos esperados) cae por debajo del umbral configurado.
+   * Tag estable por mes para que la misma notificación se actualice si el
+   * monto cambia, en lugar de duplicarse.
+   */
+  alertaMargenBajo({ saldoProyectado, umbral, periodo }) {
+    const formato = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+    const sev = saldoProyectado < 0 ? 'critical' : 'warning';
+    const titulo = saldoProyectado < 0
+      ? `🚨 Margen negativo: ${formato.format(saldoProyectado)}`
+      : `⚠ Margen bajo: ${formato.format(saldoProyectado)}`;
+    return this.show({
+      title: titulo,
+      body: `Tu saldo proyectado para ${periodo} está por debajo del umbral de ${formato.format(umbral)}.`,
+      tag: `margen-${periodo}`,
+      renotify: true,
+      severidad: sev,
+      data: { kind: 'margen', saldoProyectado, umbral, periodo },
+    });
+  },
 };
 
 /**
@@ -138,5 +160,44 @@ export async function chequeoDiarioTarjetas() {
     if (dias_alerta.includes(r.dias_para_vencimiento) && r.dias_para_vencimiento >= 0) {
       await Notif.alertaTarjeta(t, r, 'vencimiento', r.dias_para_vencimiento);
     }
+  }
+}
+
+/**
+ * Chequea si el saldo proyectado del mes en curso está por debajo del umbral
+ * configurado en ajustes.notificaciones.margen_minimo. Si activado, dispara
+ * una notificación.
+ *
+ * Saldo proyectado = ingresos del mes - gastos efectivos del mes.
+ * Si el usuario fijó umbral 50.000 y queda 30.000, lo avisa.
+ */
+export async function chequeoMargenDisponible() {
+  const aj = await DB.get('ajustes', 'ajustes_globales');
+  if (!aj?.notificaciones?.alertas_margen) return; // feature opt-in
+
+  const umbral = Number(aj.notificaciones.margen_minimo) || 0;
+  if (umbral <= 0) return; // sin umbral configurado, no alertar
+
+  const ahora = new Date();
+  const desde = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+  const hasta = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0);
+
+  const dentroDelMes = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso + 'T12:00:00');
+    return d >= desde && d <= hasta;
+  };
+
+  const gastos = (await DB.live('gastos')).filter(g => dentroDelMes(g.fecha));
+  const ingresos = (await DB.live('ingresos')).filter(i => dentroDelMes(i.fecha));
+
+  const totalGastos   = gastos.reduce((a, g) => a + (g.monto || 0), 0);
+  const totalIngresos = ingresos.reduce((a, i) => a + ((i.sueldo_neto || 0) + (i.bonos || 0)), 0);
+  const saldoProyectado = totalIngresos - totalGastos;
+
+  if (saldoProyectado < umbral) {
+    const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const periodo = `${MESES_ES[ahora.getMonth()]} ${ahora.getFullYear()}`;
+    await Notif.alertaMargenBajo({ saldoProyectado, umbral, periodo });
   }
 }

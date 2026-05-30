@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.6",
-    "build":  23,
-    "modified":  "2026-05-30T06:30:36Z",
-    "commit":  "M index.html, M js/app.js, js/pdf-import.js",
-    "notes":  "Auto-update 2026-05-30 03:30"
+    "version":  "1.7",
+    "build":  24,
+    "modified":  "2026-05-30T06:40:32Z",
+    "commit":  "M index.html, M js/app.js, M js/notifications.js, js/pdf-export.js",
+    "notes":  "Auto-update 2026-05-30 03:40"
 }

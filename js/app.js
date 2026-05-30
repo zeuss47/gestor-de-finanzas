@@ -20,7 +20,7 @@ import { calcularCapacidad, simularCompra, cuotasPendientes } from './credito.js
 import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
 import { fetchCotizaciones, timestampUltimoFetch } from './cotizaciones.js';
-import { Notif, chequeoDiarioTarjetas } from './notifications.js';
+import { Notif, chequeoDiarioTarjetas, chequeoMargenDisponible } from './notifications.js';
 import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync, wipeRemoto } from './sync.js';
 
 /* ============ Estado en memoria (cache de render) ============ */
@@ -2255,6 +2255,8 @@ function abrirSettings() {
   if (form.elements.notif_confirmar)    form.elements.notif_confirmar.checked   = !!aj.notificaciones?.confirmar_movimientos;
   if (form.elements.notif_ia)           form.elements.notif_ia.checked          = !!aj.notificaciones?.alertas_ia;
   if (form.elements.alertas_dias)       form.elements.alertas_dias.value        = (aj.notificaciones?.alertas_tarjeta_dias || [5,2,1]).join(',');
+  if (form.elements.alertas_margen)     form.elements.alertas_margen.checked    = !!aj.notificaciones?.alertas_margen;
+  if (form.elements.margen_minimo)      form.elements.margen_minimo.value       = aj.notificaciones?.margen_minimo ?? '';
 
   // Toggles de widgets (con íconos)
   const cont = form.querySelector('#widgets-toggle');
@@ -2329,6 +2331,8 @@ async function guardarSettings(form) {
     alertas_ia: !!form.elements.notif_ia?.checked,
     alertas_tarjeta_dias: (form.elements.alertas_dias?.value || '5,2,1')
       .split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x) && x > 0),
+    alertas_margen: !!form.elements.alertas_margen?.checked,
+    margen_minimo: Number(form.elements.margen_minimo?.value) || 0,
   };
 
   aj.ui.widgets_visibles = [...form.querySelectorAll('#widgets-toggle input:checked')]
@@ -2358,6 +2362,8 @@ const syncCallbacks = {
     actualizarTimestampSync();
     // Mini toast solo si fue manual; las demás syncs son silenciosas.
     if (motivo === 'manual') toast('✓', 1200);
+    // Re-chequear margen tras pulls remotos (otro dispositivo cargó datos)
+    try { await chequeoMargenDisponible(); } catch {}
   },
   onError: (err, motivo) => {
     setSyncIndicator('error');
@@ -4262,9 +4268,10 @@ async function init() {
   reiniciarAutoSync();
   actualizarTimestampSync();
 
-  // Chequeo de tarjetas + IA tras render
+  // Chequeo de tarjetas + IA + margen disponible tras render
   setTimeout(async () => {
     await chequeoDiarioTarjetas();
+    await chequeoMargenDisponible();
     if (state.ajustes?.notificaciones?.alertas_ia) {
       state.diagnosticos.forEach(d => Notif.alertaIA(d));
     }
@@ -4488,6 +4495,61 @@ async function init() {
       toast('✓ Importado correctamente');
     } catch (err) {
       toast('Error al importar: ' + err.message, 3000);
+    }
+  });
+
+  // PDF: selector dinámico de período (mes / año / rango)
+  document.querySelectorAll('input[name="pdf_periodo_tipo"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const tipo = r.value;
+      document.getElementById('pdf-mes-wrap').hidden   = tipo !== 'mes';
+      document.getElementById('pdf-anio-wrap').hidden  = tipo !== 'anio';
+      document.getElementById('pdf-rango-wrap').hidden = tipo !== 'rango';
+    });
+  });
+
+  // Default: mes actual, año actual
+  const _hoyPdf = new Date();
+  const _mesPdfEl  = document.getElementById('pdf-mes');
+  const _anioPdfEl = document.getElementById('pdf-anio');
+  const _anioPdfSoloEl = document.getElementById('pdf-anio-solo');
+  if (_mesPdfEl  && !_mesPdfEl.value)  _mesPdfEl.value = String(_hoyPdf.getMonth() + 1);
+  if (_anioPdfEl && !_anioPdfEl.value) _anioPdfEl.value = String(_hoyPdf.getFullYear());
+  if (_anioPdfSoloEl && !_anioPdfSoloEl.value) _anioPdfSoloEl.value = String(_hoyPdf.getFullYear());
+
+  document.getElementById('btn-export-pdf')?.addEventListener('click', async () => {
+    const tipoEl = document.querySelector('input[name="pdf_periodo_tipo"]:checked');
+    const tipo = tipoEl?.value || 'mes';
+    let periodo;
+    if (tipo === 'mes') {
+      const mes  = document.getElementById('pdf-mes')?.value;
+      const anio = document.getElementById('pdf-anio')?.value;
+      if (!mes || !anio) { toast('Completá mes y año', 2000); return; }
+      periodo = { tipo: 'mes', mes, anio };
+    } else if (tipo === 'anio') {
+      const anio = document.getElementById('pdf-anio-solo')?.value;
+      if (!anio) { toast('Completá el año', 2000); return; }
+      periodo = { tipo: 'anio', anio };
+    } else {
+      const desde = document.getElementById('pdf-desde')?.value;
+      const hasta = document.getElementById('pdf-hasta')?.value;
+      if (!desde || !hasta) { toast('Completá las fechas', 2000); return; }
+      if (desde > hasta)    { toast('La fecha "desde" debe ser anterior a "hasta"', 2500); return; }
+      periodo = { tipo: 'rango', desde, hasta };
+    }
+
+    const btn = document.getElementById('btn-export-pdf');
+    const txt = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando PDF…'; }
+    try {
+      const { exportarReportePDF } = await import('./pdf-export.js');
+      const nombre = await exportarReportePDF(state, periodo);
+      toast(`✓ PDF descargado: ${nombre}`, 3500);
+    } catch (e) {
+      console.error('[pdf-export] error:', e);
+      alert('No se pudo generar el PDF:\n\n' + (e?.message || e));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = txt; }
     }
   });
 

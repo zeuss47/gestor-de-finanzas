@@ -2247,6 +2247,46 @@
         </fieldset>
 
         <fieldset class="space-y-2 mt-4">
+          <legend>📄 Exportar reporte PDF</legend>
+          <p class="text-xs mb-2" style="color:var(--ink-muted)">
+            Generá un PDF imprimible con resumen ejecutivo, desglose por categoría, cuentas, tarjetas y lista detallada de movimientos.
+          </p>
+
+          <div class="grid grid-cols-3 gap-2">
+            <label class="type-pill"><input type="radio" name="pdf_periodo_tipo" value="mes" checked/><span>📅 Mes</span></label>
+            <label class="type-pill"><input type="radio" name="pdf_periodo_tipo" value="anio"/><span>📆 Año</span></label>
+            <label class="type-pill"><input type="radio" name="pdf_periodo_tipo" value="rango"/><span>🎯 Rango</span></label>
+          </div>
+
+          <!-- Selector mes -->
+          <div class="grid grid-cols-2 gap-2 mt-2" id="pdf-mes-wrap">
+            <select id="pdf-mes" class="input">
+              <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+              <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+              <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+              <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+            <input type="number" id="pdf-anio" class="input" min="2000" max="2100" placeholder="Año" />
+          </div>
+
+          <!-- Selector año -->
+          <div class="mt-2" id="pdf-anio-wrap" hidden>
+            <input type="number" id="pdf-anio-solo" class="input" min="2000" max="2100" placeholder="Año (ej: 2026)" />
+          </div>
+
+          <!-- Selector rango -->
+          <div class="grid grid-cols-2 gap-2 mt-2" id="pdf-rango-wrap" hidden>
+            <input type="date" id="pdf-desde" class="input" />
+            <input type="date" id="pdf-hasta" class="input" />
+          </div>
+
+          <button type="button" id="btn-export-pdf" class="btn-secondary w-full text-sm mt-3"
+                  style="border-color:var(--brand);color:var(--brand)">
+            📄 Generar y descargar PDF
+          </button>
+        </fieldset>
+
+        <fieldset class="space-y-2 mt-4">
           <legend>Zona peligrosa</legend>
           <p class="text-xs mb-2" style="color:var(--ink-muted)">
             Borra gastos, ingresos, tarjetas, cuentas y metas — local y en el repo de GitHub si tenés Sync configurada. <strong>Mantiene</strong> tu PAT y la configuración de Sync para que no tengas que reconectar.
@@ -2371,6 +2411,20 @@
           <legend>Alertas de tarjeta</legend>
           <p class="text-xs mb-2" style="color:var(--ink-muted)">Días antes del cierre/vencimiento para notificar:</p>
           <input name="alertas_dias" class="input" placeholder="Ej: 5, 2, 1" value="5,2,1" />
+        </fieldset>
+
+        <fieldset class="space-y-2 mt-4">
+          <legend>Margen disponible del mes</legend>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" name="alertas_margen" /> Avisarme cuando el margen baje del umbral
+          </label>
+          <p class="text-xs mb-1" style="color:var(--ink-muted)">
+            Saldo proyectado del mes (ingresos − gastos). Si baja del umbral, te llega una notificación.
+          </p>
+          <div class="input-with-prefix">
+            <span class="input-prefix">$</span>
+            <input name="margen_minimo" type="number" min="0" step="1000" class="input" placeholder="Ej: 50000" />
+          </div>
         </fieldset>
       </div>
 
