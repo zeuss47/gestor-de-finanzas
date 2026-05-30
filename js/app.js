@@ -19,6 +19,7 @@ import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto } from './
 import { calcularCapacidad, simularCompra, cuotasPendientes } from './credito.js';
 import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
+import { analizarSaludFinanciera, simularEscenario } from './ai-advisor.js';
 import { fetchCotizaciones, timestampUltimoFetch } from './cotizaciones.js';
 import { Notif, chequeoDiarioTarjetas, chequeoMargenDisponible } from './notifications.js';
 import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync, wipeRemoto } from './sync.js';
@@ -35,6 +36,9 @@ const state = {
   capacidad: null,   // cálculo de capacidad crediticia
   estado: null,      // estado global
   diagnosticos: [],
+  proyeccion: null,  // proyectarBalance()
+  saturacion: [],    // predecirSaturacionTarjetas()
+  salud: null,       // analizarSaludFinanciera() — asesor integral
   version: null,     // info del archivo version.json
 };
 
@@ -283,6 +287,23 @@ async function reloadAll() {
   });
   // Mergeamos: tarjetas primero (más críticas), después gastos generales
   state.diagnosticos = [...diagTarjetas, ...state.diagnosticos];
+
+  // Proyección de saldo + saturación de tarjetas (para el asesor)
+  state.proyeccion = proyectarBalance({
+    gastos: state.gastos, ingresos: state.ingresos,
+    cuentas: state.cuentas, tarjetas: state.tarjetas, horizonte: 90,
+  });
+  state.saturacion = predecirSaturacionTarjetas({
+    gastos: state.gastos, tarjetas: state.tarjetas, resumenes: state.resumenes,
+  });
+
+  // Asesor financiero integral (score + estrategias + pronóstico)
+  state.salud = analizarSaludFinanciera({
+    gastos: state.gastos, ingresos: state.ingresos, tarjetas: state.tarjetas,
+    cuentas: state.cuentas, metas: state.metas,
+    capacidad: state.capacidad, estado: state.estado, resumenes: state.resumenes,
+    diagnosticos: state.diagnosticos, proyeccion: state.proyeccion, saturacion: state.saturacion,
+  });
 
   renderWidgets();
   if (currentTab === 'gastos') renderMovimientos();
@@ -821,49 +842,234 @@ function renderCredito(el) {
   `;
 }
 
+// Genera el HTML del medidor de score (gauge circular) reutilizable.
+function _scoreGaugeHTML(salud, size = 72) {
+  if (!salud) return '';
+  const score = salud.score || 0;
+  const color = salud.color || 'var(--brand)';
+  const r = (size - 10) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * (score / 100);
+  const cx = size / 2;
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex-shrink:0">
+      <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="var(--border)" stroke-width="6"/>
+      <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${color}" stroke-width="6"
+              stroke-linecap="round" stroke-dasharray="${dash} ${circ}"
+              transform="rotate(-90 ${cx} ${cx})"/>
+      <text x="50%" y="48%" text-anchor="middle" dominant-baseline="middle"
+            style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:${size*0.28}px;fill:var(--ink)">${score}</text>
+      <text x="50%" y="68%" text-anchor="middle" dominant-baseline="middle"
+            style="font-size:${size*0.12}px;fill:var(--ink-muted)">/100</text>
+    </svg>`;
+}
+
 function renderIA(el) {
+  const salud = state.salud;
+
+  // ── Score de salud financiera ──
+  const scoreBox = el.querySelector('[data-bind="salud-score"]');
+  if (scoreBox && salud) {
+    scoreBox.innerHTML = `
+      ${_scoreGaugeHTML(salud, 72)}
+      <div class="salud-score-info">
+        <span class="salud-score-nivel" style="color:${salud.color}">${salud.nivel}</span>
+        <span class="salud-score-resumen">${escapeHtml(salud.resumen)}</span>
+      </div>`;
+  } else if (scoreBox) {
+    scoreBox.innerHTML = '';
+  }
+
+  // ── Estrategias top (del asesor) + diagnósticos ──
   const box = el.querySelector('[data-bind="diagnosticos"]');
   box.innerHTML = '';
 
-  if (!state.diagnosticos.length) {
+  const estrategias = (salud?.estrategias || []).slice(0, 3);
+  const TIPO_STYLE = {
+    critico:  { border: 'var(--danger)',  text: 'var(--danger-2)' },
+    alerta:   { border: 'var(--warning)', text: 'var(--warning-2)' },
+    consejo:  { border: 'var(--brand)',   text: 'var(--brand)' },
+    positivo: { border: 'var(--success)', text: 'var(--success)' },
+  };
+
+  if (estrategias.length) {
+    for (const e of estrategias) {
+      const s = TIPO_STYLE[e.tipo] || TIPO_STYLE.consejo;
+      box.insertAdjacentHTML('beforeend', `
+        <div class="rounded-xl p-3 border-l-[3px]"
+             style="background:var(--surface-2);border-color:${s.border};border-top:1px solid ${s.border}22;border-right:1px solid ${s.border}22;border-bottom:1px solid ${s.border}22">
+          <p class="font-semibold text-sm" style="color:${s.text}">${escapeHtml(e.titulo)}</p>
+          <p class="text-xs mt-1" style="color:var(--ink-2)">${escapeHtml(e.detalle)}</p>
+          ${e.accion ? `<p class="text-xs mt-1.5 font-medium" style="color:var(--ink-muted)">💬 ${escapeHtml(e.accion)}</p>` : ''}
+        </div>`);
+    }
+  } else {
     box.innerHTML = `
       <div class="flex items-center gap-3 py-3" style="color:var(--ink-muted)">
         <span class="text-2xl">✅</span>
-        <p class="text-sm">Sin anomalías detectadas. Todo en orden.</p>
+        <p class="text-sm">Sin alertas. Cargá ingresos y gastos para un análisis más rico.</p>
       </div>`;
   }
 
-  const SEV_STYLE = {
-    critical: { bg: 'var(--danger-bg)',  border: 'var(--danger)',  text: 'var(--danger-2)',  icon: '🚨' },
-    warning:  { bg: 'var(--warning-bg)', border: 'var(--warning)', text: 'var(--warning-2)', icon: '⚠️' },
-    info:     { bg: 'var(--info-bg)',     border: 'var(--info)',    text: 'var(--info)',       icon: '💡' },
-  };
+  // Botón "Ver análisis completo"
+  el.querySelector('[data-action="ver-salud"]')?.addEventListener('click', abrirSaludFinanciera);
 
-  for (const d of state.diagnosticos) {
-    const s = SEV_STYLE[d.severidad] || SEV_STYLE.info;
-    box.insertAdjacentHTML('beforeend', `
-      <div class="rounded-xl p-3 border-l-[3px]"
-           style="background:${s.bg};border-color:${s.border};border-top:1px solid ${s.border}22;border-right:1px solid ${s.border}22;border-bottom:1px solid ${s.border}22">
-        <div class="flex items-start gap-2">
-          <span class="text-base flex-shrink-0 mt-0.5">${s.icon}</span>
-          <div>
-            <p class="font-semibold text-sm" style="color:${s.text}">${escapeHtml(d.titulo)}</p>
-            <p class="text-xs mt-1" style="color:var(--ink-2)">${escapeHtml(d.detalle)}</p>
-            ${d.sugerencia ? `<p class="text-xs mt-1.5 font-medium" style="color:var(--ink-muted)">💬 ${escapeHtml(d.sugerencia)}</p>` : ''}
-          </div>
-        </div>
-      </div>`);
-  }
-
+  // Selector de sensibilidad (recomputa diagnósticos + asesor)
   const sel = el.querySelector('#sens-select');
   if (sel) {
     sel.value = state.ajustes?.sensibilidad_ia || 'moderado';
     sel.onchange = async () => {
       await saveAjustes({ sensibilidad_ia: sel.value });
-      state.diagnosticos = diagnosticar(state.gastos, { sensibilidad: sel.value });
-      renderIA(el);
+      await reloadAll();
     };
   }
+}
+
+// Datos base que consume el asesor (para re-simular what-if)
+function _saludBaseData() {
+  return {
+    gastos: state.gastos, ingresos: state.ingresos, tarjetas: state.tarjetas,
+    cuentas: state.cuentas, metas: state.metas,
+    capacidad: state.capacidad, estado: state.estado, resumenes: state.resumenes,
+    diagnosticos: state.diagnosticos, proyeccion: state.proyeccion, saturacion: state.saturacion,
+  };
+}
+
+const _FMT0 = (n) => '$' + Math.round(n || 0).toLocaleString('es-AR');
+
+function abrirSaludFinanciera() {
+  const dlg = document.getElementById('dlg-salud');
+  const body = document.getElementById('salud-body');
+  if (!dlg || !body) return;
+  const salud = state.salud;
+  if (!salud) { toast('Sin datos suficientes para el análisis', 2000); return; }
+
+  // Sub-puntajes
+  const subHtml = Object.values(salud.subscores).map(s => {
+    const col = s.valor >= 70 ? 'var(--success)' : s.valor >= 45 ? 'var(--warning)' : 'var(--danger)';
+    return `
+      <div class="salud-sub">
+        <div class="salud-sub-head">
+          <span class="salud-sub-label">${s.label}</span>
+          <span class="salud-sub-val" style="color:${col}">${s.valor}</span>
+        </div>
+        <div class="salud-sub-bar"><div class="salud-sub-fill" style="width:${s.valor}%;background:${col}"></div></div>
+      </div>`;
+  }).join('');
+
+  // Estrategias (todas)
+  const TIPO = {
+    critico:  'var(--danger)', alerta: 'var(--warning)',
+    consejo:  'var(--brand)',   positivo: 'var(--success)',
+  };
+  const estrHtml = salud.estrategias.length ? salud.estrategias.map(e => `
+    <div class="salud-estrategia" style="border-left-color:${TIPO[e.tipo] || 'var(--brand)'}">
+      <p class="salud-estrategia-tit" style="color:${TIPO[e.tipo] || 'var(--ink)'}">${escapeHtml(e.titulo)}</p>
+      <p class="salud-estrategia-det">${escapeHtml(e.detalle)}</p>
+      ${e.accion ? `<p class="salud-estrategia-acc">💬 ${escapeHtml(e.accion)}</p>` : ''}
+      ${e.impacto > 0 ? `<span class="salud-estrategia-impacto">Impacto: ${_FMT0(e.impacto)}/mes</span>` : ''}
+    </div>`).join('') : `<p class="text-sm" style="color:var(--ink-muted)">Sin estrategias: tus finanzas están equilibradas.</p>`;
+
+  // Pronóstico 3 meses
+  const pronoHtml = salud.pronostico.map(p => {
+    const col = p.neto >= 0 ? 'var(--success)' : 'var(--danger)';
+    return `
+      <div class="salud-prono-row">
+        <span class="salud-prono-mes">${p.periodo}</span>
+        <span class="salud-prono-neto" style="color:${col}">${p.neto >= 0 ? '+' : ''}${_FMT0(p.neto)}</span>
+        <span class="salud-prono-saldo">saldo ${_FMT0(p.saldo_acumulado)}</span>
+        <span style="grid-column:1/-1;font-size:.64rem;color:var(--ink-muted)">
+          ingresos ${_FMT0(p.ingresos)} − habituales ${_FMT0(p.gastos_habituales)} − cuotas ${_FMT0(p.cuotas)}
+        </span>
+      </div>`;
+  }).join('');
+
+  // Categorías para el selector del simulador
+  const cats = [...new Set(state.gastos.filter(g => !g.deleted).map(g => g.categoria || 'general'))];
+  const catOpts = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+
+  body.innerHTML = `
+    <div class="salud-score-row" style="margin-bottom:1rem">
+      ${_scoreGaugeHTML(salud, 90)}
+      <div class="salud-score-info">
+        <span class="salud-score-nivel" style="color:${salud.color};font-size:1.3rem">${salud.nivel}</span>
+        <span class="salud-score-resumen">${escapeHtml(salud.resumen)}</span>
+      </div>
+    </div>
+
+    <p class="salud-section-title">Desglose del puntaje</p>
+    <div class="salud-sub-grid">${subHtml}</div>
+
+    <p class="salud-section-title">Estrategias y medidas (${salud.estrategias.length})</p>
+    <div class="space-y-2">${estrHtml}</div>
+
+    <p class="salud-section-title">Pronóstico 3 meses</p>
+    <div class="salud-pronostico">${pronoHtml}</div>
+
+    <p class="salud-section-title">🧪 Simulador "¿qué pasa si…?"</p>
+    <div class="salud-sim-box">
+      <div class="grid grid-cols-2 gap-2">
+        <div class="form-section">
+          <label class="form-label">Recortar categoría</label>
+          <select id="sim-cat" class="input"><option value="">— ninguna —</option>${catOpts}</select>
+        </div>
+        <div class="form-section">
+          <label class="form-label">Monto a recortar / mes</label>
+          <div class="input-with-prefix"><span class="input-prefix">$</span>
+            <input id="sim-recorte" type="number" class="input" placeholder="0" step="1000"></div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-2">
+        <div class="form-section">
+          <label class="form-label">Nueva compra en cuotas (total)</label>
+          <div class="input-with-prefix"><span class="input-prefix">$</span>
+            <input id="sim-compra" type="number" class="input" placeholder="0" step="1000"></div>
+        </div>
+        <div class="form-section">
+          <label class="form-label">Cantidad de cuotas</label>
+          <input id="sim-cuotas" type="number" class="input" placeholder="12" min="1" max="60" value="12">
+        </div>
+      </div>
+      <button type="button" id="sim-go" class="btn-primary w-full text-sm mt-3">⚡ Simular escenario</button>
+      <div id="sim-result" hidden></div>
+    </div>
+  `;
+
+  // Wire simulador
+  document.getElementById('sim-go')?.addEventListener('click', async () => {
+    const { simularEscenario } = await import('./ai-advisor.js');
+    const cat = document.getElementById('sim-cat')?.value || '';
+    const recorte = parseFloat(document.getElementById('sim-recorte')?.value) || 0;
+    const compra = parseFloat(document.getElementById('sim-compra')?.value) || 0;
+    const cuotas = parseInt(document.getElementById('sim-cuotas')?.value) || 12;
+
+    const cambios = {};
+    if (recorte > 0) cambios.recortes = [{ categoria: cat || 'general', monto: recorte }];
+    if (compra > 0)  cambios.nuevaCuota = { monto: compra, cuotas };
+
+    if (!cambios.recortes && !cambios.nuevaCuota) { toast('Ingresá un recorte o una compra para simular', 2500); return; }
+
+    const sim = simularEscenario(_saludBaseData(), cambios);
+    const d = sim.delta;
+    const scoreCol = d.score >= 0 ? 'var(--success)' : 'var(--danger)';
+    const dispCol  = d.disponible_mensual >= 0 ? 'var(--success)' : 'var(--danger)';
+    const res = document.getElementById('sim-result');
+    res.hidden = false;
+    res.className = 'salud-sim-result';
+    res.innerHTML = `
+      <div class="salud-sim-delta">
+        <span>Score: <b style="color:${sim.antes.color}">${sim.antes.score}</b> → <b style="color:${sim.despues.color}">${sim.despues.score}</b>
+          <b style="color:${scoreCol}">(${d.score >= 0 ? '+' : ''}${d.score})</b></span>
+        <span>Disponible/mes: <b style="color:${dispCol}">${d.disponible_mensual >= 0 ? '+' : ''}${_FMT0(d.disponible_mensual)}</b></span>
+      </div>
+      ${d.cuota_nueva_mensual > 0 ? `<p class="text-[11px] mt-2" style="color:var(--ink-muted)">La compra suma una cuota de <b>${_FMT0(d.cuota_nueva_mensual)}/mes</b>.</p>` : ''}
+      ${d.recorte_aplicado > 0 ? `<p class="text-[11px] mt-1" style="color:var(--ink-muted)">Recorte aplicado: <b>${_FMT0(d.recorte_aplicado)}/mes</b>.</p>` : ''}
+      <p class="text-[11px] mt-2" style="color:${sim.despues.score >= sim.antes.score ? 'var(--success)' : 'var(--danger)'}">
+        ${sim.despues.score >= sim.antes.score ? '✓ Este escenario mejora (o mantiene) tu salud financiera.' : '⚠ Este escenario empeora tu salud financiera.'}
+      </p>`;
+  });
+
+  dlg.showModal();
 }
 
 function renderMetas(el) {
@@ -1151,12 +1357,19 @@ function renderTipoCambio(el) {
   if (!box) return;
   box.innerHTML = '';
 
-  // Ordenar: oficial primero, después blue/tarjeta/etc, otros al final
+  // Ordenar: oficial primero, después blue/tarjeta/etc, otros al final.
+  // Filtrar: solo monedas marcadas como visibles (visible !== false).
   const orden = ['USD', 'USD_BLUE', 'USD_TARJETA', 'USD_MEP', 'USD_CCL', 'USD_CRIPTO', 'USD_MAYOR', 'EUR', 'BRL'];
-  const sorted = Object.entries(cambios).sort(([a],[b]) => {
-    const ia = orden.indexOf(a); const ib = orden.indexOf(b);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
+  const sorted = Object.entries(cambios)
+    .filter(([, c]) => c.visible !== false)
+    .sort(([a],[b]) => {
+      const ia = orden.indexOf(a); const ib = orden.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+
+  if (!sorted.length) {
+    box.innerHTML = `<p class="text-xs text-center py-3" style="color:var(--ink-muted)">Todas las monedas están ocultas. Tocá ⚙ para mostrar alguna.</p>`;
+  }
 
   for (const [key, c] of sorted) {
     const equiv = (state.estado?.saldo_liquido || 0) / (c.valor || 1);
@@ -1242,6 +1455,7 @@ async function actualizarCotizacionesAuto(force = false) {
         venta: val.venta,
         fecha_api: val.fecha,
         auto: true,
+        visible: previo.visible !== false, // preservar la elección de visibilidad
       };
     }
     state.ajustes.tipos_cambio_updated = new Date().toLocaleString('es-AR');
@@ -1255,19 +1469,63 @@ async function actualizarCotizacionesAuto(force = false) {
   }
 }
 
-async function abrirEditorTiposCambio() {
+// Editor modal de cotizaciones: mostrar/ocultar monedas + editar valores.
+function abrirEditorTiposCambio() {
+  const dlg = document.getElementById('dlg-editor-cotiz');
+  const cont = document.getElementById('ec-lista');
+  if (!dlg || !cont) return;
   const cambios = state.ajustes?.tipos_cambio || {};
-  const valores = {};
-  for (const [key, c] of Object.entries(cambios)) {
-    const v = prompt(`Valor de ${c.nombre} (${key}) en ARS:`, c.valor);
-    if (v === null) return;
-    valores[key] = { ...c, valor: parseFloat(v) || c.valor };
-  }
-  state.ajustes.tipos_cambio = valores;
+
+  const orden = ['USD', 'USD_BLUE', 'USD_TARJETA', 'USD_MEP', 'USD_CCL', 'USD_CRIPTO', 'USD_MAYOR', 'EUR', 'BRL'];
+  const entries = Object.entries(cambios).sort(([a],[b]) => {
+    const ia = orden.indexOf(a); const ib = orden.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  cont.innerHTML = entries.map(([key, c]) => `
+    <div class="ec-row" data-key="${key}">
+      <label class="ec-toggle" title="Mostrar en el dashboard">
+        <input type="checkbox" class="ec-visible" ${c.visible !== false ? 'checked' : ''}>
+        <span class="ec-simbolo">${c.simbolo || '💱'}</span>
+      </label>
+      <div class="ec-info">
+        <span class="ec-nombre">${escapeHtml(c.nombre || key)}</span>
+        <span class="ec-key">${key}${c.auto ? ' · LIVE' : c.manual ? ' · manual' : ''}</span>
+      </div>
+      <div class="ec-valor-wrap">
+        <span class="ec-prefix">$</span>
+        <input type="number" step="0.01" class="ec-valor input" value="${c.valor ?? ''}" placeholder="0">
+      </div>
+    </div>`).join('') || `<p class="text-xs" style="color:var(--ink-muted)">No hay cotizaciones cargadas. Tocá 🔄 en el widget para traerlas.</p>`;
+
+  dlg.showModal();
+}
+
+async function guardarEditorTiposCambio() {
+  const cont = document.getElementById('ec-lista');
+  if (!cont) return;
+  const cambios = { ...(state.ajustes?.tipos_cambio || {}) };
+  cont.querySelectorAll('.ec-row').forEach(row => {
+    const key = row.dataset.key;
+    if (!cambios[key]) return;
+    const visible = row.querySelector('.ec-visible')?.checked !== false;
+    const valorRaw = row.querySelector('.ec-valor')?.value;
+    const valor = parseFloat(valorRaw);
+    cambios[key] = {
+      ...cambios[key],
+      visible,
+      valor: isNaN(valor) ? cambios[key].valor : valor,
+      // Si el usuario editó el valor a mano, lo marcamos manual para que el
+      // fetch automático no lo pise.
+      manual: (!isNaN(valor) && valor !== cambios[key].valor) ? true : cambios[key].manual,
+    };
+  });
+  state.ajustes.tipos_cambio = cambios;
   state.ajustes.tipos_cambio_updated = new Date().toLocaleString('es-AR');
   await saveAjustes({});
   await reloadAll();
-  toast('Cotizaciones actualizadas');
+  document.getElementById('dlg-editor-cotiz')?.close();
+  toast('✓ Cotizaciones actualizadas');
 }
 
 function renderCalculadora(el) {
@@ -4690,6 +4948,15 @@ async function init() {
     form.elements.desc_ley_19032.value          = (bruto * 0.03).toFixed(2);
     actualizarResumenRecibo();
   });
+
+  // ── Salud financiera (análisis IA completo) ──────────────────
+  document.getElementById('salud-close-x')?.addEventListener('click', () => document.getElementById('dlg-salud')?.close());
+  document.getElementById('salud-cerrar')?.addEventListener('click', () => document.getElementById('dlg-salud')?.close());
+
+  // ── Editor de cotizaciones (mostrar/ocultar + editar) ────────
+  document.getElementById('ec-guardar')?.addEventListener('click', () => guardarEditorTiposCambio());
+  document.getElementById('ec-cancelar')?.addEventListener('click', () => document.getElementById('dlg-editor-cotiz')?.close());
+  document.getElementById('ec-close-x')?.addEventListener('click', () => document.getElementById('dlg-editor-cotiz')?.close());
 
   // ── Centro de carga de PDF (Documentos) ──────────────────────
   const abrirDocumentos = () => document.getElementById('dlg-documentos')?.showModal();

@@ -652,15 +652,25 @@
 <!-- IA Local -->
 <template id="tpl-widget-ia">
   <article class="widget card-glass p-5">
-    <header class="flex items-center justify-between mb-4">
-      <h2 class="ff-display text-sm font-semibold uppercase tracking-wider text-muted">Análisis IA</h2>
+    <header class="flex items-center justify-between mb-3">
+      <h2 class="ff-display text-sm font-semibold uppercase tracking-wider text-muted">Análisis IA · Salud financiera</h2>
       <select id="sens-select" class="input" style="width:auto;padding:.25rem .7rem .25rem .5rem;font-size:.75rem">
         <option value="estricto">Estricto</option>
         <option value="moderado" selected>Moderado</option>
         <option value="flexible">Flexible</option>
       </select>
     </header>
-    <div data-bind="diagnosticos" class="space-y-2"></div>
+
+    <!-- Score de salud financiera -->
+    <div class="salud-score-row" data-bind="salud-score"></div>
+
+    <!-- Top estrategias / diagnósticos -->
+    <div data-bind="diagnosticos" class="space-y-2 mt-3"></div>
+
+    <button type="button" data-action="ver-salud" class="btn-secondary w-full text-sm mt-3"
+            style="border-color:var(--brand);color:var(--brand)">
+      🧠 Ver análisis completo y simulador
+    </button>
   </article>
 </template>
 
@@ -1850,6 +1860,61 @@
 </dialog>
 
 <!-- ===== DIÁLOGO: IMPORTAR RESUMEN BANCARIO PDF ============= -->
+<!-- ===== SALUD FINANCIERA (análisis IA completo) ============= -->
+<dialog id="dlg-salud">
+  <div class="form-modern" style="min-width:min(96vw,720px);max-width:760px">
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--brand),var(--neon-purple))">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Salud financiera</h3>
+        <p class="text-xs" style="color:var(--ink-muted)">Análisis IA integral según tus ingresos y gastos</p>
+      </div>
+      <button type="button" id="salud-close-x"
+        style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
+        title="Cerrar">✕</button>
+    </div>
+    <div class="form-modern-body" id="salud-body" style="overflow-y:auto;overscroll-behavior:contain"></div>
+    <div class="form-modern-footer">
+      <button type="button" id="salud-cerrar" class="btn-secondary flex-1">Cerrar</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ===== EDITOR DE COTIZACIONES ============================= -->
+<dialog id="dlg-editor-cotiz">
+  <div class="form-modern" style="min-width:min(94vw,480px);max-width:520px">
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--brand),var(--neon-purple))">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Cotizaciones</h3>
+        <p class="text-xs" style="color:var(--ink-muted)">Mostrá u ocultá monedas y editá sus valores</p>
+      </div>
+      <button type="button" id="ec-close-x"
+        style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
+        title="Cerrar">✕</button>
+    </div>
+    <div class="form-modern-body">
+      <p class="text-[11px] mb-1" style="color:var(--ink-muted)">
+        El <strong>tilde</strong> controla si la moneda aparece en el dashboard. Editar un valor lo fija como manual (el actualizador automático no lo pisa).
+      </p>
+      <div id="ec-lista" class="ec-lista"></div>
+    </div>
+    <div class="form-modern-footer">
+      <button type="button" id="ec-guardar" class="btn-primary flex-1">Guardar</button>
+      <button type="button" id="ec-cancelar" class="btn-secondary flex-1">Cancelar</button>
+    </div>
+  </div>
+</dialog>
+
 <!-- ===== CARGAR DOCUMENTOS (PDF) ============================= -->
 <dialog id="dlg-documentos">
   <div class="form-modern" style="min-width:min(94vw,520px);max-width:560px">

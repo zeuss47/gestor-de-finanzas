@@ -3778,6 +3778,96 @@ body.view-analisis #main-widgets::before {
 .rsb-mov-badge.probable { background: rgba(255,184,0,.15); color: var(--warning); }
 .rsb-mov-badge.faltante { background: rgba(255,45,110,.15); color: var(--danger); }
 
+/* ── Salud financiera (score + estrategias + análisis completo) ── */
+.salud-score-row {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .85rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(0,240,255,0.05), rgba(181,55,255,0.04));
+  border: 1px solid var(--border);
+}
+.salud-score-info { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.salud-score-nivel { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.05rem; }
+.salud-score-resumen { font-size: .72rem; color: var(--ink-muted); line-height: 1.4; }
+
+/* Sub-puntajes (barras) */
+.salud-sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.salud-sub { display: flex; flex-direction: column; gap: .25rem; }
+.salud-sub-head { display: flex; justify-content: space-between; font-size: .68rem; }
+.salud-sub-label { color: var(--ink-muted); }
+.salud-sub-val { font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+.salud-sub-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.salud-sub-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+
+/* Estrategia card */
+.salud-estrategia {
+  border-radius: 12px; padding: .8rem .9rem;
+  border: 1px solid var(--border); border-left-width: 3px;
+  background: var(--surface);
+}
+.salud-estrategia-tit { font-weight: 700; font-size: .88rem; }
+.salud-estrategia-det { font-size: .76rem; color: var(--ink-2); margin-top: .25rem; line-height: 1.4; }
+.salud-estrategia-acc { font-size: .76rem; color: var(--ink-muted); margin-top: .4rem; font-weight: 500; }
+.salud-estrategia-impacto {
+  display: inline-block; margin-top: .4rem; font-size: .66rem; font-weight: 700;
+  padding: .12rem .5rem; border-radius: 999px;
+  background: rgba(0,255,159,.15); color: var(--success);
+}
+
+/* Pronóstico (tabla compacta) */
+.salud-pronostico { display: flex; flex-direction: column; gap: .4rem; }
+.salud-prono-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: .5rem 1rem;
+  align-items: center; padding: .55rem .7rem;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+  font-size: .75rem;
+}
+.salud-prono-mes { font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+.salud-prono-neto { font-family: 'Space Grotesk', sans-serif; font-weight: 600; text-align: right; }
+.salud-prono-saldo { font-size: .68rem; color: var(--ink-muted); text-align: right; }
+
+/* Simulador what-if */
+.salud-sim-box {
+  border: 1px solid var(--brand); border-radius: 14px; padding: 1rem;
+  background: linear-gradient(135deg, rgba(0,240,255,0.04), rgba(181,55,255,0.03));
+}
+.salud-sim-result {
+  margin-top: .75rem; padding: .75rem; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.salud-sim-delta { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .78rem; }
+.salud-sim-delta b { font-family: 'Space Grotesk', sans-serif; }
+
+.salud-section-title {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink-muted); margin: 1.1rem 0 .5rem; font-weight: 600;
+}
+.salud-section-title:first-child { margin-top: 0; }
+
+/* ── Editor de cotizaciones ────────────────────────────────────── */
+.ec-lista { display: flex; flex-direction: column; gap: .5rem; margin-top: .5rem; }
+.ec-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: .75rem;
+  padding: .55rem .6rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.ec-toggle { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
+.ec-toggle input { width: 16px; height: 16px; accent-color: var(--brand); flex-shrink: 0; }
+.ec-simbolo { font-size: 1.1rem; }
+.ec-info { display: flex; flex-direction: column; min-width: 0; }
+.ec-nombre { font-size: .82rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ec-key { font-size: .62rem; color: var(--ink-muted); letter-spacing: .03em; }
+.ec-valor-wrap { display: flex; align-items: center; position: relative; }
+.ec-prefix { position: absolute; left: .5rem; color: var(--ink-muted); font-size: .8rem; pointer-events: none; }
+.ec-valor { width: 110px; padding-left: 1.3rem !important; text-align: right; font-size: .82rem; }
+/* Fila atenuada si la moneda está oculta */
+.ec-row:has(.ec-visible:not(:checked)) { opacity: .55; }
+
 /* ── Centro de carga de documentos (PDF) ──────────────────────── */
 .docs-card {
   display: flex;
