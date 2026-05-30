@@ -29,7 +29,7 @@ async function cargarPdfJs() {
   return mod;
 }
 
-async function extraerTextoPdf(file) {
+export async function extraerTextoPdf(file) {
   const pdfjs = await cargarPdfJs();
   const buffer = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: buffer }).promise;
@@ -68,7 +68,7 @@ async function extraerTextoPdf(file) {
 /* ─── Helpers de parsing ───────────────────────────────────────── */
 
 // "1.199.671,16" → 1199671.16
-function num(s) {
+export function num(s) {
   if (!s) return 0;
   return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
 }
@@ -115,7 +115,7 @@ function buscarTotalNeto(texto, lineas) {
   return 0;
 }
 
-function buscarFechaPago(texto) {
+export function buscarFechaPago(texto) {
   // "FECHA DE PAGO 31/03/2026"
   const m = texto.match(/FECHA\s+DE\s+PAGO[\s\S]{0,40}?(\d{2})\/(\d{2})\/(\d{4})/i);
   if (m) return `${m[3]}-${m[2]}-${m[1]}`;
@@ -125,7 +125,7 @@ function buscarFechaPago(texto) {
   return '';
 }
 
-function buscarPeriodoPago(texto) {
+export function buscarPeriodoPago(texto) {
   const limpiarMes = (s) => s.toUpperCase().replace(/[ÁÉÍÓÚ]/g, c => 'AEIOU'['ÁÉÍÓÚ'.indexOf(c)]);
 
   // "PERÍODO DE PAGO ... MARZO 2026" — ventana amplia porque el layout columnar
@@ -145,7 +145,7 @@ function buscarPeriodoPago(texto) {
   return '';
 }
 
-function buscarEmpleador(lineas) {
+export function buscarEmpleador(lineas) {
   // El empleador suele ser la primera o segunda línea (antes de "CUIT")
   for (let i = 0; i < Math.min(5, lineas.length); i++) {
     const l = lineas[i].trim();

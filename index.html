@@ -426,6 +426,15 @@
     </p>
   </section>
 
+  <!-- TARJETAS MOBILE -->
+  <section id="sec-tarjetas-mobile" class="hidden px-4 pb-32 max-w-md mx-auto">
+    <div class="flex items-center justify-between py-4">
+      <h2 class="ff-display text-xl font-semibold">Tarjetas</h2>
+      <button id="btn-nueva-tarjeta-m" class="btn-secondary text-xs">+ Nueva</button>
+    </div>
+    <div id="tm-lista" class="space-y-3"></div>
+  </section>
+
   <!-- QUICK ACTIONS (solo mobile) -->
   <section id="qa-wrap" class="mobile-only fixed bottom-20 left-0 right-0 z-20 pointer-events-none">
     <div class="max-w-md mx-auto px-4">
@@ -1834,6 +1843,72 @@
   </form>
 </dialog>
 
+<!-- ===== DIÁLOGO: IMPORTAR RESUMEN BANCARIO PDF ============= -->
+<dialog id="dlg-resumen-bancario">
+  <div class="form-modern" style="min-width:min(96vw,780px);max-width:820px">
+
+    <!-- Header -->
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--brand),var(--neon-purple))">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="12" x2="12" y2="18"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Resumen bancario</h3>
+        <p class="text-xs" style="color:var(--ink-muted)">Cotejar PDF con gastos registrados</p>
+      </div>
+      <button type="button" id="rsb-close-x"
+        style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1;transition:color .15s"
+        onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--ink-muted)'"
+        title="Cerrar">✕</button>
+    </div>
+
+    <!-- Paso 0: selección de tarjeta + drop zone -->
+    <div id="rsb-paso-0" class="form-modern-body">
+      <div class="rsb-field-group">
+        <label class="form-label" for="rsb-tarjeta-sel">¿A qué tarjeta corresponde este resumen?</label>
+        <select id="rsb-tarjeta-sel" class="input w-full"></select>
+      </div>
+
+      <div id="rsb-dropzone" class="rsb-dropzone" role="button" tabindex="0" title="Click o arrastrá el PDF">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5"
+             class="rsb-dropzone-icon" aria-hidden="true">
+          <rect x="8" y="4" width="28" height="38" rx="3" stroke="currentColor"/>
+          <path d="M28 4v12h12" stroke="currentColor"/>
+          <path d="M18 28l6-6 6 6M24 22v14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M16 36h16" stroke="currentColor" stroke-linecap="round"/>
+        </svg>
+        <p class="rsb-dropzone-label">Arrastrá el PDF o <span class="rsb-dropzone-link">hacé click para elegir</span></p>
+        <p class="rsb-dropzone-hint">Solo archivos .pdf · procesado 100% en tu dispositivo</p>
+      </div>
+      <input type="file" id="rsb-file" accept="application/pdf,.pdf" hidden />
+    </div>
+
+    <!-- Paso 1: progreso -->
+    <div id="rsb-paso-1" class="form-modern-body rsb-centered" hidden>
+      <div class="rsb-spinner" aria-label="Procesando…"></div>
+      <p id="rsb-progreso-txt" class="rsb-progreso-txt">Leyendo PDF…</p>
+    </div>
+
+    <!-- Paso 2: cotejo de movimientos -->
+    <div id="rsb-paso-2" class="rsb-paso-2-layout" hidden>
+      <div id="rsb-resumen-header" class="rsb-resumen-header form-modern-body" style="padding-bottom:.5rem"></div>
+
+      <div id="rsb-lista-movimientos" class="rsb-lista-movimientos form-modern-body" style="overflow-y:auto;flex:1;padding-top:.25rem"></div>
+
+      <div class="form-modern-footer">
+        <button type="button" id="rsb-cargar-faltantes" class="btn-primary flex-1">Cargar gastos no encontrados</button>
+        <button type="button" id="rsb-cancelar" class="btn-secondary flex-1">Cerrar</button>
+      </div>
+    </div>
+
+  </div>
+</dialog>
+
 <!-- ===== WIDGET HISTORY DRAWER ============================== -->
 <!-- ===== DRAWER DETALLE DE TARJETA ============================= -->
 <dialog id="dlg-tarjeta-detalle">
@@ -1956,6 +2031,18 @@
         <div id="td-proximos-ciclos" class="space-y-1.5"></div>
       </div>
 
+      <!-- Sección: Ciclos de facturación (Feature A) -->
+      <div class="td-section mb-4" id="td-seccion-ciclos">
+        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted)">📅 Ciclos de facturación</p>
+        <div id="td-ciclos-lista"></div>
+      </div>
+
+      <!-- Sección: Próximo resumen a pagar (Feature C) -->
+      <div class="td-section mb-4" id="td-seccion-plan-pago">
+        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted)">💸 Próximo resumen a pagar</p>
+        <div id="td-plan-pago"></div>
+      </div>
+
       <!-- Sección: Simulador de compra -->
       <details class="form-collapse">
         <summary>
@@ -1985,9 +2072,12 @@
     </div>
 
     <!-- Footer -->
-    <div class="widget-drawer-footer">
+    <div class="widget-drawer-footer" style="flex-wrap:wrap;gap:.5rem">
       <button type="button" id="td-add-gasto" class="btn-primary flex-1">+ Cargar gasto en esta tarjeta</button>
       <button type="button" id="td-close-2"  class="btn-secondary flex-1">Cerrar</button>
+      <button type="button" id="td-import-resumen" class="btn-secondary text-sm" style="width:100%;flex-basis:100%">
+        📄 Cotejar resumen bancario (PDF)
+      </button>
     </div>
   </div>
 </dialog>

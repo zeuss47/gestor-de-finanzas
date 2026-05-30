@@ -102,6 +102,7 @@ function switchTab(tab) {
   currentTab = tab;
   const root  = document.getElementById('main-widgets');
   const secMov = document.getElementById('section-movimientos');
+  const secTarjetasMobile = document.getElementById('sec-tarjetas-mobile');
 
   // Reset clases de modo
   document.body.classList.remove('view-analisis');
@@ -109,13 +110,23 @@ function switchTab(tab) {
   if (tab === 'gastos') {
     root.classList.add('hidden');
     secMov?.classList.remove('hidden');
+    secTarjetasMobile?.classList.add('hidden');
     renderMovimientos();
+    return;
+  }
+
+  if (tab === 'tarjetas') {
+    root.classList.add('hidden');
+    secMov?.classList.add('hidden');
+    secTarjetasMobile?.classList.remove('hidden');
+    renderTarjetasMobile();
     return;
   }
 
   // Tabs que muestran el dashboard
   root.classList.remove('hidden');
   secMov?.classList.add('hidden');
+  secTarjetasMobile?.classList.add('hidden');
 
   if (tab === 'analisis') {
     // Filtrar visualmente: solo widgets analíticos
@@ -2806,6 +2817,13 @@ function abrirDrawerTarjeta(tarjetaId) {
   simRes.hidden = true;
   simRes.innerHTML = '';
 
+  // Feature A: ciclos de facturación
+  const resumenActual = resumen || {};
+  renderCiclosTarjeta(tarjeta, resumenActual);
+
+  // Feature C: plan de pago próximo
+  renderPlanPago(tarjeta, resumenActual);
+
   dlg.showModal();
 }
 
@@ -2860,6 +2878,173 @@ function renderHistoricoCotizaciones(tarjeta) {
         <span class="usd-history-cotiz">${FMT.format(h.cotizacion)}</span>
       </div>`);
   });
+}
+
+/* ── FEATURE A: Ciclos de facturación ─────────────────────────── */
+function renderCiclosTarjeta(tarjeta, resumenActual) {
+  const cont = document.getElementById('td-ciclos-lista');
+  if (!cont) return;
+
+  const pagados = new Set(tarjeta.ciclos_pagados || []);
+  const hoy = new Date();
+  const ciclos = [];
+
+  for (let i = -5; i <= 1; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
+    const resumenMes = resumenTarjeta(tarjeta, state.gastos, d);
+    const periodo = resumenMes.periodo;
+    const esPagado = pagados.has(periodo);
+    const esFuturo = d > new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const esActual = periodo === resumenActual.periodo;
+    ciclos.push({ periodo, resumenMes, esPagado, esFuturo, esActual });
+  }
+
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  cont.innerHTML = ciclos.reverse().map(c => {
+    const [y, m] = c.periodo.split('-');
+    const label = `${MESES[parseInt(m, 10) - 1]} ${y}`;
+    const estado = c.esFuturo ? 'proximo' : c.esPagado ? 'pagado' : 'pendiente';
+    const colorMap = { pagado: 'var(--success)', pendiente: 'var(--warning)', proximo: 'var(--ink-muted)' };
+    const badgeMap = { pagado: '✓ PAGADO', pendiente: '⏳ PENDIENTE', proximo: '📅 PRÓXIMO' };
+    const colorEstado = colorMap[estado];
+    const badgeEstado = badgeMap[estado];
+    const total = c.resumenMes.total_resumen;
+    const venc = c.resumenMes.fecha_vencimiento;
+    const actualBadge = c.esActual ? '<span style="color:var(--brand);font-size:.6rem;margin-left:.25rem">● actual</span>' : '';
+
+    return `<div class="td-ciclo-row" data-periodo="${c.periodo}">
+      <div class="td-ciclo-info">
+        <span class="td-ciclo-mes">${label}${actualBadge}</span>
+        <span class="td-ciclo-venc" style="color:var(--ink-muted);font-size:.7rem">Vence: ${venc || '—'}</span>
+      </div>
+      <div class="td-ciclo-monto">${FMT.format(total)}</div>
+      <div class="td-ciclo-badge" style="color:${colorEstado}">${badgeEstado}</div>
+      ${!c.esFuturo && !c.esPagado ? `<button class="td-ciclo-pagar btn-secondary text-xs" data-periodo="${c.periodo}" data-tarjeta="${tarjeta.id}" style="border-color:var(--success);color:var(--success)">✓ Pagar</button>` : ''}
+    </div>`;
+  }).join('');
+
+  cont.querySelectorAll('.td-ciclo-pagar').forEach(btn => {
+    btn.onclick = async () => {
+      const t = state.tarjetas.find(x => x.id === btn.dataset.tarjeta);
+      if (!t) return;
+      if (!t.ciclos_pagados) t.ciclos_pagados = [];
+      if (!t.ciclos_pagados.includes(btn.dataset.periodo)) {
+        t.ciclos_pagados.push(btn.dataset.periodo);
+        await DB.put('tarjetas', t);
+        notificarCambioLocal();
+        toast(`✓ ${btn.dataset.periodo} marcado como pagado`);
+        abrirDrawerTarjeta(t.id);
+      }
+    };
+  });
+}
+
+/* ── FEATURE C: Plan de pago ──────────────────────────────────── */
+function renderPlanPago(tarjeta, resumen) {
+  const cont = document.getElementById('td-plan-pago');
+  if (!cont) return;
+
+  const hoy = new Date();
+  const venc = resumen.fecha_vencimiento ? new Date(resumen.fecha_vencimiento + 'T12:00:00') : null;
+  const diasAlVenc = venc ? Math.ceil((venc - hoy) / 86400000) : null;
+
+  const proximoIngreso = (state.ingresos || [])
+    .filter(i => !i.deleted && i.fecha)
+    .map(i => ({ ...i, fechaD: new Date(i.fecha + 'T12:00:00') }))
+    .filter(i => i.fechaD >= hoy)
+    .sort((a, b) => a.fechaD - b.fechaD)[0];
+
+  const total = resumen.total_resumen || 0;
+  const urgente = diasAlVenc !== null && diasAlVenc <= 5;
+  const colorUrg = urgente ? 'var(--danger)' : diasAlVenc !== null && diasAlVenc <= 15 ? 'var(--warning)' : 'var(--success)';
+
+  let ingresoHtml = '';
+  if (proximoIngreso) {
+    const montoIngreso = (proximoIngreso.sueldo_neto || 0) + (proximoIngreso.bonos || 0);
+    const llegaAntes = venc && proximoIngreso.fechaD <= venc;
+    const llegaDespues = venc && proximoIngreso.fechaD > venc;
+    ingresoHtml = `
+      <div style="border-top:1px solid var(--border);margin-top:.5rem;padding-top:.5rem">
+        <div class="flex justify-between items-center">
+          <span class="text-xs" style="color:var(--ink-muted)">🤑 Próximo ingreso</span>
+          <span class="text-xs font-semibold" style="color:var(--success)">${proximoIngreso.fecha} · ${FMT.format(montoIngreso)}</span>
+        </div>
+        ${llegaAntes ? '<p class="text-[10px] mt-1" style="color:var(--success)">✓ Ingreso llega antes del vencimiento</p>' : ''}
+        ${llegaDespues ? '<p class="text-[10px] mt-1" style="color:var(--danger)">⚠ Ingreso llega DESPUÉS del vencimiento</p>' : ''}
+      </div>`;
+  } else {
+    ingresoHtml = `<p class="text-[10px] mt-2" style="color:var(--ink-muted)">Sin ingresos próximos cargados. Cargá un recibo de sueldo.</p>`;
+  }
+
+  cont.innerHTML = `
+    <div style="background:var(--surface-2);border-radius:12px;padding:1rem;border:1px solid var(--border)">
+      <div class="flex justify-between items-center mb-2">
+        <span class="text-xs" style="color:var(--ink-muted)">Total a pagar</span>
+        <span class="ff-display font-bold" style="color:${urgente ? 'var(--danger)' : 'var(--ink)'}">${FMT.format(total)}</span>
+      </div>
+      <div class="flex justify-between items-center mb-2">
+        <span class="text-xs" style="color:var(--ink-muted)">Fecha de vencimiento</span>
+        <span class="text-sm font-semibold" style="color:${colorUrg}">${resumen.fecha_vencimiento || '—'}${diasAlVenc !== null ? ' (' + diasAlVenc + 'd)' : ''}</span>
+      </div>
+      ${ingresoHtml}
+    </div>`;
+}
+
+/* ── FEATURE B: Vista tarjetas mobile ────────────────────────── */
+function renderTarjetasMobile() {
+  const lista = document.getElementById('tm-lista');
+  if (!lista) return;
+
+  const tarjetas = (state.tarjetas || []).filter(t => !t.deleted && t.activa !== false);
+  if (!tarjetas.length) {
+    lista.innerHTML = `<p class="text-sm text-center py-8" style="color:var(--ink-muted)">Sin tarjetas. Tocá "+ Nueva".</p>`;
+    const btnNuevaVacio = document.getElementById('btn-nueva-tarjeta-m');
+    if (btnNuevaVacio) btnNuevaVacio.onclick = () => openDialog('dlg-tarjeta');
+    return;
+  }
+
+  lista.innerHTML = tarjetas.map(t => {
+    const r = resumenTarjeta(t, state.gastos);
+    const pct = t.limite_un_pago ? Math.min(100, Math.round((r.total_resumen / t.limite_un_pago) * 100)) : 0;
+    const colorPct = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--warning)' : 'var(--success)';
+    return `<div class="card-glass rounded-2xl p-4" style="border-color:${t.color || 'var(--border)'}22">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full flex-shrink-0" style="background:${t.color || 'var(--brand)'}"></span>
+          <span class="ff-display font-bold text-sm">${escapeHtml(t.nombre)}</span>
+        </div>
+        <span class="text-xs" style="color:var(--ink-muted)">Cierra en <b style="color:var(--brand)">${r.dias_para_cierre}d</b></span>
+      </div>
+      <div class="flex justify-between items-end mb-2">
+        <div>
+          <p class="text-[10px] uppercase tracking-wider" style="color:var(--ink-muted)">Acumulado este ciclo</p>
+          <p class="ff-display font-bold text-xl" style="color:${colorPct}">${FMT.format(r.total_resumen)}</p>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px]" style="color:var(--ink-muted)">Vence ${r.fecha_vencimiento || '—'}</p>
+          <p class="text-xs font-semibold" style="color:${colorPct}">${pct}% del límite</p>
+        </div>
+      </div>
+      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:.75rem">
+        <div style="width:${pct}%;height:100%;background:${colorPct};border-radius:2px;transition:width .3s"></div>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn-primary flex-1 text-xs" data-tm-add="${t.id}">+ Agregar gasto</button>
+        <button class="btn-secondary flex-1 text-xs" data-tm-detalle="${t.id}">Ver detalle</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  lista.querySelectorAll('[data-tm-add]').forEach(btn => {
+    btn.onclick = () => openDialog('dlg-gasto', { metodo_pago: 'credito', tarjeta_id: btn.dataset.tmAdd });
+  });
+  lista.querySelectorAll('[data-tm-detalle]').forEach(btn => {
+    btn.onclick = () => abrirDrawerTarjeta(btn.dataset.tmDetalle);
+  });
+
+  const btnNueva = document.getElementById('btn-nueva-tarjeta-m');
+  if (btnNueva) btnNueva.onclick = () => openDialog('dlg-tarjeta');
 }
 
 async function cerrarPeriodoUSD(tarjetaId) {
@@ -4324,10 +4509,11 @@ async function init() {
     const tab = b.dataset.tab;
     if (tab === 'gastos') {
       switchTab('gastos');
+    } else if (tab === 'tarjetas') {
+      switchTab('tarjetas');
     } else {
       switchTab('home');
-      if (tab === 'tarjetas') openDialog('dlg-tarjeta');
-      if (tab === 'metas')    openDialog('dlg-meta');
+      if (tab === 'metas') openDialog('dlg-meta');
     }
   });
 
@@ -4367,6 +4553,9 @@ async function init() {
   document.getElementById('dlg-recibo')?.addEventListener('close', async (e) => {
     if (e.target.returnValue === 'save') await handleSubmitRecibo(e.target.querySelector('form'));
   });
+
+  // ── Módulo: Resumen Bancario PDF ─────────────────────────────
+  iniciarModuloResumenBancario();
 
   // Recalcular resumen del recibo en vivo
   document.addEventListener('input', (e) => {
@@ -5685,3 +5874,280 @@ document.addEventListener('click', (e) => {
   _hdState.chartMode = e.target.dataset.mode;
   _hdRenderChart();
 });
+
+/* ================================================================
+   Módulo: Importar Resumen Bancario PDF
+   ================================================================ */
+
+/**
+ * Abre el diálogo de cotejo de resumen bancario, opcionalmente con una
+ * tarjeta preseleccionada.
+ * @param {string} [tarjetaIdPreseleccionado]
+ */
+function abrirImportResumen(tarjetaIdPreseleccionado) {
+  const dlg = document.getElementById('dlg-resumen-bancario');
+  if (!dlg) return;
+
+  // Poblar select con tarjetas activas
+  const sel = document.getElementById('rsb-tarjeta-sel');
+  sel.innerHTML = state.tarjetas
+    .filter(t => !t.deleted && t.activa !== false)
+    .map(t => `<option value="${t.id}" ${t.id === tarjetaIdPreseleccionado ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`)
+    .join('');
+
+  // Reset pasos
+  document.getElementById('rsb-paso-0').hidden = false;
+  document.getElementById('rsb-paso-1').hidden = true;
+  document.getElementById('rsb-paso-2').hidden = true;
+
+  // Limpiar file input para permitir re-subir el mismo archivo
+  const fileInput = document.getElementById('rsb-file');
+  if (fileInput) fileInput.value = '';
+
+  dlg.showModal();
+}
+
+/**
+ * Renderiza el paso 2 con los movimientos cotejados.
+ * @param {{periodo:string, banco:string, movimientos:Array, totalResumen:number}} resultado
+ * @param {string} tarjetaId
+ */
+function _rsbRenderCotejo(resultado, tarjetaId) {
+  const { periodo, banco, movimientos, totalResumen } = resultado;
+
+  // ── Cabecera ──────────────────────────────────────────────
+  const headerEl = document.getElementById('rsb-resumen-header');
+  const [anio, mes] = (periodo || '').split('-');
+  const mesesNombres = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const periodoLabel = (anio && mes) ? `${mesesNombres[parseInt(mes,10)] || mes} ${anio}` : (periodo || '—');
+
+  const nExacto   = movimientos.filter(m => m.confianza === 'exacto').length;
+  const nProbable = movimientos.filter(m => m.confianza === 'probable').length;
+  const nFaltante = movimientos.filter(m => m.confianza === 'no_encontrado').length;
+
+  headerEl.innerHTML = `
+    <div class="rsb-resumen-kpi">
+      <span class="rsb-resumen-kpi-label">Período</span>
+      <span class="rsb-resumen-kpi-val">${escapeHtml(periodoLabel)}</span>
+    </div>
+    <div class="rsb-resumen-kpi">
+      <span class="rsb-resumen-kpi-label">Banco / Emisor</span>
+      <span class="rsb-resumen-kpi-val">${escapeHtml(banco || '—')}</span>
+    </div>
+    ${totalResumen ? `
+    <div class="rsb-resumen-kpi">
+      <span class="rsb-resumen-kpi-label">Total resumen</span>
+      <span class="rsb-resumen-kpi-val brand">${FMT.format(totalResumen)}</span>
+    </div>` : ''}
+    <div class="rsb-stats">
+      <span class="rsb-stat-pill exacto">✓ ${nExacto} ya cargados</span>
+      ${nProbable ? `<span class="rsb-stat-pill probable">⚠ ${nProbable} probables</span>` : ''}
+      <span class="rsb-stat-pill faltante">➕ ${nFaltante} faltantes</span>
+    </div>
+  `;
+
+  // ── Lista de movimientos ────────────────────────────────
+  const listaEl = document.getElementById('rsb-lista-movimientos');
+
+  if (!movimientos.length) {
+    listaEl.innerHTML = `<div class="rsb-empty">No se detectaron movimientos en el PDF.<br>Verificá que sea un resumen de tarjeta estándar.</div>`;
+    return;
+  }
+
+  listaEl.innerHTML = movimientos.map((mov, idx) => {
+    const fechaFmt = mov.fecha
+      ? mov.fecha.split('-').reverse().join('/')
+      : '—';
+    const montoFmt = mov.moneda && mov.moneda !== 'ARS'
+      ? `${mov.moneda} ${mov.monto.toLocaleString('es-AR', {minimumFractionDigits:2})}`
+      : FMT.format(mov.monto);
+
+    const esExacto   = mov.confianza === 'exacto';
+    const esProbable = mov.confianza === 'probable';
+    const esFaltante = mov.confianza === 'no_encontrado';
+
+    // El checkbox solo es funcional para los no encontrados; para exactos/probables es display-only
+    const checkHtml = esFaltante
+      ? `<input type="checkbox" class="rsb-mov-check" data-idx="${idx}" checked title="Seleccionado para cargar">`
+      : `<span style="display:inline-block;width:16px"></span>`;
+
+    const badge = esExacto
+      ? `<span class="rsb-mov-badge exacto">✓ Ya cargado</span>`
+      : esProbable
+        ? `<span class="rsb-mov-badge probable">⚠ Probable</span>`
+        : `<span class="rsb-mov-badge faltante">➕ Cargar</span>`;
+
+    const matchHint = esProbable && mov.match
+      ? `<span class="rsb-mov-fecha" title="Match probable con: ${escapeHtml(mov.match.descripcion)}">↔ ${escapeHtml(mov.match.descripcion.slice(0,30))}</span>`
+      : '';
+
+    return `
+      <div class="rsb-mov-row" data-idx="${idx}" data-confianza="${mov.confianza}">
+        ${checkHtml}
+        <div class="rsb-mov-info">
+          <span class="rsb-mov-fecha">${escapeHtml(fechaFmt)}</span>
+          <span class="rsb-mov-desc" title="${escapeHtml(mov.descripcion)}">${escapeHtml(mov.descripcion)}</span>
+          ${matchHint}
+        </div>
+        <span class="rsb-mov-monto">${escapeHtml(montoFmt)}</span>
+        ${badge}
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Registra todos los listeners del módulo de resumen bancario.
+ * Se llama una sola vez durante el init de la app.
+ */
+function iniciarModuloResumenBancario() {
+  // Variable de closure para mantener los movimientos parseados entre pasos
+  let _movimientosCotejados = [];
+
+  // ── Botón en drawer de tarjeta ────────────────────────────
+  document.getElementById('td-import-resumen')?.addEventListener('click', () => {
+    // _drawerTarjetaIdActual es la variable de closure del módulo de drawers
+    const tarjetaId = _drawerTarjetaIdActual || '';
+    document.getElementById('dlg-tarjeta-detalle')?.close();
+    abrirImportResumen(tarjetaId);
+  });
+
+  // ── Drop zone: click y drag-and-drop ────────────────────
+  const dropzone = document.getElementById('rsb-dropzone');
+  const fileInput = document.getElementById('rsb-file');
+
+  dropzone?.addEventListener('click', () => fileInput?.click());
+  dropzone?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput?.click(); }
+  });
+
+  dropzone?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('drag-over');
+  });
+  dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      _rsbProcesarArchivo(file);
+    } else {
+      toast('Por favor arrastrá un archivo PDF', 2500);
+    }
+  });
+
+  // ── File input change ────────────────────────────────────
+  fileInput?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) _rsbProcesarArchivo(file);
+  });
+
+  // ── Botones del paso 2 ───────────────────────────────────
+  document.getElementById('rsb-cargar-faltantes')?.addEventListener('click', async () => {
+    const tarjetaId = document.getElementById('rsb-tarjeta-sel')?.value;
+    if (!tarjetaId) { toast('Seleccioná una tarjeta', 2000); return; }
+
+    // Recopilar los movimientos seleccionados (no_encontrado con checkbox marcado)
+    const listaEl = document.getElementById('rsb-lista-movimientos');
+    const seleccionados = [];
+    listaEl?.querySelectorAll('.rsb-mov-check').forEach(cb => {
+      if (cb.checked) {
+        const idx = parseInt(cb.dataset.idx, 10);
+        const mov = _movimientosCotejados[idx];
+        if (mov && mov.confianza === 'no_encontrado') seleccionados.push(mov);
+      }
+    });
+
+    if (!seleccionados.length) {
+      toast('No hay gastos faltantes seleccionados', 2000);
+      return;
+    }
+
+    const btn = document.getElementById('rsb-cargar-faltantes');
+    btn.disabled = true;
+    btn.textContent = '⏳ Guardando…';
+
+    let guardados = 0;
+    try {
+      for (const mov of seleccionados) {
+        const g = {
+          id: uuid(),
+          fecha: mov.fecha,
+          monto: mov.monto,
+          moneda: mov.moneda || 'ARS',
+          descripcion: mov.descripcion,
+          categoria: 'general',
+          metodo_pago: 'credito',
+          tipo: 'unico',
+          tarjeta_id: tarjetaId,
+          updated_at: Math.floor(Date.now() / 1000),
+        };
+        await DB.put('gastos', g);
+        guardados++;
+      }
+      await reloadAll();
+      toast(`✓ ${guardados} gasto${guardados > 1 ? 's' : ''} cargado${guardados > 1 ? 's' : ''} correctamente`, 3000);
+      document.getElementById('dlg-resumen-bancario')?.close();
+    } catch (err) {
+      console.error('[rsb] Error al guardar:', err);
+      toast('Error al guardar: ' + (err?.message || err), 3500);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Cargar gastos no encontrados';
+    }
+  });
+
+  document.getElementById('rsb-cancelar')?.addEventListener('click', () => {
+    document.getElementById('dlg-resumen-bancario')?.close();
+  });
+  document.getElementById('rsb-close-x')?.addEventListener('click', () => {
+    document.getElementById('dlg-resumen-bancario')?.close();
+  });
+
+  // ── Función interna de procesamiento ────────────────────
+  async function _rsbProcesarArchivo(file) {
+    const tarjetaId = document.getElementById('rsb-tarjeta-sel')?.value;
+    if (!tarjetaId) {
+      toast('Seleccioná una tarjeta antes de cargar el PDF', 2500);
+      return;
+    }
+
+    // Ir al paso 1
+    document.getElementById('rsb-paso-0').hidden = true;
+    document.getElementById('rsb-paso-1').hidden = false;
+    document.getElementById('rsb-paso-2').hidden = true;
+
+    const progresoTxt = document.getElementById('rsb-progreso-txt');
+
+    try {
+      progresoTxt.textContent = 'Leyendo PDF…';
+      const { parsearResumenTarjeta, matchearConGastos } = await import('./pdf-statement-parser.js');
+
+      progresoTxt.textContent = 'Extrayendo movimientos…';
+      const resultado = await parsearResumenTarjeta(file);
+
+      progresoTxt.textContent = 'Cotejando con gastos registrados…';
+      _movimientosCotejados = matchearConGastos(resultado.movimientos, state.gastos, tarjetaId);
+
+      // Pasar al paso 2
+      document.getElementById('rsb-paso-1').hidden = true;
+      document.getElementById('rsb-paso-2').hidden = false;
+
+      _rsbRenderCotejo({ ...resultado, movimientos: _movimientosCotejados }, tarjetaId);
+
+      // Resetear file input para permitir re-subir
+      const fi = document.getElementById('rsb-file');
+      if (fi) fi.value = '';
+
+    } catch (err) {
+      console.error('[rsb] Error procesando PDF:', err);
+      // Volver al paso 0 con mensaje de error
+      document.getElementById('rsb-paso-1').hidden = true;
+      document.getElementById('rsb-paso-0').hidden = false;
+      toast('No se pudo procesar el PDF: ' + (err?.message || String(err)), 4000);
+      const fi = document.getElementById('rsb-file');
+      if (fi) fi.value = '';
+    }
+  }
+}

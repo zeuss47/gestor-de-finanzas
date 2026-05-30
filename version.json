@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.14",
-    "build":  31,
-    "modified":  "2026-05-30T10:18:21Z",
-    "commit":  "M css/styles.css, M css/tailwind.css, M index.html",
-    "notes":  "Auto-update 2026-05-30 07:18"
+    "version":  "1.15",
+    "build":  32,
+    "modified":  "2026-05-30T12:49:48Z",
+    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js, M js/pdf-import.js, js/pdf-state...",
+    "notes":  "Auto-update 2026-05-30 09:49"
 }

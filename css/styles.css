@@ -3248,6 +3248,21 @@ body.view-analisis #main-widgets::before {
   color: var(--brand);
 }
 
+/* ── Ciclos de tarjeta ─────────────────────────────────────────── */
+.td-ciclo-row {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .6rem .75rem; border-radius: 10px;
+  border: 1px solid var(--border); margin-bottom: .4rem;
+  flex-wrap: wrap;
+}
+.td-ciclo-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.td-ciclo-mes  { font-size: .8rem; font-weight: 700; font-family: 'Space Grotesk',sans-serif; }
+.td-ciclo-monto { font-size: .8rem; font-weight: 600; text-align: right; min-width: 80px; font-family: 'Space Grotesk',sans-serif; }
+.td-ciclo-badge { font-size: .6rem; font-weight: 700; letter-spacing: .05em; min-width: 80px; text-align: center; }
+
+/* ── Tarjetas mobile ───────────────────────────────────────────── */
+#sec-tarjetas-mobile { padding-top: env(safe-area-inset-top, 0); }
+
 /* ── Ciclos custom (override por mes) ────────────────────────── */
 .ciclo-custom-add {
   padding: .75rem;
@@ -3451,4 +3466,217 @@ body.view-analisis #main-widgets::before {
   border-radius: var(--r-sm);
   background: linear-gradient(135deg, rgba(0,240,255,0.08), rgba(0,255,159,0.04));
   border: 1px solid var(--brand);
+}
+
+/* ================================================================
+   Módulo: Importar Resumen Bancario PDF
+   ================================================================ */
+
+/* Drop zone */
+.rsb-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  margin-top: 1rem;
+  padding: 2.2rem 1.5rem;
+  border: 2px dashed var(--border-2);
+  border-radius: var(--r);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  outline: none;
+}
+.rsb-dropzone:hover,
+.rsb-dropzone:focus-visible,
+.rsb-dropzone.drag-over {
+  border-color: var(--brand);
+  background: rgba(0, 240, 255, 0.06);
+}
+.rsb-dropzone-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--ink-muted);
+  transition: color .2s;
+}
+.rsb-dropzone:hover .rsb-dropzone-icon,
+.rsb-dropzone.drag-over .rsb-dropzone-icon { color: var(--brand); }
+.rsb-dropzone-label {
+  font-size: .875rem;
+  color: var(--ink-2);
+  text-align: center;
+}
+.rsb-dropzone-link {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rsb-dropzone-hint {
+  font-size: .72rem;
+  color: var(--ink-muted);
+}
+
+/* Paso 1: spinner */
+.rsb-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 1.5rem;
+}
+.rsb-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--border-2);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: rsb-spin .8s linear infinite;
+}
+@keyframes rsb-spin { to { transform: rotate(360deg); } }
+.rsb-progreso-txt {
+  font-size: .9rem;
+  color: var(--ink-2);
+}
+
+/* Paso 2: cabecera del resumen */
+.rsb-resumen-header {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.rsb-resumen-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+.rsb-resumen-kpi-label {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--ink-muted);
+}
+.rsb-resumen-kpi-val {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.rsb-resumen-kpi-val.brand { color: var(--brand); }
+
+.rsb-paso-2-layout {
+  display: flex;
+  flex-direction: column;
+  max-height: 80dvh;
+  overflow: hidden;
+}
+
+/* Estadísticas de cotejo */
+.rsb-stats {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.rsb-stat-pill {
+  font-size: .65rem;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rsb-stat-pill.exacto   { background: rgba(0,255,159,.15); color: var(--success); }
+.rsb-stat-pill.probable { background: rgba(255,184,0,.15); color: var(--warning); }
+.rsb-stat-pill.faltante { background: rgba(255,45,110,.15); color: var(--danger); }
+
+/* Lista de movimientos */
+.rsb-lista-movimientos {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding-bottom: .5rem;
+}
+.rsb-mov-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: .6rem 1rem;
+  padding: .6rem .85rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: background .15s;
+}
+.rsb-mov-row:hover { background: var(--surface-2); }
+
+.rsb-mov-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.rsb-mov-info {
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  min-width: 0;
+}
+.rsb-mov-fecha {
+  font-size: .65rem;
+  color: var(--ink-muted);
+  letter-spacing: .04em;
+}
+.rsb-mov-desc {
+  font-size: .82rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rsb-mov-monto {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  text-align: right;
+}
+.rsb-mov-badge {
+  font-size: .62rem;
+  padding: .15rem .45rem;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rsb-mov-badge.exacto   { background: rgba(0,255,159,.15); color: var(--success); }
+.rsb-mov-badge.probable { background: rgba(255,184,0,.15); color: var(--warning); }
+.rsb-mov-badge.faltante { background: rgba(255,45,110,.15); color: var(--danger); }
+
+/* Placeholder de lista vacía */
+.rsb-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--ink-muted);
+  font-size: .85rem;
+}
+
+/* Campo helper */
+.rsb-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+}
+
+/* Responsive mobile */
+@media (max-width: 520px) {
+  .rsb-mov-row {
+    grid-template-columns: auto 1fr auto;
+  }
+  .rsb-mov-badge { display: none; }
+  .rsb-mov-monto { font-size: .8rem; }
 }
