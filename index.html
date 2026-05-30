@@ -364,11 +364,7 @@
   <header id="app-header">
     <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <div>
-          <p class="text-xs text-dimmed mb-0.5">Hola,</p>
-          <h1 class="ff-display text-xl font-semibold leading-tight" id="hd-greeting">tus finanzas</h1>
-        </div>
-        <span id="hd-version" class="mobile-only header-version-badge" title="Versión"></span>
+        <span id="hd-version" class="header-version-badge" title="Versión"></span>
       </div>
       <div class="flex items-center gap-2">
         <button id="btn-sync"
@@ -448,6 +444,7 @@
   <section id="qa-wrap" class="mobile-only fixed bottom-20 left-0 right-0 z-20 pointer-events-none">
     <div class="max-w-md mx-auto px-4">
       <div class="flex gap-2 overflow-x-auto pb-2 pointer-events-auto" id="quick-actions">
+        <button id="qa-docs" class="quick-btn" style="border-color:var(--brand);color:var(--brand)">📄 Cargar PDF</button>
         <button data-quick="kiosco"      class="quick-btn">🥤 Kiosco</button>
         <button data-quick="combustible" class="quick-btn">⛽ Nafta</button>
         <button data-quick="super"       class="quick-btn">🛒 Súper</button>
@@ -499,15 +496,6 @@
       </svg>
       <span>Metas</span>
     </button>
-
-    <button id="nav-docs" class="nav-btn" title="Cargar PDF">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
-        <path d="M12 18v-6M9 15l3-3 3 3" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span>Cargar PDF</span>
-    </button>
   </nav>
 
 </div><!-- /#main-area -->
@@ -539,7 +527,8 @@
     <div class="right-panel-section">
       <p class="sidebar-section-title mb-3">Acción rápida</p>
       <button id="rp-btn-gasto"   class="btn-primary w-full mb-2 text-sm">+ Nuevo gasto</button>
-      <button id="rp-btn-ingreso" class="btn-secondary w-full text-sm">+ Registrar ingreso</button>
+      <button id="rp-btn-ingreso" class="btn-secondary w-full mb-2 text-sm">+ Registrar ingreso</button>
+      <button id="rp-btn-docs"    class="btn-secondary w-full text-sm" style="border-color:var(--brand);color:var(--brand)">📄 Cargar PDF</button>
     </div>
 
   </div>

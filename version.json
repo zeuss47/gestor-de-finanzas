@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.22",
-    "build":  39,
-    "modified":  "2026-05-30T15:29:16Z",
-    "commit":  "M css/styles.css, M index.html, M js/app.js, js/ai-advisor.js",
-    "notes":  "Auto-update 2026-05-30 12:29"
+    "version":  "1.23",
+    "build":  40,
+    "modified":  "2026-05-30T15:51:29Z",
+    "commit":  "M css/styles.css, M index.html, M js/app.js",
+    "notes":  "Auto-update 2026-05-30 12:51"
 }

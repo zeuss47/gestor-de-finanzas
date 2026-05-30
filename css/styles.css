@@ -572,7 +572,7 @@ select.input {
   bottom: 0; left: 0; right: 0;
   /* display:grid + columns explícito para que el Tailwind base reset no rompa el layout */
   display: grid !important;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: rgba(7,9,15,0.85);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);

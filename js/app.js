@@ -2803,9 +2803,9 @@ function abrirVistaCuentas() {
 function abrirVistaMetas() {
   const metas = (state.metas || []).filter(m => !m.deleted);
   if (metas.length === 0) {
-    toast('No hay metas. Creá una desde Ajustes', 3000);
-    abrirSettings();
-    setTimeout(() => cambiarSettingsTab('cuentas'), 200);
+    // No hay metas: abrir directamente el diálogo para crear una (antes abría
+    // por error la pestaña de Cuentas en Ajustes).
+    openDialog('dlg-meta');
     return;
   }
   abrirSelectorEntidad('metas', metas);
@@ -4962,6 +4962,8 @@ async function init() {
   const abrirDocumentos = () => document.getElementById('dlg-documentos')?.showModal();
   document.getElementById('nav-docs')?.addEventListener('click', abrirDocumentos);
   document.getElementById('sb-docs')?.addEventListener('click', abrirDocumentos);
+  document.getElementById('rp-btn-docs')?.addEventListener('click', abrirDocumentos);
+  document.getElementById('qa-docs')?.addEventListener('click', abrirDocumentos);
   document.getElementById('docs-close-x')?.addEventListener('click', () => document.getElementById('dlg-documentos')?.close());
 
   // Tarjeta "Recibo de sueldo": abre el form de recibo y dispara el selector de PDF
@@ -5019,10 +5021,7 @@ async function init() {
     };
   });
 
-  // Saludo
-  const h = new Date().getHours();
-  document.getElementById('hd-greeting').textContent =
-    h < 12 ? 'Buen día ☀️' : h < 19 ? 'Buenas tardes' : 'Buenas noches 🌙';
+  // (El saludo se quitó del header; solo queda el badge de versión)
 
   // Sidebar desktop nav
   document.querySelectorAll('[data-sidebar-tab]').forEach(btn => {
