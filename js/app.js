@@ -1165,7 +1165,7 @@ function renderBalance(el) {
     ingMap.set(k, (ingMap.get(k) || 0) + ((i.sueldo_neto || 0) + (i.bonos || 0)));
   }
   for (const g of state.gastos || []) {
-    if (g.deleted || !enRango(g.fecha)) continue;
+    if (g.deleted || g.es_pago_tarjeta || !enRango(g.fecha)) continue; // pago de tarjeta no es consumo
     const k = bucketKey(new Date(g.fecha + 'T12:00:00'));
     gasMap.set(k, (gasMap.get(k) || 0) + gastoEf(g));
   }
@@ -1482,6 +1482,7 @@ function renderCategorias(el) {
 
   const catMap = new Map();
   for (const g of state.gastos) {
+    if (g.es_pago_tarjeta) continue; // el pago de tarjeta no es una categoría de consumo
     if (!g.fecha?.startsWith(mk)) continue;
     const cat = g.categoria || 'general';
     let m = g.monto;
@@ -3424,7 +3425,9 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
           </div>
           <div class="td-ciclo-monto">${FMT.format(total)}</div>
           <div class="td-ciclo-badge" style="color:${colorMap[estado]}">${badgeMap[estado]}</div>
-          ${!c.esFuturo && !c.esPagado ? `<button class="td-ciclo-pagar btn-secondary text-xs" data-periodo="${c.periodo}" data-tarjeta="${tarjeta.id}" style="border-color:var(--success);color:var(--success)">✓ Pagar</button>` : ''}
+          ${c.esFuturo ? '' : c.esPagado
+            ? `<button class="td-ciclo-pendiente btn-secondary text-xs" data-periodo="${c.periodo}" data-tarjeta="${tarjeta.id}" style="border-color:var(--warning);color:var(--warning)">↺ Pendiente</button>`
+            : `<button class="td-ciclo-pagar btn-secondary text-xs" data-periodo="${c.periodo}" data-tarjeta="${tarjeta.id}" data-total="${total}" style="border-color:var(--success);color:var(--success)">✓ Pagar</button>`}
         </div>
         <div class="td-ciclo-detalle" data-idx="${idx}" hidden></div>
       </div>`;
@@ -3450,7 +3453,7 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
 
   cont.querySelectorAll('.td-ciclo-clickable').forEach(row => {
     row.addEventListener('click', (e) => {
-      if (e.target.closest('.td-ciclo-pagar')) return;  // el botón pagar no expande
+      if (e.target.closest('.td-ciclo-pagar, .td-ciclo-pendiente')) return; // los botones no expanden
       toggle(parseInt(row.dataset.idx, 10));
     });
     row.addEventListener('keydown', (e) => {
@@ -3458,22 +3461,105 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
     });
   });
 
-  // Botón "Pagar"
+  // Botón "Pagar" → abre el diálogo de pago (con opción de descontar de cuenta)
   cont.querySelectorAll('.td-ciclo-pagar').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
+    btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const t = state.tarjetas.find(x => x.id === btn.dataset.tarjeta);
-      if (!t) return;
-      if (!t.ciclos_pagados) t.ciclos_pagados = [];
-      if (!t.ciclos_pagados.includes(btn.dataset.periodo)) {
-        t.ciclos_pagados.push(btn.dataset.periodo);
-        await DB.put('tarjetas', t);
-        notificarCambioLocal();
-        toast(`✓ ${btn.dataset.periodo} marcado como pagado`);
-        abrirDrawerTarjeta(t.id);
-      }
+      abrirPagoCiclo(btn.dataset.tarjeta, btn.dataset.periodo, parseFloat(btn.dataset.total) || 0);
     });
   });
+
+  // Botón "Pendiente" → revierte el estado pagado
+  cont.querySelectorAll('.td-ciclo-pendiente').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      marcarCicloPendiente(btn.dataset.tarjeta, btn.dataset.periodo);
+    });
+  });
+}
+
+/* ── Pago de ciclo de tarjeta (con descuento de cuenta) ────────── */
+let _pagoCicloCtx = null;
+
+function abrirPagoCiclo(tarjetaId, periodo, total) {
+  const t = state.tarjetas.find(x => x.id === tarjetaId);
+  if (!t) return;
+  _pagoCicloCtx = { tarjetaId, periodo, total };
+  const [y, m] = periodo.split('-');
+  const mesLabel = `${_CICLO_MESES[parseInt(m, 10) - 1]} ${y}`;
+  document.getElementById('pc-subtitulo').textContent = `${t.nombre} · ${mesLabel}`;
+  document.getElementById('pc-monto').value = Math.round(total) || '';
+
+  // Poblar cuentas
+  const sel = document.getElementById('pc-cuenta');
+  const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+  sel.innerHTML = `<option value="">— No descontar (solo marcar pagado) —</option>` +
+    cuentas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)} · saldo ${FMT.format(calcularSaldoCuenta(c))}</option>`).join('');
+
+  document.getElementById('dlg-pago-ciclo')?.showModal();
+}
+
+async function confirmarPagoCiclo() {
+  if (!_pagoCicloCtx) return;
+  const { tarjetaId, periodo } = _pagoCicloCtx;
+  const t = state.tarjetas.find(x => x.id === tarjetaId);
+  if (!t) return;
+  const cuentaId = document.getElementById('pc-cuenta')?.value || '';
+  const monto = parseFloat(document.getElementById('pc-monto')?.value) || 0;
+
+  if (!t.ciclos_pagados) t.ciclos_pagados = [];
+  if (!t.ciclos_pagados.includes(periodo)) t.ciclos_pagados.push(periodo);
+  if (!t.ciclos_pagos) t.ciclos_pagos = {};
+
+  if (cuentaId && monto > 0) {
+    // Registrar el pago como movimiento que descuenta de la cuenta.
+    // es_pago_tarjeta lo excluye del análisis de gasto por categoría (no es un
+    // consumo nuevo, es la liquidación de la deuda ya registrada en la tarjeta).
+    const [y, m] = periodo.split('-');
+    const mesLabel = `${_CICLO_MESES[parseInt(m, 10) - 1]} ${y}`;
+    const g = {
+      id: uuid(),
+      fecha: new Date().toISOString().slice(0, 10),
+      monto, moneda: 'ARS',
+      descripcion: `Pago ${t.nombre} · ${mesLabel}`,
+      categoria: 'Pago tarjeta',
+      metodo_pago: 'transferencia',
+      tipo: 'unico',
+      cuenta_id: cuentaId,
+      tarjeta_id: null,
+      es_pago_tarjeta: true,
+      updated_at: Math.floor(Date.now() / 1000),
+    };
+    await DB.put('gastos', g);
+    t.ciclos_pagos[periodo] = { cuenta_id: cuentaId, gasto_id: g.id, monto, fecha: g.fecha };
+  } else {
+    t.ciclos_pagos[periodo] = { cuenta_id: null, monto, fecha: new Date().toISOString().slice(0, 10) };
+  }
+
+  await DB.put('tarjetas', t);
+  notificarCambioLocal();
+  document.getElementById('dlg-pago-ciclo')?.close();
+  toast(`✓ Pago registrado${cuentaId ? ' y descontado de la cuenta' : ''}`);
+  await reloadAll();
+  abrirDrawerTarjeta(tarjetaId);
+}
+
+async function marcarCicloPendiente(tarjetaId, periodo) {
+  const t = state.tarjetas.find(x => x.id === tarjetaId);
+  if (!t) return;
+  t.ciclos_pagados = (t.ciclos_pagados || []).filter(p => p !== periodo);
+  const info = t.ciclos_pagos?.[periodo];
+  if (info?.gasto_id) {
+    if (confirm('Este ciclo tenía un pago descontado de una cuenta.\n\n¿Eliminar también ese movimiento para revertir el descuento del saldo?')) {
+      await DB.softDelete('gastos', info.gasto_id);
+    }
+  }
+  if (t.ciclos_pagos) delete t.ciclos_pagos[periodo];
+  await DB.put('tarjetas', t);
+  notificarCambioLocal();
+  toast(`${periodo} marcado como pendiente`);
+  await reloadAll();
+  abrirDrawerTarjeta(tarjetaId);
 }
 
 /* ── FEATURE C: Plan de pago ──────────────────────────────────── */
@@ -5130,6 +5216,11 @@ async function init() {
     form.elements.desc_ley_19032.value          = (bruto * 0.03).toFixed(2);
     actualizarResumenRecibo();
   });
+
+  // ── Pago de ciclo de tarjeta ─────────────────────────────────
+  document.getElementById('pc-confirmar')?.addEventListener('click', () => confirmarPagoCiclo());
+  document.getElementById('pc-cancelar')?.addEventListener('click', () => document.getElementById('dlg-pago-ciclo')?.close());
+  document.getElementById('pc-close-x')?.addEventListener('click', () => document.getElementById('dlg-pago-ciclo')?.close());
 
   // ── Salud financiera (análisis IA completo) ──────────────────
   document.getElementById('salud-close-x')?.addEventListener('click', () => document.getElementById('dlg-salud')?.close());

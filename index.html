@@ -1585,6 +1585,45 @@
 </dialog>
 
 <!-- Meta -->
+<!-- ===== PAGO DE CICLO DE TARJETA ============================ -->
+<dialog id="dlg-pago-ciclo">
+  <div class="form-modern" style="min-width:min(94vw,460px);max-width:500px">
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--success),var(--brand))">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+          <path d="M6 15h4"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Registrar pago</h3>
+        <p class="text-xs" style="color:var(--ink-muted)" id="pc-subtitulo">—</p>
+      </div>
+      <button type="button" id="pc-close-x"
+        style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
+        title="Cerrar">✕</button>
+    </div>
+    <div class="form-modern-body">
+      <div class="form-section">
+        <label class="form-label">Total a pagar</label>
+        <div class="input-with-prefix"><span class="input-prefix">$</span>
+          <input type="number" id="pc-monto" class="input input-lg" step="0.01" placeholder="0" /></div>
+      </div>
+      <div class="form-section">
+        <label class="form-label">¿Descontar de una cuenta?</label>
+        <select id="pc-cuenta" class="input"></select>
+        <p class="text-[10px] mt-1" style="color:var(--ink-muted)">
+          Si elegís una cuenta, se registra un movimiento que descuenta el pago de su saldo. Si elegís "No descontar", solo se marca como pagado.
+        </p>
+      </div>
+    </div>
+    <div class="form-modern-footer">
+      <button type="button" id="pc-confirmar" class="btn-primary flex-1">✓ Confirmar pago</button>
+      <button type="button" id="pc-cancelar" class="btn-secondary flex-1">Cancelar</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="dlg-meta">
   <form method="dialog" class="form-modern" style="min-width:min(94vw,560px);max-width:600px">
     <input type="hidden" name="_editing_id" />
