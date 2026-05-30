@@ -5913,13 +5913,14 @@ function abrirImportResumen(tarjetaIdPreseleccionado) {
  * @param {string} tarjetaId
  */
 function _rsbRenderCotejo(resultado, tarjetaId) {
-  const { periodo, banco, movimientos, totalResumen } = resultado;
+  const { periodo, banco, movimientos, saldoTotal, pagoMinimo, fechaCierre, fechaVencimiento, totalConsumos } = resultado;
 
   // ── Cabecera ──────────────────────────────────────────────
   const headerEl = document.getElementById('rsb-resumen-header');
   const [anio, mes] = (periodo || '').split('-');
   const mesesNombres = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const periodoLabel = (anio && mes) ? `${mesesNombres[parseInt(mes,10)] || mes} ${anio}` : (periodo || '—');
+  const ddmm = (iso) => iso ? iso.split('-').reverse().join('/') : '—';
 
   const nExacto   = movimientos.filter(m => m.confianza === 'exacto').length;
   const nProbable = movimientos.filter(m => m.confianza === 'probable').length;
@@ -5927,17 +5928,22 @@ function _rsbRenderCotejo(resultado, tarjetaId) {
 
   headerEl.innerHTML = `
     <div class="rsb-resumen-kpi">
-      <span class="rsb-resumen-kpi-label">Período</span>
+      <span class="rsb-resumen-kpi-label">${escapeHtml(banco || 'Banco')} · Período</span>
       <span class="rsb-resumen-kpi-val">${escapeHtml(periodoLabel)}</span>
     </div>
     <div class="rsb-resumen-kpi">
-      <span class="rsb-resumen-kpi-label">Banco / Emisor</span>
-      <span class="rsb-resumen-kpi-val">${escapeHtml(banco || '—')}</span>
+      <span class="rsb-resumen-kpi-label">Cierre → Vencimiento</span>
+      <span class="rsb-resumen-kpi-val">${ddmm(fechaCierre)} → ${ddmm(fechaVencimiento)}</span>
     </div>
-    ${totalResumen ? `
+    ${saldoTotal ? `
     <div class="rsb-resumen-kpi">
-      <span class="rsb-resumen-kpi-label">Total resumen</span>
-      <span class="rsb-resumen-kpi-val brand">${FMT.format(totalResumen)}</span>
+      <span class="rsb-resumen-kpi-label">Saldo a pagar</span>
+      <span class="rsb-resumen-kpi-val brand">${FMT.format(saldoTotal)}</span>
+    </div>` : ''}
+    ${pagoMinimo ? `
+    <div class="rsb-resumen-kpi">
+      <span class="rsb-resumen-kpi-label">Pago mínimo</span>
+      <span class="rsb-resumen-kpi-val">${FMT.format(pagoMinimo)}</span>
     </div>` : ''}
     <div class="rsb-stats">
       <span class="rsb-stat-pill exacto">✓ ${nExacto} ya cargados</span>
@@ -5981,11 +5987,15 @@ function _rsbRenderCotejo(resultado, tarjetaId) {
       ? `<span class="rsb-mov-fecha" title="Match probable con: ${escapeHtml(mov.match.descripcion)}">↔ ${escapeHtml(mov.match.descripcion.slice(0,30))}</span>`
       : '';
 
+    const cuotaTag = mov.cuotasTotal
+      ? `<span class="rsb-mov-cuota" title="Compra en cuotas">cuota ${mov.cuotaActual}/${mov.cuotasTotal}</span>`
+      : '';
+
     return `
       <div class="rsb-mov-row" data-idx="${idx}" data-confianza="${mov.confianza}">
         ${checkHtml}
         <div class="rsb-mov-info">
-          <span class="rsb-mov-fecha">${escapeHtml(fechaFmt)}</span>
+          <span class="rsb-mov-fecha">${escapeHtml(fechaFmt)}${cuotaTag}</span>
           <span class="rsb-mov-desc" title="${escapeHtml(mov.descripcion)}">${escapeHtml(mov.descripcion)}</span>
           ${matchHint}
         </div>
@@ -6071,6 +6081,7 @@ function iniciarModuloResumenBancario() {
     let guardados = 0;
     try {
       for (const mov of seleccionados) {
+        const esCuota = !!mov.cuotasTotal;
         const g = {
           id: uuid(),
           fecha: mov.fecha,
@@ -6079,13 +6090,18 @@ function iniciarModuloResumenBancario() {
           descripcion: mov.descripcion,
           categoria: 'general',
           metodo_pago: 'credito',
-          tipo: 'unico',
+          tipo: esCuota ? 'cuotas' : 'unico',
           tarjeta_id: tarjetaId,
           updated_at: Math.floor(Date.now() / 1000),
         };
+        if (esCuota) {
+          g.cuotas_total = mov.cuotasTotal;
+          g.cuota_numero = mov.cuotaActual || 1;
+        }
         await DB.put('gastos', g);
         guardados++;
       }
+      notificarCambioLocal();
       await reloadAll();
       toast(`✓ ${guardados} gasto${guardados > 1 ? 's' : ''} cargado${guardados > 1 ? 's' : ''} correctamente`, 3000);
       document.getElementById('dlg-resumen-bancario')?.close();

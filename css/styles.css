@@ -3657,6 +3657,19 @@ body.view-analisis #main-widgets::before {
 .rsb-mov-badge.probable { background: rgba(255,184,0,.15); color: var(--warning); }
 .rsb-mov-badge.faltante { background: rgba(255,45,110,.15); color: var(--danger); }
 
+/* Tag de cuota dentro de la fecha del movimiento */
+.rsb-mov-cuota {
+  display: inline-block;
+  margin-left: .4rem;
+  font-size: .58rem;
+  padding: .05rem .35rem;
+  border-radius: 999px;
+  background: rgba(181,55,255,.18);
+  color: var(--neon-purple, #b537ff);
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+
 /* Placeholder de lista vacía */
 .rsb-empty {
   text-align: center;
