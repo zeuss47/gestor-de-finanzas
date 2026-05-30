@@ -657,12 +657,28 @@ dialog {
   inset: 0;
   padding: 0;
 }
-/* Dialogs que contienen un formulario "moderno" toman el ancho del form
-   interno (que define su propio min-width/max-width) en lugar del default
-   de 420px. Sin esto los forms anchos quedan recortados a la derecha. */
+/* Dialogs que contienen un formulario "moderno" se ajustan al ancho REAL
+   del form interno (que define su propio min/max-width) en lugar del
+   default de 420px. `width: auto` los expandía al viewport; `fit-content`
+   los hace tomar el ancho del contenido. */
 dialog:has(.form-modern) {
-  width: auto;
-  max-width: 96vw;
+  width: fit-content;
+  max-width: min(96vw, 780px);
+  min-width: min(94vw, 360px);
+}
+
+/* En mobile angosto, los grids de 2 columnas dentro de form-modern se
+   colapsan a 1 columna para que los inputs no queden truncados. */
+@media (max-width: 640px) {
+  .form-modern .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+  /* Alinear el ancho del form interno al del dialog padre para evitar
+     overflow horizontal de 2px por estilos inline `min-width:96vw`. */
+  .form-modern {
+    min-width: min(94vw, 720px) !important;
+    max-width: 94vw !important;
+  }
 }
 dialog::backdrop {
   background: rgba(0,0,0,.65);
