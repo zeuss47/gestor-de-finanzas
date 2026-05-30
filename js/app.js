@@ -2963,9 +2963,11 @@ function bindDrawerTarjetaHandlers() {
 
 const WIDGET_META = {
   estado_global:      { icon: '💰', titulo: 'Estado global',          filtra: 'todos' },
+  sueldo:             { icon: '💼', titulo: 'Sueldo y aguinaldo',      filtra: 'todos' },
   cuentas:            { icon: '🏦', titulo: 'Cuentas bancarias',      filtra: 'todos' },
   tarjetas:           { icon: '💳', titulo: 'Tarjetas de crédito',    filtra: 'tarjeta' },
   simulacion_credito: { icon: '📊', titulo: 'Capacidad crediticia',   filtra: 'tarjeta' },
+  prediccion:         { icon: '🔮', titulo: 'Predicción de gasto',     filtra: 'todos' },
   ia_local:           { icon: '🧠', titulo: 'Análisis IA',             filtra: 'todos' },
   metas:              { icon: '🎯', titulo: 'Metas de ahorro',         filtra: 'metas' },
   grafico:            { icon: '📈', titulo: 'Evolución 6 meses',       filtra: 'todos' },
@@ -3548,6 +3550,531 @@ function _hdRenderChart() {
   });
 }
 
+/* ============================================================
+   RENDERERS ESPECÍFICOS POR WIDGET
+   Cada renderer recibe (dlg) y configura header/KPIs/chart/lista
+   según el tipo de dato del widget. Si no hay renderer custom,
+   el código cae al flujo genérico (movimientos filtrados).
+   ============================================================ */
+
+function _hdSetKPIs(items) {
+  // items: [{ label, value, color }] hasta 3
+  const labels = ['hd-kpi-total', 'hd-kpi-count', 'hd-kpi-avg'];
+  for (let i = 0; i < labels.length; i++) {
+    const el = document.getElementById(labels[i]);
+    if (!el) continue;
+    const lblEl = el.previousElementSibling;
+    const it = items[i];
+    if (it) {
+      el.textContent = it.value;
+      el.style.color = it.color || 'var(--ink)';
+      if (lblEl) lblEl.textContent = it.label;
+    } else {
+      el.textContent = '—';
+      el.style.color = 'var(--ink-muted)';
+      if (lblEl) lblEl.textContent = '';
+    }
+  }
+}
+
+function _hdRenderChartCustom({ labels, datasets }) {
+  const canvas = document.getElementById('hd-chart');
+  if (!canvas) return;
+  if (_hdState.chart) { try { _hdState.chart.destroy(); } catch {} }
+  const statsEl = document.getElementById('hd-chart-stats');
+  if (statsEl) statsEl.innerHTML = '';
+  const ctx = canvas.getContext('2d');
+  _hdState.chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: datasets.length > 1, labels: { color: 'var(--ink)', boxWidth: 10 } } },
+      scales: {
+        x: { ticks: { color: 'var(--ink-muted)' }, grid: { display: false } },
+        y: { ticks: { color: 'var(--ink-muted)', callback: (v) => Math.abs(v)>=1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(127,127,127,.1)' } },
+      },
+    },
+  });
+}
+
+function _hdSetEmpty(msg) {
+  const list  = document.getElementById('hd-list');
+  const empty = document.getElementById('hd-empty');
+  if (list)  list.innerHTML = '';
+  if (empty) {
+    empty.classList.remove('hidden');
+    const txt = empty.querySelector('p') || empty;
+    txt.textContent = msg;
+  }
+}
+
+const _widgetRenderers = {
+
+  // ── SUELDO: lista de recibos (ingresos) + evolución del neto ────
+  sueldo: () => {
+    const items = (state.ingresos || []).filter(i => !i.deleted).sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+    const totalNeto = items.reduce((a,i) => a + ((i.sueldo_neto||0) + (i.bonos||0)), 0);
+    const promedio  = items.length ? totalNeto / items.length : 0;
+    _hdSetKPIs([
+      { label: 'Total acumulado', value: FMT.format(totalNeto), color: 'var(--success)' },
+      { label: 'Recibos',         value: String(items.length) },
+      { label: 'Promedio',        value: FMT.format(promedio) },
+    ]);
+    // Chart: evolución del neto por recibo
+    const sorted = [...items].reverse();
+    const labels = sorted.map(i => i.periodo_aplicacion || i.fecha || '');
+    const data   = sorted.map(i => Math.round((i.sueldo_neto||0) + (i.bonos||0)));
+    _hdRenderChartCustom({
+      labels,
+      datasets: [{
+        label: 'Neto cobrado', data, borderColor: '#00ff9f',
+        backgroundColor: 'rgba(0,255,159,.15)', tension: .3, fill: true,
+      }],
+    });
+    // Lista
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!items.length) return _hdSetEmpty('No hay recibos cargados todavía');
+    document.getElementById('hd-empty').classList.add('hidden');
+    for (const i of items) {
+      const neto = (i.sueldo_neto||0) + (i.bonos||0);
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">💼</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(i.descripcion || 'Sueldo')}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${i.fecha || '—'} · período ${i.periodo_aplicacion || '—'}</p>
+          </div>
+          <span class="hd-item-monto" style="color:var(--success)">+${FMT.format(neto)}</span>
+        </div>`);
+    }
+  },
+
+  // ── CUENTAS: lista de cuentas con saldo y gráfico de saldos ─────
+  cuentas: () => {
+    const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+    const saldoCuenta = (c) => {
+      const ingresoCuenta = (state.ingresos || []).filter(i => !i.deleted && i.cuenta_id === c.id).reduce((a,i) => a + ((i.sueldo_neto||0)+(i.bonos||0)), 0);
+      const gastoCuenta   = (state.gastos   || []).filter(g => !g.deleted && g.cuenta_id === c.id).reduce((a,g) => a + (g.monto||0), 0);
+      return (c.saldo_inicial || 0) + ingresoCuenta - gastoCuenta;
+    };
+    const saldoTotal = cuentas.reduce((a,c) => a + saldoCuenta(c), 0);
+    _hdSetKPIs([
+      { label: 'Saldo total', value: FMT.format(saldoTotal), color: saldoTotal>=0?'var(--success)':'var(--danger)' },
+      { label: 'Cuentas',     value: String(cuentas.length) },
+      { label: 'Promedio',    value: FMT.format(cuentas.length ? saldoTotal/cuentas.length : 0) },
+    ]);
+    _hdRenderChartCustom({
+      labels: cuentas.map(c => c.nombre || 'Cuenta'),
+      datasets: [{
+        label: 'Saldo', data: cuentas.map(c => Math.round(saldoCuenta(c))),
+        borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.2)',
+        tension: 0, fill: true,
+      }],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!cuentas.length) return _hdSetEmpty('No tenés cuentas configuradas');
+    document.getElementById('hd-empty').classList.add('hidden');
+    const TIPOS = { ahorro:'🏦', sueldo:'💼', conjunta:'👥', inversion:'📈', cripto:'₿' };
+    for (const c of cuentas) {
+      const s = saldoCuenta(c);
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon" style="background:${c.color||'#3b82f6'}33;color:${c.color||'#3b82f6'}">${TIPOS[c.tipo]||'🏦'}</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(c.nombre)}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${c.tipo||'cuenta'} · inicial ${FMT.format(c.saldo_inicial||0)}</p>
+          </div>
+          <span class="hd-item-monto" style="color:${s>=0?'var(--success)':'var(--danger)'}">${FMT.format(s)}</span>
+        </div>`);
+    }
+  },
+
+  // ── TARJETAS: consumos por tarjeta + chart por tarjeta ──────────
+  tarjetas: () => {
+    const tarjetas = (state.tarjetas || []).filter(t => !t.deleted && t.activa !== false);
+    const consumoPorTarjeta = (t) =>
+      (state.gastos || []).filter(g => !g.deleted && g.tarjeta_id === t.id).reduce((a,g) => a + (g.monto||0), 0);
+    const totalConsumido = tarjetas.reduce((a,t) => a + consumoPorTarjeta(t), 0);
+    const totalLimite    = tarjetas.reduce((a,t) => a + (t.limite_credito || 0), 0);
+    _hdSetKPIs([
+      { label: 'Total consumido', value: FMT.format(totalConsumido), color: 'var(--danger)' },
+      { label: 'Tarjetas',        value: String(tarjetas.length) },
+      { label: 'Límite total',    value: FMT.format(totalLimite), color: 'var(--brand)' },
+    ]);
+    _hdRenderChartCustom({
+      labels: tarjetas.map(t => t.nombre || 'Tarjeta'),
+      datasets: [
+        { label: 'Consumido', data: tarjetas.map(t => Math.round(consumoPorTarjeta(t))),
+          borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.2)', tension: 0, fill: true },
+        { label: 'Límite',    data: tarjetas.map(t => Math.round(t.limite_credito||0)),
+          borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.05)', tension: 0, fill: false, borderDash:[5,5] },
+      ],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!tarjetas.length) return _hdSetEmpty('No tenés tarjetas configuradas');
+    document.getElementById('hd-empty').classList.add('hidden');
+    for (const t of tarjetas) {
+      const cons = consumoPorTarjeta(t);
+      const pct  = t.limite_credito ? Math.round((cons / t.limite_credito) * 100) : 0;
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon" style="background:${t.color||'#3b82f6'}33;color:${t.color||'#3b82f6'}">💳</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(t.nombre)}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${pct}% usado · cierre día ${t.dia_cierre || '—'}</p>
+          </div>
+          <span class="hd-item-monto" style="color:var(--danger)">${FMT.format(cons)}</span>
+        </div>`);
+    }
+  },
+
+  // ── METAS: progreso de cada meta ────────────────────────────────
+  metas: () => {
+    const metas = (state.metas || []).filter(m => !m.deleted);
+    const totalObjetivo = metas.reduce((a,m) => a + (m.monto_objetivo || 0), 0);
+    const totalAhorrado = metas.reduce((a,m) => a + (m.monto_actual || 0), 0);
+    const pctGlobal     = totalObjetivo ? Math.round((totalAhorrado / totalObjetivo) * 100) : 0;
+    _hdSetKPIs([
+      { label: 'Ahorrado',  value: FMT.format(totalAhorrado), color: 'var(--success)' },
+      { label: 'Objetivo',  value: FMT.format(totalObjetivo), color: 'var(--brand)' },
+      { label: 'Progreso',  value: `${pctGlobal}%`,           color: 'var(--success)' },
+    ]);
+    _hdRenderChartCustom({
+      labels: metas.map(m => m.nombre || 'Meta'),
+      datasets: [
+        { label: 'Ahorrado', data: metas.map(m => Math.round(m.monto_actual||0)),
+          borderColor: '#00ff9f', backgroundColor: 'rgba(0,255,159,.25)', tension: 0, fill: true },
+        { label: 'Objetivo', data: metas.map(m => Math.round(m.monto_objetivo||0)),
+          borderColor: '#b537ff', backgroundColor: 'rgba(181,55,255,.05)', tension: 0, fill: false, borderDash:[5,5] },
+      ],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!metas.length) return _hdSetEmpty('No tenés metas cargadas');
+    document.getElementById('hd-empty').classList.add('hidden');
+    for (const m of metas) {
+      const pct = m.monto_objetivo ? Math.min(100, Math.round((m.monto_actual||0)/m.monto_objetivo*100)) : 0;
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">🎯</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(m.nombre || 'Meta')}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${FMT.format(m.monto_actual||0)} / ${FMT.format(m.monto_objetivo||0)} · prioridad ${m.prioridad||'—'}</p>
+          </div>
+          <span class="hd-item-monto" style="color:var(--success)">${pct}%</span>
+        </div>`);
+    }
+  },
+
+  // ── CATEGORIAS: top categorías del período ──────────────────────
+  categorias: () => {
+    const ahora = new Date();
+    const desde = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const gastos = (state.gastos || []).filter(g => !g.deleted && g.fecha && new Date(g.fecha+'T12:00:00') >= desde);
+    const porCat = new Map();
+    for (const g of gastos) {
+      const k = g.categoria || 'general';
+      porCat.set(k, (porCat.get(k) || 0) + (g.monto || 0));
+    }
+    const sorted = [...porCat.entries()].sort((a,b) => b[1] - a[1]);
+    const total = sorted.reduce((a,[,v]) => a + v, 0);
+    _hdSetKPIs([
+      { label: 'Total mes',  value: FMT.format(total), color: 'var(--danger)' },
+      { label: 'Categorías', value: String(sorted.length) },
+      { label: 'Top cat',    value: sorted[0] ? sorted[0][0] : '—' },
+    ]);
+    _hdRenderChartCustom({
+      labels: sorted.slice(0, 10).map(([k]) => k),
+      datasets: [{
+        label: 'Gastado este mes', data: sorted.slice(0, 10).map(([,v]) => Math.round(v)),
+        borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.2)', tension: 0, fill: true,
+      }],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!sorted.length) return _hdSetEmpty('No hay gastos este mes');
+    document.getElementById('hd-empty').classList.add('hidden');
+    for (const [cat, monto] of sorted) {
+      const pct = total ? Math.round((monto/total)*100) : 0;
+      const icon = CAT_ICON_HD[cat] || '📌';
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">${icon}</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(cat)}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${pct}% del total</p>
+          </div>
+          <span class="hd-item-monto" style="color:var(--danger)">${FMT.format(monto)}</span>
+        </div>`);
+    }
+  },
+
+  // ── TIPO DE CAMBIO: cotizaciones actuales + última actualización ─
+  tipo_cambio: () => {
+    const cot = state.ajustes?.tipos_cambio || {};
+    const filas = Object.entries(cot).map(([key, c]) => ({
+      moneda: key,
+      nombre: c.nombre || key,
+      simbolo: c.simbolo || '',
+      compra: Number(c.compra || c.valor || 0),
+      venta:  Number(c.venta  || c.valor || 0),
+      manual: !!c.manual,
+      fecha_api: c.fecha_api,
+    })).filter(f => f.venta > 0 || f.compra > 0);
+
+    const usd = filas.find(f => f.moneda === 'USD');
+    const eur = filas.find(f => f.moneda === 'EUR');
+    _hdSetKPIs([
+      { label: 'USD venta', value: usd ? FMT.format(usd.venta) : '—', color: 'var(--success)' },
+      { label: 'EUR venta', value: eur ? FMT.format(eur.venta) : '—', color: 'var(--brand)' },
+      { label: 'Monedas',   value: String(filas.length) },
+    ]);
+    _hdRenderChartCustom({
+      labels: filas.map(f => f.moneda),
+      datasets: [
+        { label: 'Compra', data: filas.map(f => f.compra),
+          borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.15)', tension: 0, fill: true },
+        { label: 'Venta',  data: filas.map(f => f.venta),
+          borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.15)', tension: 0, fill: true },
+      ],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!filas.length) return _hdSetEmpty('Sin cotizaciones cargadas. Tocá el botón de actualizar en el widget.');
+    document.getElementById('hd-empty').classList.add('hidden');
+    for (const f of filas) {
+      const spread = f.compra ? (((f.venta - f.compra) / f.compra) * 100).toFixed(1) : '0';
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">💱</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(f.nombre)} (${f.moneda})${f.manual ? ' ✏' : ''}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">compra ${FMT.format(f.compra)} · spread ${spread}%${f.fecha_api ? ' · ' + new Date(f.fecha_api).toLocaleDateString('es-AR') : ''}</p>
+          </div>
+          <span class="hd-item-monto" style="color:var(--danger)">${FMT.format(f.venta)}</span>
+        </div>`);
+    }
+  },
+
+  // ── IA LOCAL: diagnósticos detectados ───────────────────────────
+  ia_local: () => {
+    const diag = state.diagnosticos || [];
+    const altas = diag.filter(d => d.nivel === 'alto' || d.severidad === 'alta').length;
+    _hdSetKPIs([
+      { label: 'Alertas',   value: String(diag.length) },
+      { label: 'Críticas',  value: String(altas), color: 'var(--danger)' },
+      { label: 'Sensibilidad', value: state.ajustes?.ia?.sensibilidad || 'moderado' },
+    ]);
+    // Chart: alertas por categoría
+    const porCat = new Map();
+    for (const d of diag) {
+      const k = d.categoria || d.tipo || 'general';
+      porCat.set(k, (porCat.get(k) || 0) + 1);
+    }
+    const arr = [...porCat.entries()];
+    _hdRenderChartCustom({
+      labels: arr.map(([k]) => k),
+      datasets: [{
+        label: 'Alertas por tipo', data: arr.map(([,v]) => v),
+        borderColor: '#b537ff', backgroundColor: 'rgba(181,55,255,.2)', tension: 0, fill: true,
+      }],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!diag.length) return _hdSetEmpty('Sin alertas. La IA no detectó patrones inusuales.');
+    document.getElementById('hd-empty').classList.add('hidden');
+    for (const d of diag) {
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">🧠</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(d.titulo || d.mensaje || 'Alerta IA')}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${escapeHtml(d.descripcion || d.detalle || '')}</p>
+          </div>
+          <span class="hd-item-monto" style="color:${d.nivel === 'alto' ? 'var(--danger)' : 'var(--warning)'}">${escapeHtml(d.nivel || 'info')}</span>
+        </div>`);
+    }
+  },
+
+  // ── SIMULACIÓN CRÉDITO: capacidad de endeudamiento ──────────────
+  simulacion_credito: () => {
+    const ingresos = (state.ingresos || []).filter(i => !i.deleted);
+    const ingresoMes = ingresos.length ? ingresos.reduce((a,i) => a + ((i.sueldo_neto||0)+(i.bonos||0)), 0) / Math.max(1, ingresos.length) : 0;
+    const capacidadMax = ingresoMes * 0.3;
+    const cuotasActuales = (state.gastos || []).filter(g => !g.deleted && g.tipo === 'cuotas').reduce((a,g) => a + ((g.monto||0) / (g.cuotas_total || 1)), 0);
+    const disponible = capacidadMax - cuotasActuales;
+    const pctUsado = capacidadMax ? Math.round((cuotasActuales / capacidadMax) * 100) : 0;
+    _hdSetKPIs([
+      { label: 'Disponible',  value: FMT.format(disponible), color: disponible>0?'var(--success)':'var(--danger)' },
+      { label: 'Cap. máxima', value: FMT.format(capacidadMax), color: 'var(--brand)' },
+      { label: 'Usado',       value: `${pctUsado}%`, color: pctUsado>70?'var(--danger)':'var(--warning)' },
+    ]);
+    _hdRenderChartCustom({
+      labels: ['Disponible', 'Usado en cuotas'],
+      datasets: [{
+        label: 'Distribución capacidad', data: [Math.max(0,Math.round(disponible)), Math.round(cuotasActuales)],
+        borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.25)', tension: 0, fill: true,
+      }],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    const cuotas = (state.gastos || []).filter(g => !g.deleted && g.tipo === 'cuotas');
+    if (!cuotas.length) return _hdSetEmpty('No tenés cuotas activas. Tu capacidad está libre.');
+    document.getElementById('hd-empty').classList.add('hidden');
+    for (const g of cuotas) {
+      const cuota = (g.monto||0) / (g.cuotas_total || 1);
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">💳</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(g.descripcion || 'Cuota')}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${g.cuotas_total} cuotas de ${FMT.format(cuota)} · total ${FMT.format(g.monto||0)}</p>
+          </div>
+          <span class="hd-item-monto" style="color:var(--warning)">${FMT.format(cuota)}/mes</span>
+        </div>`);
+    }
+  },
+
+  // ── PREDICCIÓN: proyección del mes en curso ─────────────────────
+  prediccion: () => {
+    const ahora = new Date();
+    const desde = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const hasta = new Date(ahora.getFullYear(), ahora.getMonth()+1, 0);
+    const gastosMes = (state.gastos || []).filter(g => !g.deleted && g.fecha && new Date(g.fecha+'T12:00:00') >= desde && new Date(g.fecha+'T12:00:00') <= hasta);
+    const totalParcial = gastosMes.reduce((a,g) => a + (g.monto||0), 0);
+    const diasTranscurridos = Math.max(1, ahora.getDate());
+    const diasTotales       = hasta.getDate();
+    const proyeccion = (totalParcial / diasTranscurridos) * diasTotales;
+    const ritmo      = totalParcial / diasTranscurridos;
+    _hdSetKPIs([
+      { label: 'Gasto al cierre', value: FMT.format(proyeccion), color: 'var(--danger)' },
+      { label: 'Parcial al día',  value: FMT.format(totalParcial), color: 'var(--warning)' },
+      { label: 'Ritmo diario',    value: FMT.format(ritmo) },
+    ]);
+    // Chart: gasto acumulado real + proyección lineal
+    const acumulado = [];
+    let acum = 0;
+    for (let d = 1; d <= diasTotales; d++) {
+      const isoDia = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const delDia = gastosMes.filter(g => g.fecha === isoDia).reduce((a,g) => a + (g.monto||0), 0);
+      acum += delDia;
+      acumulado.push(d <= diasTranscurridos ? Math.round(acum) : null);
+    }
+    const proyArr = Array(diasTotales).fill(null).map((_, i) => Math.round(((i+1) / diasTotales) * proyeccion));
+    _hdRenderChartCustom({
+      labels: Array(diasTotales).fill(0).map((_, i) => String(i+1)),
+      datasets: [
+        { label: 'Real',       data: acumulado, borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.2)', tension: .3, fill: true },
+        { label: 'Proyectado', data: proyArr,   borderColor: '#b537ff', backgroundColor: 'transparent', borderDash:[5,5], tension: .3, fill: false },
+      ],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!gastosMes.length) return _hdSetEmpty('Sin gastos este mes para proyectar');
+    document.getElementById('hd-empty').classList.add('hidden');
+    // Ordenar por fecha desc y mostrar los del mes
+    gastosMes.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+    for (const g of gastosMes.slice(0, 30)) {
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">${CAT_ICON_HD[g.categoria]||'📌'}</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">(${escapeHtml(g.categoria||'general')}) - ${escapeHtml(g.descripcion||'Gasto')}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">${g.fecha}</p>
+          </div>
+          <span class="hd-item-monto" style="color:var(--danger)">${FMT.format(g.monto||0)}</span>
+        </div>`);
+    }
+  },
+
+  // ── CALCULADORA: info de uso (no tiene historial transaccional) ─
+  calculadora: () => {
+    _hdSetKPIs([
+      { label: 'Tipo',      value: 'Herramienta' },
+      { label: 'Operación', value: 'Conversión' },
+      { label: 'Estado',    value: 'Activa', color: 'var(--success)' },
+    ]);
+    _hdRenderChartCustom({ labels: [], datasets: [] });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    document.getElementById('hd-empty').classList.add('hidden');
+    list.innerHTML = `
+      <div class="hd-item"><div class="hd-item-info">
+        <p class="text-sm font-semibold" style="color:var(--ink)">¿Cómo usar la calculadora?</p>
+        <p class="text-[10px]" style="color:var(--ink-muted)">Ingresá un monto en cualquier moneda (ARS/USD/EUR/BRL) y obtené la conversión automática usando las cotizaciones actuales.</p>
+      </div></div>
+      <div class="hd-item"><div class="hd-item-info">
+        <p class="text-sm font-semibold" style="color:var(--ink)">Fuente de cotizaciones</p>
+        <p class="text-[10px]" style="color:var(--ink-muted)">Usa los valores del widget Tipo de cambio. Refrescá ese widget para actualizar.</p>
+      </div></div>`;
+  },
+
+  // ── COMPARADOR: este mes vs anterior ────────────────────────────
+  comparador: () => {
+    const ahora = new Date();
+    const esteMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const findMes = new Date(ahora.getFullYear(), ahora.getMonth()+1, 0);
+    const antMes  = new Date(ahora.getFullYear(), ahora.getMonth()-1, 1);
+    const antFin  = new Date(ahora.getFullYear(), ahora.getMonth(), 0);
+
+    const gastosEnRango = (from, to) => (state.gastos || []).filter(g => !g.deleted && g.fecha && new Date(g.fecha+'T12:00:00') >= from && new Date(g.fecha+'T12:00:00') <= to);
+    const ge = gastosEnRango(esteMes, findMes).reduce((a,g) => a + (g.monto||0), 0);
+    const ga = gastosEnRango(antMes, antFin).reduce((a,g) => a + (g.monto||0), 0);
+    const delta = ge - ga;
+    const pct = ga ? Math.round((delta/ga)*100) : 0;
+    _hdSetKPIs([
+      { label: 'Este mes',  value: FMT.format(ge), color: 'var(--danger)' },
+      { label: 'Anterior',  value: FMT.format(ga) },
+      { label: 'Variación', value: `${pct>=0?'+':''}${pct}%`, color: pct>=0?'var(--danger)':'var(--success)' },
+    ]);
+    // Por categoría comparado
+    const catSet = new Set();
+    const porCat = (gastos) => {
+      const m = new Map();
+      for (const g of gastos) {
+        const k = g.categoria || 'general';
+        m.set(k, (m.get(k)||0) + (g.monto||0));
+        catSet.add(k);
+      }
+      return m;
+    };
+    const eM = porCat(gastosEnRango(esteMes, findMes));
+    const aM = porCat(gastosEnRango(antMes, antFin));
+    const cats = [...catSet];
+    _hdRenderChartCustom({
+      labels: cats,
+      datasets: [
+        { label: 'Mes anterior', data: cats.map(c => Math.round(aM.get(c)||0)),
+          borderColor: '#7a9bc2', backgroundColor: 'rgba(122,155,194,.2)', tension: 0, fill: true },
+        { label: 'Este mes',     data: cats.map(c => Math.round(eM.get(c)||0)),
+          borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.2)', tension: 0, fill: true },
+      ],
+    });
+    const list = document.getElementById('hd-list');
+    list.innerHTML = '';
+    if (!cats.length) return _hdSetEmpty('No hay datos para comparar todavía');
+    document.getElementById('hd-empty').classList.add('hidden');
+    for (const c of cats.sort((a,b) => (eM.get(b)||0) - (eM.get(a)||0))) {
+      const ev = eM.get(c)||0; const av = aM.get(c)||0;
+      const dlt = ev - av;
+      const icon = CAT_ICON_HD[c] || '📌';
+      list.insertAdjacentHTML('beforeend', `
+        <div class="hd-item">
+          <span class="hd-item-icon">${icon}</span>
+          <div class="hd-item-info">
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(c)}</p>
+            <p class="text-[10px]" style="color:var(--ink-muted)">ant ${FMT.format(av)} → ahora ${FMT.format(ev)}</p>
+          </div>
+          <span class="hd-item-monto" style="color:${dlt>=0?'var(--danger)':'var(--success)'}">${dlt>=0?'+':''}${FMT.format(dlt)}</span>
+        </div>`);
+    }
+  },
+};
+
 function abrirHistorialWidget(widgetId) {
   const dlg = document.getElementById('dlg-widget-history');
   if (!dlg) return;
@@ -3603,9 +4130,23 @@ function abrirHistorialWidget(widgetId) {
   const sortEl = document.getElementById('hd-sort');
   if (sortEl) sortEl.value = 'fecha-desc';
 
-  // Render
-  _hdRenderItems();
-  _hdRenderChart();
+  // Dispatch: si hay renderer específico para este widget, lo usamos.
+  // Si no, cae al renderizado genérico de movimientos filtrados (estado_global,
+  // grafico, resumen_anual, flujo_mensual usan el genérico que ya funciona).
+  if (_widgetRenderers[widgetId]) {
+    // Para renderers custom, ocultamos filtros que no aplican
+    const filtros2 = document.querySelector('.widget-drawer-filters');
+    if (filtros2) filtros2.style.display = 'none';
+    try { _widgetRenderers[widgetId](); }
+    catch (e) {
+      console.error('[historial widget] renderer custom falló para', widgetId, e);
+      _hdRenderItems();
+      _hdRenderChart();
+    }
+  } else {
+    _hdRenderItems();
+    _hdRenderChart();
+  }
 
   dlg.showModal();
 }
