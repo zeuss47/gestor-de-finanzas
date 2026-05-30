@@ -57,24 +57,36 @@ export function mergePorTimestamp(locales, remotos) {
 }
 
 /* ---------- HTTP helper ---------- */
+const GH_TIMEOUT_MS = 12_000;
 async function gh(method, url, cfg, body) {
   const headers = {
     'Authorization': `token ${cfg.pat}`,
     'Accept': 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
   };
-  const opts = { method, headers };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), GH_TIMEOUT_MS);
+  const opts = { method, headers, signal: ctrl.signal };
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
-  const r = await fetch(url, opts);
-  if (r.status === 404) return null;
-  if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`GitHub ${method} ${url} -> ${r.status}: ${txt}`);
+  try {
+    const r = await fetch(url, opts);
+    if (r.status === 404) return null;
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error(`GitHub ${method} ${url} -> ${r.status}: ${txt}`);
+    }
+    return r.json();
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error(`GitHub ${method} ${url} -> timeout (${GH_TIMEOUT_MS}ms)`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return r.json();
 }
 
 function urlArchivo(cfg, archivo) {
@@ -203,28 +215,39 @@ export async function syncAll(cfg, { onProgress } = {}) {
   }
 
   const resultados = {};
-  for (const [store, archivo] of Object.entries(ARCHIVOS)) {
-    onProgress?.(`Pull ${archivo}…`);
-    const { items: remotos, sha } = await pullArchivo(cfg, archivo);
-    const locales = await DB.all(store);
-    const merged = mergePorTimestamp(locales, remotos);
+  let exito = false;
+  try {
+    for (const [store, archivo] of Object.entries(ARCHIVOS)) {
+      onProgress?.(`Pull ${archivo}…`);
+      const { items: remotos, sha } = await pullArchivo(cfg, archivo);
+      const locales = await DB.all(store);
+      const merged = mergePorTimestamp(locales, remotos);
 
-    // Persistimos el merge en local
-    onProgress?.(`Merge ${archivo}…`);
-    await DB.clear(store);
-    if (merged.length) await DB.bulkPut(store, merged);
+      // Persistimos el merge en local
+      onProgress?.(`Merge ${archivo}…`);
+      await DB.clear(store);
+      if (merged.length) await DB.bulkPut(store, merged);
 
-    // Subir SIEMPRE que detectemos diferencias (más simple y robusto que
-    // calcular hashes; el merge ya es idempotente).
-    onProgress?.(`Push ${archivo}…`);
-    const nuevoSha = await _pushIdempotente(
-      cfg, archivo, merged, `sync(${archivo}) ${merged.length} items`, 5, sha
-    );
-    resultados[archivo] = { count: merged.length, sha: nuevoSha };
+      // Subir SIEMPRE que detectemos diferencias (más simple y robusto que
+      // calcular hashes; el merge ya es idempotente).
+      onProgress?.(`Push ${archivo}…`);
+      const nuevoSha = await _pushIdempotente(
+        cfg, archivo, merged, `sync(${archivo}) ${merged.length} items`, 5, sha
+      );
+      resultados[archivo] = { count: merged.length, sha: nuevoSha };
+    }
+    exito = true;
+  } finally {
+    // Actualizar last_pull_ts SI Y SOLO SI completamos todos los archivos.
+    // Si falló a mitad, dejamos el last_pull_ts viejo para que el próximo
+    // sync re-detecte el reset remoto y vacíe locales otra vez.
+    if (exito) {
+      const ahora = Math.floor(Date.now() / 1000);
+      await setState({ last_sync_ts: ahora, last_pull_ts: ahora, last_ok: true });
+    } else {
+      await setState({ last_ok: false });
+    }
   }
-
-  const ahora = Math.floor(Date.now() / 1000);
-  await setState({ last_sync_ts: ahora, last_pull_ts: ahora, last_ok: true });
   return resultados;
 }
 
@@ -438,6 +461,10 @@ export function stopAutoSync() {
   _autoSyncState.timer = null;
   _autoSyncState.pendingPush = null;
   _autoSyncState.inflightPromise = null;
+  // Anular cfg para que programarPush() no programe nuevos pushes después del stop.
+  // Esto es defensivo: durante un reset, evita que un sync residual escriba al repo
+  // entre stopAutoSync() y location.reload().
+  _autoSyncState.cfg = null;
 }
 
 /**

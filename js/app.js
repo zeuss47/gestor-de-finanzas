@@ -58,9 +58,9 @@ function actualizarVersionUI() {
   const v = state.version;
   if (!v) return;
 
-  // Versión corta: 1.0.1 → 1.1, 1.2.3 → 1.2 (solo mayor.menor)
-  const partes = v.version.split('.');
-  const corto = partes.length >= 2 ? `${partes[0]}.${partes[1]}` : v.version;
+  // Versión corta: tomamos como mucho 2 segmentos (mayor.menor).
+  // Soporta formatos: "1" → "1", "1.2" → "1.2", "1.2.3" → "1.2".
+  const corto = String(v.version || '').split('.').slice(0, 2).join('.') || '0';
 
   // Sidebar
   const sbVer = document.getElementById('sb-version');
@@ -3867,7 +3867,7 @@ const _widgetRenderers = {
     _hdSetKPIs([
       { label: 'Alertas',   value: String(diag.length) },
       { label: 'Críticas',  value: String(altas), color: 'var(--danger)' },
-      { label: 'Sensibilidad', value: state.ajustes?.ia?.sensibilidad || 'moderado' },
+      { label: 'Sensibilidad', value: state.ajustes?.sensibilidad_ia || 'moderado' },
     ]);
     // Chart: alertas por categoría
     const porCat = new Map();
@@ -3931,7 +3931,7 @@ const _widgetRenderers = {
         <div class="hd-item">
           <span class="hd-item-icon">💳</span>
           <div class="hd-item-info">
-            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(g.descripcion || 'Cuota')}</p>
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">(${escapeHtml(g.categoria || 'general')}) - ${escapeHtml(g.descripcion || 'Cuota')}</p>
             <p class="text-[10px]" style="color:var(--ink-muted)">${g.cuotas_total} cuotas de ${FMT.format(cuota)} · total ${FMT.format(g.monto||0)}</p>
           </div>
           <span class="hd-item-monto" style="color:var(--warning)">${FMT.format(cuota)}/mes</span>
@@ -4134,12 +4134,16 @@ function abrirHistorialWidget(widgetId) {
   // Si no, cae al renderizado genérico de movimientos filtrados (estado_global,
   // grafico, resumen_anual, flujo_mensual usan el genérico que ya funciona).
   if (_widgetRenderers[widgetId]) {
-    // Para renderers custom, ocultamos filtros que no aplican
+    // Para renderers custom, ocultamos filtros que no aplican.
+    // Se restauran arriba (línea ~3556) cada vez que se reabre el drawer,
+    // así que aunque cierres con filtros ocultos, la próxima apertura los repone.
     const filtros2 = document.querySelector('.widget-drawer-filters');
     if (filtros2) filtros2.style.display = 'none';
     try { _widgetRenderers[widgetId](); }
     catch (e) {
       console.error('[historial widget] renderer custom falló para', widgetId, e);
+      // Restaurar filtros si el renderer custom falla, para que el fallback los use
+      if (filtros2) filtros2.style.display = '';
       _hdRenderItems();
       _hdRenderChart();
     }

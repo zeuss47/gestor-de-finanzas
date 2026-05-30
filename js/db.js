@@ -75,8 +75,10 @@ function _wrap(req) {
 /* ---------- API de uso ---------- */
 export const DB = {
   async put(store, obj) {
-    // Auto-actualiza updated_at antes de escribir (clave del LWW merge).
-    if (!('updated_at' in obj)) obj.updated_at = Math.floor(Date.now() / 1000);
+    // SIEMPRE actualizamos updated_at al escribir desde la app: cualquier put
+    // local es una "edición del usuario" y debe ganar el LWW frente a la copia
+    // remota cuando sincronizamos. Para mergeo de items remotos preservando su
+    // updated_at original, usar `bulkPut` (que no toca el campo).
     obj.updated_at = Math.floor(Date.now() / 1000);
     const s = await _tx(store, 'readwrite');
     return _wrap(s.put(obj));

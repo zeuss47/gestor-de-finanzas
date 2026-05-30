@@ -19,7 +19,7 @@
  *     una ruta de acción, la pasa por la querystring.
  */
 
-const VERSION = 'v3.1.0-pages';
+const VERSION = 'v3.2.0-pages';
 const SHELL_CACHE = `shell-${VERSION}`;
 
 // Base scope dinámico: el SW se registra en su propio directorio,
