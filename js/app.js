@@ -1928,20 +1928,19 @@ function renderMovimientos() {
   const selMes = document.getElementById('mov-mes-filter');
   if (!list) return;
 
-  // Reconstruir opciones de mes
-  const meses = new Set();
-  state.gastos.forEach(g => { if (g.fecha) meses.add(g.fecha.slice(0,7)); });
-  state.ingresos.forEach(i => {
-    if (i.fecha) meses.add(i.fecha.slice(0,7));
-    if (i.periodo_aplicacion) meses.add(i.periodo_aplicacion);
-  });
+  // input[type="month"]: si no tiene valor aún, poner el mes actual o el último con datos
   const mesActual = new Date().toISOString().slice(0,7);
-  const mesList = [...meses].sort().reverse();
-  const prevVal = selMes.value || _movMesFiltro || mesActual;
-  selMes.innerHTML = (mesList.length ? mesList : [mesActual])
-    .map(m => `<option value="${m}"${m === prevVal ? ' selected' : ''}>${m}</option>`)
-    .join('');
-  selMes.onchange = renderMovimientos;
+  if (!selMes.value) {
+    const meses = new Set();
+    state.gastos.forEach(g => { if (g.fecha) meses.add(g.fecha.slice(0,7)); });
+    state.ingresos.forEach(i => {
+      if (i.fecha) meses.add(i.fecha.slice(0,7));
+      if (i.periodo_aplicacion) meses.add(i.periodo_aplicacion);
+    });
+    const mesList = [...meses].sort().reverse();
+    selMes.value = _movMesFiltro || (mesList.length ? mesList[0] : mesActual);
+  }
+  selMes.onchange = () => { _movMesFiltro = selMes.value; renderMovimientos(); };
 
   const mes = selMes.value || mesActual;
   _movMesFiltro = mes;
