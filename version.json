@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.7",
-    "build":  24,
-    "modified":  "2026-05-30T06:40:32Z",
-    "commit":  "M index.html, M js/app.js, M js/notifications.js, js/pdf-export.js",
-    "notes":  "Auto-update 2026-05-30 03:40"
+    "version":  "1.8",
+    "build":  25,
+    "modified":  "2026-05-30T06:44:03Z",
+    "commit":  "M css/styles.css",
+    "notes":  "Auto-update 2026-05-30 03:44"
 }
