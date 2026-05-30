@@ -1828,7 +1828,7 @@ function actualizarRightPanel() {
         <div class="flex items-center gap-2 py-1.5" style="border-bottom:1px solid var(--border)">
           <span class="text-base flex-shrink-0">${icon}</span>
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-medium truncate" style="color:var(--ink)">${escapeHtml(m.descripcion||'Movimiento')}</p>
+            <p class="text-xs font-medium truncate" style="color:var(--ink)">${m._tipo === 'gasto' && m.categoria ? `(${escapeHtml(m.categoria)}) - ` : ''}${escapeHtml(m.descripcion||'Movimiento')}</p>
             <p class="text-[10px]" style="color:var(--ink-muted)">${m.fecha||m.periodo_aplicacion||''}</p>
           </div>
           <p class="text-xs font-bold flex-shrink-0" style="color:${color}">${sign}${FMT.format(Math.abs(monto))}</p>
@@ -1943,8 +1943,8 @@ function renderMovimientos() {
       <div class="mov-item flex items-center gap-3 bg-surf-alt rounded-2xl px-3 py-3 border border-black/5 dark:border-white/10">
         <span class="w-9 h-9 rounded-xl bg-surf flex items-center justify-center text-lg flex-shrink-0">${icon}</span>
         <div class="flex-1 min-w-0">
-          <p class="font-semibold text-sm truncate">${escapeHtml(g.descripcion)}${tipoTag}${cuotas ? `<span class="text-ink-muted"> · ${cuotas}</span>` : ''}</p>
-          <p class="text-[11px] text-ink-muted truncate">${g.fecha} · ${escapeHtml(g.categoria)} · ${metodo}</p>
+          <p class="font-semibold text-sm truncate">(${escapeHtml(g.categoria || 'general')}) - ${escapeHtml(g.descripcion)}${tipoTag}${cuotas ? `<span class="text-ink-muted"> · ${cuotas}</span>` : ''}</p>
+          <p class="text-[11px] text-ink-muted truncate">${g.fecha} · ${metodo}</p>
           ${g.compartido ? `<p class="text-[10px] text-sky-600 dark:text-sky-400">👫 Compartido · ${escapeHtml(g.compartido.persona)}</p>` : ''}
         </div>
         <div class="text-right flex-shrink-0">
@@ -2043,6 +2043,11 @@ function prepararDialogoGasto(form) {
   form.querySelectorAll('input[name="tipo"]').forEach(r => r.onchange = refrescar);
   // Escuchar cambio en método de pago para mostrar/ocultar cuenta
   form.querySelectorAll('input[name="metodo_pago"]').forEach(r => r.addEventListener('change', refrescar));
+  // Inicializar label de "¿En qué gastaste?" con la categoría actual (en edición o nuevo)
+  const catInicial = form.elements.categoria?.value || '';
+  _actualizarLabelGasto(catInicial);
+  // Marcar el chip de categoría correspondiente si coincide
+  form.querySelectorAll('input[name="cat_quick"]').forEach(r => r.checked = (r.value === catInicial));
   refrescar();
 }
 
@@ -3274,12 +3279,15 @@ function _hdRenderItems() {
       const sign  = it._tipo === 'ingreso' ? '+' : '-';
       const meta  = it._tipo === 'ingreso'
         ? `Período ${it.periodo_aplicacion || '—'}`
-        : `${it.fecha} · ${escapeHtml(it.categoria || 'general')}${tarj ? ' · 💳 ' + escapeHtml(tarj.nombre) : ''}`;
+        : `${it.fecha}${tarj ? ' · 💳 ' + escapeHtml(tarj.nombre) : ''}`;
+      const desc = it._tipo === 'gasto' && it.categoria
+        ? `(${escapeHtml(it.categoria)}) - ${escapeHtml(it.descripcion || 'Movimiento')}`
+        : escapeHtml(it.descripcion || 'Movimiento');
       list.insertAdjacentHTML('beforeend', `
         <div class="hd-item">
           <span class="hd-item-icon">${icon}</span>
           <div class="hd-item-info">
-            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(it.descripcion || 'Movimiento')}</p>
+            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${desc}</p>
             <p class="text-[10px] truncate" style="color:var(--ink-muted)">${meta}</p>
           </div>
           <span class="hd-item-monto" style="color:${color}">${sign}${FMT.format(Math.abs(it.monto))}</span>
@@ -4546,10 +4554,26 @@ window.addEventListener('online', () => {
 });
 
 // Sincronizar chips de categoría con el input de texto en dlg-gasto
+// y actualizar el label "¿En qué gastaste?" con la categoría seleccionada
+function _actualizarLabelGasto(cat) {
+  const lbl = document.getElementById('lbl-descripcion-gasto');
+  if (!lbl) return;
+  const c = (cat || '').trim();
+  lbl.textContent = c ? `(${c}) - ¿En qué gastaste?` : '¿En qué gastaste?';
+}
 document.addEventListener('change', (e) => {
   if (e.target.matches('#dlg-gasto input[name="cat_quick"]')) {
     const txtInput = document.querySelector('#dlg-gasto input[name="categoria"]');
     if (txtInput) txtInput.value = e.target.value;
+    _actualizarLabelGasto(e.target.value);
+  }
+  if (e.target.matches('#dlg-gasto input[name="categoria"]')) {
+    _actualizarLabelGasto(e.target.value);
+  }
+});
+document.addEventListener('input', (e) => {
+  if (e.target.matches('#dlg-gasto input[name="categoria"]')) {
+    _actualizarLabelGasto(e.target.value);
   }
 });
 

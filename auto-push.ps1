@@ -28,16 +28,15 @@ if (Test-Path $versionFile) {
         $v = Get-Content $versionFile -Raw | ConvertFrom-Json
         $newBuild = ([int]$v.build) + 1
 
-        # Si hubo cambios mayores en archivos JS o HTML, sube minor
-        $bigFiles = ($status -split "`n" | Where-Object { $_ -match "\.(js|html)$" } | Measure-Object).Count
-        $newVersion = $v.version
-        if ($bigFiles -ge 3) {
-            $parts = $v.version -split '\.'
-            if ($parts.Length -ge 3) {
-                $patch = [int]$parts[2] + 1
-                $newVersion = "$($parts[0]).$($parts[1]).$patch"
-            }
-        }
+        # Versionado simple: major.minor. Cada commit sube minor en 1.
+        # Si la version actual tiene formato viejo (1.0.7), la convertimos a major.minor+1.
+        # Cuando minor llega a 99, sube major y reset minor a 0.
+        $parts = $v.version -split '\.'
+        $major = [int]$parts[0]
+        if ($parts.Length -ge 2) { $minor = [int]$parts[1] } else { $minor = 0 }
+        $minor = $minor + 1
+        if ($minor -ge 100) { $major = $major + 1; $minor = 0 }
+        $newVersion = "$major.$minor"
 
         # Resumen corto de archivos cambiados
         $archivos = ($status -split "`n" | ForEach-Object {

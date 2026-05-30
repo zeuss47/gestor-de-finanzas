@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.0.7",
-    "build":  17,
-    "modified":  "2026-05-30T05:23:33Z",
-    "commit":  "M js/app.js, M js/sync.js",
-    "notes":  "Auto-update 2026-05-30 02:23"
+    "version":  "1.1",
+    "build":  18,
+    "modified":  "2026-05-30T05:34:39Z",
+    "commit":  "M auto-push.ps1, M index.html, M js/app.js, M version.json",
+    "notes":  "Auto-update 2026-05-30 02:34"
 }
