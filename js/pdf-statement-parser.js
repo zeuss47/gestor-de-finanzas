@@ -121,8 +121,15 @@ function extraerFechaInicio(linea) {
 
 /* ─── Extracción de monto + moneda + descripción ───────────── */
 
-const RE_FX = /\b(USD|EUR|BRL|U\$S|U\$D)\s*([\d]{1,3}(?:\.[\d]{3})*,\d{2})(-?)/i;
+// Sin \b inicial a propósito: BBVA pega el código de moneda a la referencia del
+// consumo (ej "in1TTXjpBUSD 20,00" en CLAUDE.AI). Exigimos que el monto venga
+// inmediatamente después para no confundir nombres que casualmente traigan "USD".
+const RE_FX = /(USD|EUR|BRL|U\$S|U\$D)\s*([\d]{1,3}(?:\.[\d]{3})*,\d{2})(-?)/i;
 const RE_AMT = /(\d{1,3}(?:\.\d{3})*,\d{2})(-?)/g;
+// Fecha completa DD-Mon-YY / DD.MM.YY / DD/MM/YYYY. La usamos para detectar que
+// la "descripción" de un consumo contiene una 2ª fecha → es una fila de la tabla
+// de totales (cierre/venc/saldo) que se coló, no un consumo real.
+const RE_FULLDATE = /\b\d{1,2}[-.\/](?:[A-Za-z]{3,4}|\d{1,2})[-.\/]\d{2,4}\b/;
 
 function normalizarMoneda(s) {
   const u = s.toUpperCase();
@@ -177,6 +184,11 @@ function limpiarDesc(descRaw) {
   d = d.replace(/^\s*\d{4,8}[*A-Za-z]?\s+/, '');
   // Comprobante/cupón al final (BBVA): 4-8 dígitos. Ej "...RODR 173212"
   d = d.replace(/\s+\d{4,8}\s*$/, '');
+  // Referencia alfanumérica pegada (BBVA consumos USD): un token final que
+  // mezcla letras y dígitos (ej "in1TTXjpB", resto de "in1TTXjpBUSD"). No es
+  // parte del comercio, es el identificador de la operación.
+  const ref = d.match(/\s+([A-Za-z0-9]{5,})$/);
+  if (ref && /[A-Za-z]/.test(ref[1]) && /\d/.test(ref[1])) d = d.slice(0, ref.index);
   // Limpieza final
   d = d.replace(/\s{2,}/g, ' ').trim();
   return { desc: d, cuotaActual, cuotasTotal };
@@ -199,8 +211,14 @@ function parsearLinea(linea, ctx) {
   // Filtro de pagos/impuestos sobre el texto completo y la descripción
   if (esExcluido(f.resto)) return null;
 
+  // Una 2ª fecha completa en lo que sería la descripción delata una fila de la
+  // tabla de totales (ej "05-Jun-26 888.286,87 31,99") → no es un consumo.
+  if (RE_FULLDATE.test(md.descRaw)) return null;
+
   const { desc, cuotaActual, cuotasTotal } = limpiarDesc(md.descRaw);
-  if (!desc || desc.length < 2 || esExcluido(desc)) return null;
+  // Un consumo real siempre tiene letras en el comercio. Una fila de totales
+  // que se cuele (ej "888.286,87 31,99") queda como puros números → se descarta.
+  if (!desc || desc.length < 2 || !/[A-Za-z]/.test(desc) || esExcluido(desc)) return null;
 
   // Resolver año para DD/MM sin año explícito
   let fecha = f.fecha;
@@ -243,6 +261,24 @@ function buscarMontoLabel(texto, labels) {
     const re = new RegExp(label + '[^0-9\\-]{0,30}(\\d{1,3}(?:\\.\\d{3})*,\\d{2})', 'i');
     const m = texto.match(re);
     if (m) return num(m[1]);
+  }
+  return 0;
+}
+
+/**
+ * Busca un monto en layout TABLA: la etiqueta va en una fila y los valores en
+ * la siguiente. `cual` = 'first' (primera columna $) o 'last' (última, p.ej.
+ * "PAGO MÍNIMO $" que en BBVA es la columna más a la derecha).
+ */
+function buscarMontoTabla(lineas, etiqueta, cual = 'last') {
+  const RE = /(\d{1,3}(?:\.\d{3})*,\d{2})/g;
+  for (let i = 0; i < lineas.length; i++) {
+    if (!etiqueta.test(lineas[i])) continue;
+    for (let j = i; j <= Math.min(i + 1, lineas.length - 1); j++) {
+      const linea = j === i ? lineas[i].slice(lineas[i].search(etiqueta)) : lineas[j];
+      const ms = [...linea.matchAll(RE)].map(m => num(m[1]));
+      if (ms.length) return cual === 'first' ? ms[0] : ms[ms.length - 1];
+    }
   }
   return 0;
 }
@@ -344,14 +380,24 @@ export function _parsearTexto({ texto, lineas }) {
     mesCierre:  mesCierreStr ? parseInt(mesCierreStr, 10) : (new Date().getMonth() + 1),
   };
 
-  const saldoTotal   = buscarMontoLabel(texto, ['SALDO\\s+ACTUAL\\s*\\$', 'SALDO\\s+ACTUAL']);
-  const pagoMinimo   = buscarMontoLabel(texto, ['PAGO\\s+M[IÍ]NIMO\\s*\\$', 'PAGO\\s+M[IÍ]NIMO', 'PAGO\\s+MIN\\.?\\s*\\$']);
+  let saldoTotal = buscarMontoLabel(texto, ['SALDO\\s+ACTUAL\\s*\\$', 'SALDO\\s+ACTUAL']);
+  if (!saldoTotal) saldoTotal = buscarMontoTabla(lineas, /SALDO\s+ACTUAL\s*\$/i, 'first');
+  let pagoMinimo = buscarMontoLabel(texto, ['PAGO\\s+M[IÍ]NIMO\\s*\\$', 'PAGO\\s+M[IÍ]NIMO', 'PAGO\\s+MIN\\.?\\s*\\$']);
+  if (!pagoMinimo) pagoMinimo = buscarMontoTabla(lineas, /PAGO\s+M[IÍ]NIMO/i, 'last');
   const totalConsumos = buscarTotalConsumos(texto);
+
+  // Montos del encabezado que NUNCA son consumos: si una fila de la tabla de
+  // totales (cierre/venc/saldo/pago-mínimo) se cuela como movimiento, su monto
+  // coincide con el saldo o el pago mínimo → la descartamos como defensa extra.
+  const headerMontos = [saldoTotal, pagoMinimo].filter(x => x > 0);
+  const esHeaderMonto = (m) => headerMontos.some(h => Math.abs(h - m) < 0.5);
 
   const movimientos = [];
   for (const linea of lineas) {
     const mov = parsearLinea(linea, ctx);
-    if (mov) movimientos.push(mov);
+    if (!mov) continue;
+    if (mov.moneda === 'ARS' && esHeaderMonto(mov.monto)) continue;
+    movimientos.push(mov);
   }
 
   return {
