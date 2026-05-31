@@ -6830,6 +6830,10 @@ function _rsbRenderStatements() {
             ${r.saldoTotal ? `<span title="Saldo a pagar" class="brand">💳 ${FMT.format(r.saldoTotal)}</span>` : ''}
             ${r.pagoMinimo ? `<span title="Pago mínimo">mín ${FMT.format(r.pagoMinimo)}</span>` : ''}
           </div>
+          ${(r.validacion && !r.validacion.confiable) ? `
+          <div class="rsb-aviso-dudoso" title="${escapeHtml(r.validacion.advertencias.join(' '))}">
+            ⚠ Lectura dudosa: ${escapeHtml(r.validacion.advertencias[0] || 'los totales no reconcilian')} Revisá los consumos antes de cargar.
+          </div>` : ''}
           <label class="rsb-statement-fechas">
             <input type="checkbox" class="rsb-aplicar-fechas" data-sidx="${sidx}" ${st.aplicarFechas ? 'checked' : ''}>
             Actualizar fechas de cierre/vencimiento de la tarjeta con este resumen

@@ -30,7 +30,8 @@ async function cargarPdfJs() {
 }
 
 /**
- * Agrupa fragmentos de texto de PDF.js en líneas visuales por coordenada Y.
+ * Agrupa fragmentos de texto de PDF.js en FILAS visuales, conservando la
+ * posición de cada palabra (x0 = borde izquierdo, x1 = borde derecho).
  *
  * NO se redondea Y a entero (eso parte filas cuando un ítem cae en el borde del
  * redondeo: desc Y=500,5→501 y monto Y=500,4→500 quedaban en líneas distintas,
@@ -38,25 +39,37 @@ async function cargarPdfJs() {
  * dentro de `tol` puntos: las columnas de una misma fila comparten baseline
  * (varianza < 1pt) y las filas vecinas están separadas por bastante más.
  *
- * @param {Array<{x:number,y:number,str:string}>} items
+ * Conservar x0/x1 permite leer el PDF como una GRILLA (separar la columna PESOS
+ * de la DÓLARES por la coordenada del número, no por regex sobre el texto).
+ *
+ * @param {Array<{x0?:number,x1?:number,x?:number,y:number,str:string}>} items
  * @param {number} tol  Tolerancia en puntos (default 3).
- * @returns {string[]}  Líneas ordenadas de arriba hacia abajo.
+ * @returns {Array<{y:number, words:Array<{x0:number,x1:number,str:string}>}>}
  */
-export function _agruparEnLineas(items, tol = 3) {
+export function _agruparEnFilas(items, tol = 3) {
   const limpios = items.filter(it => it.str && it.str.trim());
   limpios.sort((a, b) => b.y - a.y); // Y descendente = de arriba hacia abajo
   const filas = [];
   let cur = null;
   for (const it of limpios) {
-    if (cur && Math.abs(cur.yRef - it.y) <= tol) {
-      cur.items.push(it);
+    const x0 = it.x0 != null ? it.x0 : (it.x || 0);
+    const x1 = it.x1 != null ? it.x1 : x0;
+    const w = { x0, x1, str: it.str };
+    if (cur && Math.abs(cur.y - it.y) <= tol) {
+      cur.words.push(w);
     } else {
-      cur = { yRef: it.y, items: [it] };
+      cur = { y: it.y, words: [w] };
       filas.push(cur);
     }
   }
-  return filas
-    .map(f => f.items.sort((a, b) => a.x - b.x).map(i => i.str).join(' ').replace(/\s+/g, ' ').trim())
+  for (const f of filas) f.words.sort((a, b) => a.x0 - b.x0);
+  return filas;
+}
+
+/** Igual que _agruparEnFilas pero devuelve sólo el texto de cada línea. */
+export function _agruparEnLineas(items, tol = 3) {
+  return _agruparEnFilas(items, tol)
+    .map(f => f.words.map(w => w.str).join(' ').replace(/\s+/g, ' ').trim())
     .filter(l => l.length > 0);
 }
 
@@ -66,19 +79,30 @@ export async function extraerTextoPdf(file) {
   const pdf = await pdfjs.getDocument({ data: buffer }).promise;
 
   const lineasPorPagina = [];
+  const filasPorPagina = [];
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
 
     const items = content.items
       .filter(it => it.str)
-      .map(it => ({ x: it.transform?.[4] || 0, y: it.transform?.[5] || 0, str: it.str }));
-    lineasPorPagina.push(..._agruparEnLineas(items));
+      .map(it => {
+        const x0 = it.transform?.[4] || 0;
+        return { x0, x1: x0 + (it.width || 0), y: it.transform?.[5] || 0, str: it.str };
+      });
+    const filas = _agruparEnFilas(items);
+    filasPorPagina.push(...filas);
+    lineasPorPagina.push(
+      ...filas
+        .map(f => f.words.map(w => w.str).join(' ').replace(/\s+/g, ' ').trim())
+        .filter(l => l.length > 0)
+    );
   }
 
   return {
     texto: lineasPorPagina.join('\n'),
     lineas: lineasPorPagina,
+    filas: filasPorPagina,
   };
 }
 

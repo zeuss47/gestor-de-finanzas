@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.30",
-    "build":  47,
-    "modified":  "2026-05-31T19:07:42Z",
-    "commit":  "M js/pdf-import.js, tests/test-pdf-lineas.mjs",
-    "notes":  "Auto-update 2026-05-31 16:07"
+    "version":  "1.31",
+    "build":  48,
+    "modified":  "2026-05-31T23:45:01Z",
+    "commit":  "M css/styles.css, M js/app.js, M js/pdf-import.js, M js/pdf-statement-parser.js, tests/test-posic...",
+    "notes":  "Auto-update 2026-05-31 20:45"
 }

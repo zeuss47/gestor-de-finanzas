@@ -131,6 +131,34 @@ const RE_AMT = /(\d{1,3}(?:\.\d{3})*,\d{2})(-?)/g;
 // de totales (cierre/venc/saldo) que se coló, no un consumo real.
 const RE_FULLDATE = /\b\d{1,2}[-.\/](?:[A-Za-z]{3,4}|\d{1,2})[-.\/]\d{2,4}\b/;
 
+// Un importe argentino: o bien con separador de miles (1.234,56) o bien plano
+// (1234,56). Macro es inconsistente y usa las dos variantes en el mismo PDF.
+const NUMERO = String.raw`(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}`;
+// Un TOKEN que es sólo un importe (con prefijo $/U$S y signo - adelante/atrás
+// o paréntesis opcionales). Sirve para detectar la celda de monto por posición.
+const RE_MONTO_TOKEN = new RegExp(`^\\(?\\s*-?\\s*(?:U\\$[SD]|USD|\\$)?\\s*(${NUMERO})\\s*(-?)\\)?$`, 'i');
+
+/**
+ * Convierte un importe impreso (formato AR) a número con signo. Maneja:
+ *  - signo '-' adelante (BBVA: '-973.072,63') o atrás (Macro: '360.197,23-')
+ *  - paréntesis como negativo: '( 45185,87 )'
+ *  - prefijos '$' / 'U$S' / 'USD'
+ *  - separador de miles inconsistente ('360.197,23' y '360197,23')
+ */
+export function parsearMonto(s) {
+  if (s == null) return null;
+  let t = String(s).trim();
+  let neg = false;
+  if (t.endsWith('-'))   { neg = true; t = t.slice(0, -1).trim(); }
+  if (t.startsWith('-')) { neg = true; t = t.slice(1).trim(); }
+  if (t.startsWith('(') && t.endsWith(')')) { neg = true; t = t.slice(1, -1).trim(); }
+  t = t.replace(/U\$[SD]|USD|\$/gi, '').trim();
+  t = t.replace(/\./g, '').replace(',', '.');
+  const v = parseFloat(t);
+  if (!isFinite(v)) return null;
+  return neg ? -v : v;
+}
+
 function normalizarMoneda(s) {
   const u = s.toUpperCase();
   if (u === 'U$S' || u === 'U$D') return 'USD';
@@ -236,6 +264,101 @@ function parsearLinea(linea, ctx) {
   return mov;
 }
 
+/* ─── Extracción de consumos POR POSICIÓN (la regla de oro) ── */
+
+/** Valor más repetido dentro de una lista numérica, con tolerancia. */
+function _modoConTolerancia(valores, tol) {
+  if (!valores.length) return null;
+  let best = null, bestCount = -1;
+  for (const v of valores) {
+    const count = valores.filter(x => Math.abs(x - v) <= tol).length;
+    if (count > bestCount) { bestCount = count; best = v; }
+  }
+  return best;
+}
+
+/**
+ * Lee los consumos tratando el PDF como una GRILLA: cada fila que empieza con
+ * una fecha es una transacción; la celda de monto se elige por su POSICIÓN
+ * (la de mayor x1 = borde derecho, alineada a la columna), y la moneda se
+ * decide por esa misma coordenada (columna DÓLARES está a la derecha de PESOS).
+ *
+ * Esto resuelve de raíz tres problemas que el texto plano no puede:
+ *  - montos que aparecen 2 veces (uno embebido en la descripción, otro en la
+ *    columna) → tomamos el de la columna (x1 mayor).
+ *  - separar pesos de dólares aunque el consumo no diga "USD" en el texto.
+ *  - la base de un impuesto entre paréntesis queda en la descripción y se ignora.
+ *
+ * @param {Array<{y:number,words:Array<{x0:number,x1:number,str:string}>}>} filas
+ */
+function _extraerConsumosPorPosicion(filas, ctx) {
+  // 1) Filas-transacción (empiezan con fecha) + sus importes con x1
+  const trans = [];
+  for (const fila of filas) {
+    const ws = fila.words || [];
+    if (!ws.length) continue;
+
+    let fecha = parsearFechaToken(ws[0].str);
+    let start = 1, dm = null;
+    if (!fecha && ws.length >= 3) {                    // "21 May 26" en 3 tokens
+      const f3 = parsearFechaToken(`${ws[0].str} ${ws[1].str} ${ws[2].str}`);
+      if (f3) { fecha = f3; start = 3; }
+    }
+    if (!fecha) {
+      dm = ws[0].str.match(/^(\d{1,2})\/(\d{1,2})$/);  // DD/MM sin año
+      if (!dm) continue;
+    }
+
+    const amounts = [];
+    ws.forEach((w, i) => {
+      if (RE_MONTO_TOKEN.test(w.str)) {
+        amounts.push({ x1: w.x1, valor: parsearMonto(w.str), idx: i });
+      }
+    });
+    if (!amounts.length) continue;
+
+    const firstIdx = Math.min(...amounts.map(a => a.idx));
+    const colAmt   = amounts.reduce((a, b) => (b.x1 > a.x1 ? b : a)); // celda = la más a la derecha
+    const descRaw  = ws.slice(start, firstIdx).map(w => w.str).join(' ').trim();
+    const rowText  = ws.map(w => w.str).join(' ');
+    trans.push({ fecha, dm, descRaw, rowText, colAmt });
+  }
+  if (!trans.length) return [];
+
+  // 2) Calibrar el borde de la columna PESOS = x1 dominante de las celdas de
+  //    monto (la mayoría de los consumos son en pesos). DÓLARES está más a la
+  //    derecha, así que una celda con x1 >> pesosEdge es un consumo en USD.
+  const pesosEdge = _modoConTolerancia(trans.map(t => t.colAmt.x1), 6);
+
+  // 3) Construir movimientos aplicando los mismos filtros que el modo texto
+  const movs = [];
+  for (const t of trans) {
+    if (esExcluido(t.rowText)) continue;
+    if (RE_FULLDATE.test(t.descRaw)) continue;          // fila de totales colada
+    const valor = t.colAmt.valor;
+    if (!(valor > 0)) continue;                         // pagos/créditos (negativos)
+
+    const porPosicion = pesosEdge != null && t.colAmt.x1 > pesosEdge + 12;
+    const porMarca    = /(?:USD|U\$[SD])\s*\d/i.test(t.rowText);
+    const moneda = (porPosicion || porMarca) ? 'USD' : 'ARS';
+
+    const { desc, cuotaActual, cuotasTotal } = limpiarDesc(t.descRaw);
+    if (!desc || desc.length < 2 || !/[A-Za-z]/.test(desc) || esExcluido(desc)) continue;
+
+    let fecha = t.fecha;
+    if (!fecha && t.dm) {
+      const mesMov = parseInt(t.dm[2], 10);
+      const anio = (ctx.mesCierre && mesMov > ctx.mesCierre) ? ctx.anioCierre - 1 : ctx.anioCierre;
+      fecha = `${anio}-${pad2(t.dm[2])}-${pad2(t.dm[1])}`;
+    }
+
+    const mov = { fecha, descripcion: desc, monto: valor, moneda };
+    if (cuotasTotal) { mov.cuotaActual = cuotaActual; mov.cuotasTotal = cuotasTotal; }
+    movs.push(mov);
+  }
+  return movs;
+}
+
 /* ─── Búsqueda de campos del header ────────────────────────── */
 
 function buscarFechaLabel(texto, labels) {
@@ -288,6 +411,18 @@ function buscarTotalConsumos(texto) {
   return m ? num(m[1]) : 0;
 }
 
+/**
+ * Total de consumos en USD impreso. En la línea "TOTAL CONSUMOS ... 857.352,71
+ * 31,99" el primero es pesos y el segundo (último) es dólares. Si sólo hay uno,
+ * no hubo consumos en USD (devuelve 0).
+ */
+function buscarTotalConsumosUSD(texto, lineas) {
+  const linea = (lineas || []).find(l => /TOTAL\s+CONSUMOS/i.test(l))
+    || (texto.match(/TOTAL\s+CONSUMOS[^\n]*/i)?.[0] ?? '');
+  const nums = [...linea.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
+  return nums.length >= 2 ? num(nums[nums.length - 1][1]) : 0;
+}
+
 function detectarBanco(texto) {
   // Contamos ocurrencias en vez de tomar el primer match: un resumen BBVA
   // menciona "BBVA" en cada pie de página, pero también nombra a otros bancos
@@ -332,7 +467,7 @@ function buscarFechasTabla(lineas, etiquetas) {
  * Parsea el resultado de extraerTextoPdf ({ texto, lineas }).
  * Separado de parsearResumenTarjeta() para poder testear sin un PDF real.
  */
-export function _parsearTexto({ texto, lineas }) {
+export function _parsearTexto({ texto, lineas, filas }) {
   const banco = detectarBanco(texto);
 
   // ── Fechas de cierre y vencimiento ──────────────────────────
@@ -359,17 +494,19 @@ export function _parsearTexto({ texto, lineas }) {
   // BBVA tiene fechas de cierre VARIABLES (28-May, luego 02-Jul). El próximo
   // cierre define el ciclo siguiente, así que lo capturamos para que la tarjeta
   // pueda gestionar el ciclo en curso Y el próximo.
-  let cierreAnterior = '', proximoCierre = '', proximoVencimiento = '';
+  let cierreAnterior = '', vencimientoAnterior = '', proximoCierre = '', proximoVencimiento = '';
   const otros = buscarFechasTabla(lineas, [/CIERRE\s+ANTERIOR/i, /PR[OÓ]XIMO\s+CIERRE/i]);
   // Orden de columnas: cierre ant. · venc. ant. · próximo cierre · próximo venc.
   if (otros.length >= 4) {
     cierreAnterior = otros[0];
+    vencimientoAnterior = otros[1];
     proximoCierre = otros[2];
     proximoVencimiento = otros[3];
   } else {
     cierreAnterior = buscarFechaLabel(texto, ['CIERRE\\s+ANTERIOR']);
+    vencimientoAnterior = buscarFechaLabel(texto, ['VENCIMIENTO\\s+ANTERIOR', 'VTO\\.?\\s+ANTERIOR']);
     proximoCierre = buscarFechaLabel(texto, ['PR[OÓ]XIMO\\s+CIERRE']);
-    proximoVencimiento = buscarFechaLabel(texto, ['PR[OÓ]XIMO\\s+VENCIMIENTO']);
+    proximoVencimiento = buscarFechaLabel(texto, ['PR[OÓ]XIMO\\s+VENCIMIENTO', 'PR[OÓ]XIMO\\s+VTO']);
   }
 
   // El período se deriva del cierre (YYYY-MM). Es lo más confiable.
@@ -384,7 +521,8 @@ export function _parsearTexto({ texto, lineas }) {
   if (!saldoTotal) saldoTotal = buscarMontoTabla(lineas, /SALDO\s+ACTUAL\s*\$/i, 'first');
   let pagoMinimo = buscarMontoLabel(texto, ['PAGO\\s+M[IÍ]NIMO\\s*\\$', 'PAGO\\s+M[IÍ]NIMO', 'PAGO\\s+MIN\\.?\\s*\\$']);
   if (!pagoMinimo) pagoMinimo = buscarMontoTabla(lineas, /PAGO\s+M[IÍ]NIMO/i, 'last');
-  const totalConsumos = buscarTotalConsumos(texto);
+  const totalConsumos    = buscarTotalConsumos(texto);
+  const totalConsumosUSD = buscarTotalConsumosUSD(texto, lineas);
 
   // Montos del encabezado que NUNCA son consumos: si una fila de la tabla de
   // totales (cierre/venc/saldo/pago-mínimo) se cuela como movimiento, su monto
@@ -392,13 +530,21 @@ export function _parsearTexto({ texto, lineas }) {
   const headerMontos = [saldoTotal, pagoMinimo].filter(x => x > 0);
   const esHeaderMonto = (m) => headerMontos.some(h => Math.abs(h - m) < 0.5);
 
-  const movimientos = [];
-  for (const linea of lineas) {
-    const mov = parsearLinea(linea, ctx);
-    if (!mov) continue;
-    if (mov.moneda === 'ARS' && esHeaderMonto(mov.monto)) continue;
-    movimientos.push(mov);
+  // ── Consumos: por POSICIÓN si tenemos geometría (filas); si no, por texto ──
+  let movimientos = [];
+  if (Array.isArray(filas) && filas.length) {
+    movimientos = _extraerConsumosPorPosicion(filas, ctx);
   }
+  if (!movimientos.length) {
+    movimientos = lineas.map(l => parsearLinea(l, ctx)).filter(Boolean);
+  }
+  movimientos = movimientos.filter(m => !(m.moneda === 'ARS' && esHeaderMonto(m.monto)));
+
+  // ── Reconciliación contable: detectar lecturas dudosas ──────
+  const validacion = _reconciliar({
+    movimientos, totalConsumos, totalConsumosUSD,
+    fechas: { cierreAnterior, vencimientoAnterior, fechaCierre, fechaVencimiento, proximoCierre, proximoVencimiento },
+  });
 
   return {
     banco,
@@ -406,12 +552,49 @@ export function _parsearTexto({ texto, lineas }) {
     fechaCierre,
     fechaVencimiento,
     cierreAnterior,
+    vencimientoAnterior,
     proximoCierre,
     proximoVencimiento,
     saldoTotal,
     pagoMinimo,
     totalConsumos,
+    totalConsumosUSD,
     movimientos,
+    validacion,
+  };
+}
+
+/**
+ * Reconciliación contable (sección 6 de la guía). Devuelve un veredicto de
+ * confianza para que la UI avise "lectura dudosa" en vez de guardar datos malos.
+ * Chequea: suma de consumos ARS/USD == totales impresos, y orden cronológico
+ * de las fechas del ciclo.
+ */
+function _reconciliar({ movimientos, totalConsumos, totalConsumosUSD, fechas }) {
+  const advertencias = [];
+  const sumaArs = movimientos.filter(m => m.moneda === 'ARS').reduce((a, m) => a + (m.monto || 0), 0);
+  const sumaUsd = movimientos.filter(m => m.moneda === 'USD').reduce((a, m) => a + (m.monto || 0), 0);
+
+  if (totalConsumos > 0 && Math.abs(sumaArs - totalConsumos) > 1) {
+    advertencias.push(`Los consumos en pesos suman ${sumaArs.toFixed(2)} pero el total impreso es ${totalConsumos.toFixed(2)}.`);
+  }
+  if (totalConsumosUSD > 0 && Math.abs(sumaUsd - totalConsumosUSD) > 0.5) {
+    advertencias.push(`Los consumos en USD suman ${sumaUsd.toFixed(2)} pero el total impreso es ${totalConsumosUSD.toFixed(2)}.`);
+  }
+
+  const orden = [fechas.cierreAnterior, fechas.vencimientoAnterior, fechas.fechaCierre,
+                 fechas.fechaVencimiento, fechas.proximoCierre, fechas.proximoVencimiento].filter(Boolean);
+  for (let i = 1; i < orden.length; i++) {
+    if (orden[i] < orden[i - 1]) { advertencias.push('Las fechas del ciclo quedaron fuera de orden cronológico.'); break; }
+  }
+
+  return {
+    confiable: advertencias.length === 0,
+    advertencias,
+    suma_ars: sumaArs,
+    suma_usd: sumaUsd,
+    total_impreso_ars: totalConsumos,
+    total_impreso_usd: totalConsumosUSD,
   };
 }
 
@@ -420,8 +603,8 @@ export function _parsearTexto({ texto, lineas }) {
  * @param {File} file  Archivo PDF subido por el usuario.
  */
 export async function parsearResumenTarjeta(file) {
-  const { texto, lineas } = await extraerTextoPdf(file);
-  return _parsearTexto({ texto, lineas });
+  const { texto, lineas, filas } = await extraerTextoPdf(file);
+  return _parsearTexto({ texto, lineas, filas });
 }
 
 /* ─── Matching con gastos existentes ───────────────────────── */

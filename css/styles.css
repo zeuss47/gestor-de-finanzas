@@ -3701,6 +3701,11 @@ body.view-analisis #main-widgets::before {
   font-size: .75rem; color: var(--ink-2);
 }
 .rsb-statement-meta .brand { color: var(--brand); font-weight: 600; }
+.rsb-aviso-dudoso {
+  margin-top: .5rem; padding: .5rem .65rem; border-radius: .55rem;
+  background: rgba(255, 176, 32, 0.12); border: 1px solid rgba(255, 176, 32, 0.4);
+  color: var(--warning, #ffb020); font-size: .72rem; line-height: 1.35;
+}
 .rsb-statement-fechas {
   display: flex; align-items: center; gap: .45rem;
   font-size: .72rem; color: var(--ink-muted); cursor: pointer;
