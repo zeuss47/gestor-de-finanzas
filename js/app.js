@@ -3168,8 +3168,15 @@ function abrirDrawerTarjeta(tarjetaId) {
   const disponibleTarjeta = Math.max(0, limTotal - usado);
   const pctUso   = limTotal > 0 ? Math.round((usado/limTotal)*100) : 0;
 
+  // El KPI "Disponible" representa lo que REALMENTE podés gastar por mes según
+  // tus ingresos (capacidad libre acotada al cupo de la tarjeta), no el cupo
+  // bruto del banco. Si todavía no hay capacidad calculada, cae al cupo libre.
+  const disponibleSegunIngresos = capTarjeta
+    ? Math.max(0, capTarjeta.recomendado_seguro)
+    : disponibleTarjeta;
+
   document.getElementById('td-resumen').textContent    = FMT.format(usado);
-  document.getElementById('td-disponible').textContent = FMT.format(disponibleTarjeta);
+  document.getElementById('td-disponible').textContent = FMT.format(disponibleSegunIngresos);
   document.getElementById('td-pct').textContent        = pctUso + '%';
 
   // Composición del resumen
@@ -6702,17 +6709,52 @@ async function _rsbAplicarFechasTarjeta(tarjetaId, resultado) {
     t.dia_vencimiento = parseInt(resultado.fechaVencimiento.slice(8, 10), 10);
   }
   if (!Array.isArray(t.ciclos_custom)) t.ciclos_custom = [];
-  const ciclo = {
+
+  // Inserta/actualiza un ciclo_custom por período. cards.js sólo respeta el
+  // ciclo si tiene inicio Y fin, así que ambos son obligatorios.
+  const upsert = (ciclo) => {
+    const idx = t.ciclos_custom.findIndex(c => c.periodo === ciclo.periodo);
+    if (idx >= 0) t.ciclos_custom[idx] = { ...t.ciclos_custom[idx], ...ciclo };
+    else t.ciclos_custom.push(ciclo);
+  };
+
+  // ── Ciclo del resumen ──────────────────────────────────────
+  // Va desde el día siguiente al cierre anterior hasta el cierre actual; se
+  // paga al vencimiento. Los bancos con cierre variable (BBVA: 28-May, luego
+  // 02-Jul) necesitan estas fechas explícitas, no un "día de cierre" fijo.
+  upsert({
     periodo: resultado.periodo,
+    inicio: resultado.cierreAnterior ? _diaSiguiente(resultado.cierreAnterior) : _inicioMesAprox(resultado.fechaCierre),
     fin: resultado.fechaCierre,
     vencimiento: resultado.fechaVencimiento || null,
-  };
-  const idx = t.ciclos_custom.findIndex(c => c.periodo === resultado.periodo);
-  if (idx >= 0) t.ciclos_custom[idx] = { ...t.ciclos_custom[idx], ...ciclo };
-  else t.ciclos_custom.push(ciclo);
+  });
+
+  // ── Próximo ciclo ──────────────────────────────────────────
+  // Del día siguiente al cierre actual hasta el próximo cierre; se paga al
+  // próximo vencimiento. Deja el ciclo en curso listo antes de su resumen.
+  if (resultado.proximoCierre) {
+    upsert({
+      periodo: resultado.proximoCierre.slice(0, 7),
+      inicio: _diaSiguiente(resultado.fechaCierre),
+      fin: resultado.proximoCierre,
+      vencimiento: resultado.proximoVencimiento || null,
+    });
+  }
 
   await DB.put('tarjetas', t);
   return true;
+}
+
+/** Devuelve el día siguiente a una fecha ISO (YYYY-MM-DD), también en ISO. */
+function _diaSiguiente(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Aproxima el inicio del ciclo al día 1 del mes del cierre (sin cierre anterior). */
+function _inicioMesAprox(isoCierre) {
+  return isoCierre.slice(0, 8) + '01';
 }
 
 const _RSB_MESES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];

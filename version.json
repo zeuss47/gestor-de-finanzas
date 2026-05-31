@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.27",
-    "build":  44,
-    "modified":  "2026-05-30T18:52:23Z",
-    "commit":  "M css/styles.css, M index.html, M js/app.js",
-    "notes":  "Auto-update 2026-05-30 15:52"
+    "version":  "1.28",
+    "build":  45,
+    "modified":  "2026-05-31T18:32:37Z",
+    "commit":  "M index.html, M js/app.js, M js/pdf-statement-parser.js",
+    "notes":  "Auto-update 2026-05-31 15:32"
 }

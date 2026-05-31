@@ -253,10 +253,41 @@ function buscarTotalConsumos(texto) {
 }
 
 function detectarBanco(texto) {
+  // Contamos ocurrencias en vez de tomar el primer match: un resumen BBVA
+  // menciona "BBVA" en cada pie de página, pero también nombra a otros bancos
+  // una sola vez (p.ej. la tabla comparativa "Primeras 10 entidades" lista
+  // "BANCO MACRO S.A.", "GALICIA", "SANTANDER"...). El emisor real es el que
+  // más se repite a lo largo del resumen.
+  let mejor = { nombre: 'Banco', n: 0 };
   for (const b of BANCOS) {
-    if (b.re.test(texto)) return b.nombre;
+    const matches = texto.match(new RegExp(b.re.source, 'gi'));
+    const n = matches ? matches.length : 0;
+    if (n > mejor.n) mejor = { nombre: b.nombre, n };
   }
-  return 'Banco';
+  return mejor.nombre;
+}
+
+/**
+ * Extrae fechas de un layout de TABLA donde las etiquetas van en una fila y
+ * los valores en la siguiente (así agrupa PDF.js por coordenada Y). Busca una
+ * línea que contenga TODAS las etiquetas dadas y devuelve las fechas de esa
+ * línea y/o las siguientes en orden posicional (1ª columna → 1ª fecha).
+ */
+function buscarFechasTabla(lineas, etiquetas) {
+  const RE_FECHA = /(\d{1,2})[-\s.]([A-Za-zÁÉÍÓÚáéíóúüÜ]{3,4}|\d{1,2})[-\s.](\d{2,4})/g;
+  for (let i = 0; i < lineas.length; i++) {
+    if (!etiquetas.every((re) => re.test(lineas[i]))) continue;
+    const fechas = [];
+    for (let j = i; j <= Math.min(i + 2, lineas.length - 1); j++) {
+      for (const m of lineas[j].matchAll(RE_FECHA)) {
+        const mm = /^\d+$/.test(m[2]) ? pad2(m[2]) : MESES_ABR[normMes(m[2])];
+        if (mm) fechas.push(`${anio4(m[3])}-${mm}-${pad2(m[1])}`);
+      }
+      if (j > i && fechas.length >= etiquetas.length) break;
+    }
+    if (fechas.length >= etiquetas.length) return fechas;
+  }
+  return [];
 }
 
 /* ─── Parser principal (testeable sin PDF) ─────────────────── */
@@ -268,8 +299,42 @@ function detectarBanco(texto) {
 export function _parsearTexto({ texto, lineas }) {
   const banco = detectarBanco(texto);
 
-  const fechaCierre = buscarFechaLabel(texto, ['CIERRE\\s+ACTUAL', 'CIERRE']);
-  const fechaVencimiento = buscarFechaLabel(texto, ['VENCIMIENTO\\s+ACTUAL', 'VENCIMIENTO']);
+  // ── Fechas de cierre y vencimiento ──────────────────────────
+  // Layout TABLA (BBVA): "CIERRE ACTUAL  VENCIMIENTO ACTUAL ..." en una fila y
+  // "28-May-26  05-Jun-26 ..." en la siguiente. Mapeamos por posición de columna
+  // para no confundir el vencimiento con el valor del cierre.
+  let fechaCierre = '', fechaVencimiento = '';
+  const actuales = buscarFechasTabla(lineas, [/CIERRE\s+ACTUAL/i, /VENCIMIENTO\s+ACTUAL/i]);
+  if (actuales.length >= 2) {
+    fechaCierre = actuales[0];
+    fechaVencimiento = actuales[1];
+  } else {
+    // Layout vertical (Macro): etiqueta y valor en líneas separadas.
+    fechaCierre = buscarFechaLabel(texto, ['CIERRE\\s+ACTUAL', 'CIERRE']);
+    fechaVencimiento = buscarFechaLabel(texto, ['VENCIMIENTO\\s+ACTUAL', 'VENCIMIENTO']);
+  }
+  // Sanity check: el vencimiento es siempre POSTERIOR al cierre. Si quedó igual
+  // o anterior, lo descartamos para que la app no muestre un ciclo degenerado.
+  if (fechaVencimiento && fechaCierre && fechaVencimiento <= fechaCierre) {
+    fechaVencimiento = '';
+  }
+
+  // ── Próximo cierre / vencimiento ────────────────────────────
+  // BBVA tiene fechas de cierre VARIABLES (28-May, luego 02-Jul). El próximo
+  // cierre define el ciclo siguiente, así que lo capturamos para que la tarjeta
+  // pueda gestionar el ciclo en curso Y el próximo.
+  let cierreAnterior = '', proximoCierre = '', proximoVencimiento = '';
+  const otros = buscarFechasTabla(lineas, [/CIERRE\s+ANTERIOR/i, /PR[OÓ]XIMO\s+CIERRE/i]);
+  // Orden de columnas: cierre ant. · venc. ant. · próximo cierre · próximo venc.
+  if (otros.length >= 4) {
+    cierreAnterior = otros[0];
+    proximoCierre = otros[2];
+    proximoVencimiento = otros[3];
+  } else {
+    cierreAnterior = buscarFechaLabel(texto, ['CIERRE\\s+ANTERIOR']);
+    proximoCierre = buscarFechaLabel(texto, ['PR[OÓ]XIMO\\s+CIERRE']);
+    proximoVencimiento = buscarFechaLabel(texto, ['PR[OÓ]XIMO\\s+VENCIMIENTO']);
+  }
 
   // El período se deriva del cierre (YYYY-MM). Es lo más confiable.
   const periodo = fechaCierre ? fechaCierre.slice(0, 7) : '';
@@ -294,6 +359,9 @@ export function _parsearTexto({ texto, lineas }) {
     periodo,
     fechaCierre,
     fechaVencimiento,
+    cierreAnterior,
+    proximoCierre,
+    proximoVencimiento,
     saldoTotal,
     pagoMinimo,
     totalConsumos,
