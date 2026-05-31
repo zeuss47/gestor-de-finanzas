@@ -29,6 +29,37 @@ async function cargarPdfJs() {
   return mod;
 }
 
+/**
+ * Agrupa fragmentos de texto de PDF.js en líneas visuales por coordenada Y.
+ *
+ * NO se redondea Y a entero (eso parte filas cuando un ítem cae en el borde del
+ * redondeo: desc Y=500,5→501 y monto Y=500,4→500 quedaban en líneas distintas,
+ * perdiendo el monto del consumo). En su lugar se agrupan ítems cuyas Y estén
+ * dentro de `tol` puntos: las columnas de una misma fila comparten baseline
+ * (varianza < 1pt) y las filas vecinas están separadas por bastante más.
+ *
+ * @param {Array<{x:number,y:number,str:string}>} items
+ * @param {number} tol  Tolerancia en puntos (default 3).
+ * @returns {string[]}  Líneas ordenadas de arriba hacia abajo.
+ */
+export function _agruparEnLineas(items, tol = 3) {
+  const limpios = items.filter(it => it.str && it.str.trim());
+  limpios.sort((a, b) => b.y - a.y); // Y descendente = de arriba hacia abajo
+  const filas = [];
+  let cur = null;
+  for (const it of limpios) {
+    if (cur && Math.abs(cur.yRef - it.y) <= tol) {
+      cur.items.push(it);
+    } else {
+      cur = { yRef: it.y, items: [it] };
+      filas.push(cur);
+    }
+  }
+  return filas
+    .map(f => f.items.sort((a, b) => a.x - b.x).map(i => i.str).join(' ').replace(/\s+/g, ' ').trim())
+    .filter(l => l.length > 0);
+}
+
 export async function extraerTextoPdf(file) {
   const pdfjs = await cargarPdfJs();
   const buffer = await file.arrayBuffer();
@@ -39,24 +70,10 @@ export async function extraerTextoPdf(file) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
 
-    // Agrupar items por línea (misma coordenada Y). PDF.js extrae fragmentos
-    // separados con sus posiciones; sin agrupar perdemos contexto de columna.
-    const filas = new Map();
-    for (const item of content.items) {
-      if (!item.str) continue;
-      const y = Math.round((item.transform?.[5] || 0));
-      if (!filas.has(y)) filas.set(y, []);
-      filas.get(y).push({
-        x: item.transform?.[4] || 0,
-        str: item.str,
-      });
-    }
-    // Ordenar líneas de arriba hacia abajo (Y descendente en PDF coords)
-    const lineasOrdenadas = [...filas.entries()]
-      .sort(([a], [b]) => b - a)
-      .map(([, items]) => items.sort((a, b) => a.x - b.x).map(i => i.str).join(' ').trim())
-      .filter(l => l.length > 0);
-    lineasPorPagina.push(...lineasOrdenadas);
+    const items = content.items
+      .filter(it => it.str)
+      .map(it => ({ x: it.transform?.[4] || 0, y: it.transform?.[5] || 0, str: it.str }));
+    lineasPorPagina.push(..._agruparEnLineas(items));
   }
 
   return {
