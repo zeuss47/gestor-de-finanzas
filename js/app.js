@@ -3493,6 +3493,145 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
   });
 }
 
+/* ── Editor masivo de cierres y vencimientos ──────────────────── */
+let _editorCiclosTarjetaId = null;
+
+/** 'YYYY-MM-DD' del día `dia` (acotado al último día del mes) en Y-M. */
+function _ajustarDiaISO(Y, M, dia) {
+  const ultimo = new Date(Y, M, 0).getDate();
+  const dd = Math.min(Math.max(1, dia), ultimo);
+  return `${Y}-${String(M).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+}
+
+/** Cierre/vencimiento que daría el "día fijo" para un período YYYY-MM. */
+function _defaultCierreVenc(diaCierre, diaVenc, periodo) {
+  const [Y, M] = periodo.split('-').map(Number);
+  const cierre = _ajustarDiaISO(Y, M, diaCierre);
+  let venc;
+  if (diaVenc > diaCierre) {
+    venc = _ajustarDiaISO(Y, M, diaVenc);
+  } else {
+    const y2 = M === 12 ? Y + 1 : Y, m2 = M === 12 ? 1 : M + 1;
+    venc = _ajustarDiaISO(y2, m2, diaVenc);
+  }
+  return { cierre, venc };
+}
+
+/** 'YYYY-MM-DD' un mes antes (para el inicio del ciclo más viejo de la lista). */
+function _unMesAntesISO(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setMonth(d.getMonth() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function abrirEditorCiclos(tarjetaId) {
+  const t = state.tarjetas.find(x => x.id === tarjetaId);
+  if (!t) return;
+  _editorCiclosTarjetaId = tarjetaId;
+
+  document.getElementById('edc-subtitulo').textContent = t.nombre;
+  document.getElementById('edc-dia-cierre').value = t.dia_cierre || '';
+  document.getElementById('edc-dia-venc').value = t.dia_vencimiento || '';
+
+  // Ciclos de -5 a +3 meses (cubre lo que se ve en la lista + próximos)
+  const hoy = new Date();
+  const vistos = new Set();
+  const filas = [];
+  for (let i = -5; i <= 3; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
+    const rm = resumenTarjeta(t, state.gastos, d);
+    if (!rm.periodo || vistos.has(rm.periodo)) continue;
+    vistos.add(rm.periodo);
+    filas.push({ periodo: rm.periodo, cierre: rm.fecha_cierre, venc: rm.fecha_vencimiento });
+  }
+  filas.sort((a, b) => b.periodo.localeCompare(a.periodo)); // más reciente primero
+
+  const cont = document.getElementById('edc-lista');
+  cont.innerHTML = filas.map(f => {
+    const [y, m] = f.periodo.split('-');
+    const label = `${_CICLO_MESES[parseInt(m, 10) - 1]} ${y}`;
+    return `
+      <div class="edc-row" data-periodo="${f.periodo}">
+        <span class="edc-row-mes">${label}</span>
+        <label class="edc-row-field"><span>Cierre</span>
+          <input type="date" class="input edc-cierre" value="${f.cierre || ''}"></label>
+        <label class="edc-row-field"><span>Vence</span>
+          <input type="date" class="input edc-venc" value="${f.venc || ''}"></label>
+      </div>`;
+  }).join('');
+
+  document.getElementById('dlg-editar-ciclos').showModal();
+}
+
+async function guardarEditorCiclos() {
+  const t = state.tarjetas.find(x => x.id === _editorCiclosTarjetaId);
+  if (!t) return;
+
+  const diaCierre = parseInt(document.getElementById('edc-dia-cierre').value, 10);
+  const diaVenc   = parseInt(document.getElementById('edc-dia-venc').value, 10);
+  if (diaCierre >= 1 && diaCierre <= 31) t.dia_cierre = diaCierre;
+  if (diaVenc   >= 1 && diaVenc   <= 31) t.dia_vencimiento = diaVenc;
+
+  // Filas en orden ascendente por período (para encadenar el inicio de cada ciclo)
+  const rows = [...document.querySelectorAll('#edc-lista .edc-row')]
+    .map(row => ({
+      periodo: row.dataset.periodo,
+      cierre:  row.querySelector('.edc-cierre').value,
+      venc:    row.querySelector('.edc-venc').value,
+    }))
+    .filter(r => r.cierre)
+    .sort((a, b) => a.periodo.localeCompare(b.periodo));
+
+  // Validaciones: vencimiento posterior al cierre y cierres crecientes
+  let prev = null;
+  for (const r of rows) {
+    if (r.venc && r.venc <= r.cierre) {
+      toast(`El vencimiento de ${r.periodo} debe ser posterior al cierre`, 3000); return;
+    }
+    if (prev && r.cierre <= prev) {
+      toast(`El cierre de ${r.periodo} debe ser posterior al ciclo anterior`, 3000); return;
+    }
+    prev = r.cierre;
+  }
+
+  // Conservar ciclos custom fuera del rango editado; reconstruir los del rango.
+  const editados = new Set(rows.map(r => r.periodo));
+  const custom = (t.ciclos_custom || []).filter(c => !editados.has(c.periodo));
+
+  // Sólo se guarda un ciclo custom cuando difiere del "día fijo"; si coincide,
+  // se deja seguir la regla del día (así cambiar el día fijo mueve a todos).
+  let prevCierre = null;
+  for (const r of rows) {
+    const def = _defaultCierreVenc(t.dia_cierre, t.dia_vencimiento, r.periodo);
+    const difiere = r.cierre !== def.cierre || (r.venc && r.venc !== def.venc);
+    const inicio = prevCierre ? _diaSiguiente(prevCierre) : _diaSiguiente(_unMesAntesISO(r.cierre));
+    if (difiere) {
+      custom.push({ periodo: r.periodo, inicio, fin: r.cierre, vencimiento: r.venc || null });
+    }
+    prevCierre = r.cierre;
+  }
+
+  t.ciclos_custom = custom;
+  t.updated_at = nowTs();
+  await DB.put('tarjetas', t);
+
+  document.getElementById('dlg-editar-ciclos').close();
+  toast('✓ Fechas de los ciclos actualizadas');
+  await reloadAll();
+  abrirDrawerTarjeta(_editorCiclosTarjetaId);
+}
+
+// Wiring del editor de ciclos
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#td-editar-ciclos')) {
+    if (_drawerTarjetaIdActual) abrirEditorCiclos(_drawerTarjetaIdActual);
+  } else if (e.target.closest('#edc-guardar')) {
+    guardarEditorCiclos();
+  } else if (e.target.closest('#edc-cancelar') || e.target.closest('#edc-close-x')) {
+    document.getElementById('dlg-editar-ciclos')?.close();
+  }
+});
+
 /* ── Pago de ciclo de tarjeta (con descuento de cuenta) ────────── */
 let _pagoCicloCtx = null;
 

@@ -3894,6 +3894,22 @@ body.view-analisis #main-widgets::before {
 }
 .salud-section-title:first-child { margin-top: 0; }
 
+/* ── Editor masivo de cierres/vencimientos ─────────────────────── */
+.edc-lista { display: flex; flex-direction: column; gap: .45rem; margin-top: .25rem; }
+.edc-row {
+  display: flex; align-items: end; gap: .55rem; flex-wrap: wrap;
+  padding: .5rem .6rem; border-radius: .6rem;
+  background: var(--surface-2, rgba(255,255,255,0.03));
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+.edc-row-mes {
+  flex: 1 1 100%; font-size: .72rem; font-weight: 600;
+  color: var(--brand); letter-spacing: .02em;
+}
+.edc-row-field { flex: 1; min-width: 130px; display: flex; flex-direction: column; gap: .2rem; }
+.edc-row-field span { font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); }
+.edc-row-field input { padding: .35rem .5rem; font-size: .8rem; }
+
 /* ── Editor de cotizaciones ────────────────────────────────────── */
 .ec-lista { display: flex; flex-direction: column; gap: .5rem; margin-top: .5rem; }
 .ec-row {

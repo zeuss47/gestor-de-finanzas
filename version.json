@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.31",
-    "build":  48,
-    "modified":  "2026-05-31T23:45:01Z",
-    "commit":  "M css/styles.css, M js/app.js, M js/pdf-import.js, M js/pdf-statement-parser.js, tests/test-posic...",
-    "notes":  "Auto-update 2026-05-31 20:45"
+    "version":  "1.32",
+    "build":  49,
+    "modified":  "2026-06-01T00:21:50Z",
+    "commit":  "M css/styles.css, M index.html, M js/app.js",
+    "notes":  "Auto-update 2026-05-31 21:21"
 }
