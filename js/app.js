@@ -775,9 +775,11 @@ async function reloadAll() {
   state.proyeccion = proyectarBalance({
     gastos: state.gastos, ingresos: state.ingresos,
     cuentas: state.cuentas, tarjetas: state.tarjetas, horizonte: 90,
+    cuotasPendientes: state.capacidad?.cuotas_pendientes || [],
   });
   state.saturacion = predecirSaturacionTarjetas({
     gastos: state.gastos, tarjetas: state.tarjetas, resumenes: state.resumenes,
+    cuotasPendientes: state.capacidad?.cuotas_pendientes || [],
   });
 
   // Asesor financiero integral (score + estrategias + pronóstico)
@@ -2447,6 +2449,7 @@ function renderPrediccion(el) {
     ingresos: state.ingresos,
     cuentas:  state.cuentas,
     tarjetas: state.tarjetas,
+    cuotasPendientes: state.capacidad?.cuotas_pendientes || [],
     horizonte: _predState.horizonte,
   });
 
@@ -2502,6 +2505,7 @@ function renderPrediccion(el) {
       gastos:    state.gastos,
       tarjetas:  state.tarjetas,
       resumenes: state.resumenes,
+      cuotasPendientes: state.capacidad?.cuotas_pendientes || [],
     });
     if (!sats.length) {
       tb.innerHTML = `<p class="text-xs text-center py-1" style="color:var(--ink-muted)">Sin tarjetas activas</p>`;

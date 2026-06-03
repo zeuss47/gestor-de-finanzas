@@ -28,6 +28,14 @@ function mean(xs) {
   return s / xs.length;
 }
 
+/** Mediana: robusta a meses atípicos (bonos, compras grandes one-shot). */
+function mediana(xs) {
+  if (!xs || xs.length === 0) return 0;
+  const a = [...xs].sort((p, q) => p - q);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
 /** Desviacion estandar poblacional. Devuelve 0 si <2 elementos. */
 function stdev(xs) {
   if (!xs || xs.length < 2) return 0;
@@ -148,7 +156,7 @@ function r2(x) { return Math.round(x * 100) / 100; }
 /**
  * Proyecta saldo total a futuro usando regresion + tendencia.
  */
-export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tarjetas = [], horizonte = 90 } = {}) {
+export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tarjetas = [], cuotasPendientes = [], horizonte = 90 } = {}) {
   const hoy = hoyISO();
   const horizDias = Math.max(1, Math.min(365, Number(horizonte) || 90));
 
@@ -207,12 +215,33 @@ export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tar
   ).length;
 
   /* ---------- Regresion + baseline + dispersion ---------- */
+  // Usar SOLO los meses con actividad real: los meses vacíos (sin ingresos ni
+  // gastos) inflaban falsamente la pendiente y disparaban la proyección.
+  const flujosConDatos = mesesSerie
+    .filter(m => (ingresosMes.get(m) || 0) > 0 || (gastosMes.get(m) || 0) > 0)
+    .map(m => (ingresosMes.get(m) || 0) - (gastosMes.get(m) || 0));
+  const serieFlujo = flujosConDatos.length >= 2 ? flujosConDatos : flujosMensuales;
   // pendiente: cuanto cambia el flujo mensual mes-a-mes
-  const { pendiente: tendenciaMensual, intercepto } = regresion(flujosMensuales);
-  // baseline: promedio ponderado (mas peso a los meses recientes)
-  const flujoBase = promedioPonderado(flujosMensuales);
-  const sigmaMes = stdev(flujosMensuales);
-  const muMes = mean(flujosMensuales);
+  const { pendiente: tendenciaMensual, intercepto } = regresion(serieFlujo);
+  // baseline: MEDIANA del flujo mensual → robusta a meses atípicos (un bono o
+  // una compra grande no distorsionan la proyección, a diferencia del promedio).
+  const flujoBase = mediana(serieFlujo);
+  const sigmaMes = stdev(serieFlujo);
+  const muMes = mean(serieFlujo);
+
+  /* ---------- Cuotas futuras comprometidas (no están en el histórico mensual
+     porque la compra en cuotas se registró de una vez). Se inyectan mes a mes
+     para que la proyección "escalone" cuando entra/sale una cuota. ---------- */
+  const egresoExtraPorMes = new Map();  // YYYY-MM -> monto de cuotas ese mes
+  for (const c of (cuotasPendientes || [])) {
+    if (!c || (c.cuotas_pendientes || 0) <= 0 || !(c.monto_cuota > 0)) continue;
+    const inicio = (typeof c.proxima_cuota_periodo === 'string' && c.proxima_cuota_periodo.length >= 7)
+      ? c.proxima_cuota_periodo.slice(0, 7) : mesActual;
+    for (let k = 0; k < c.cuotas_pendientes; k++) {
+      const mk = shiftMonth(inicio, k);
+      egresoExtraPorMes.set(mk, (egresoExtraPorMes.get(mk) || 0) + c.monto_cuota);
+    }
+  }
 
   // Para confianza: desvio relativo respecto al promedio absoluto del egreso
   const promGastoMes = mean(mesesSerie.map(m => gastosMes.get(m) || 0));
@@ -239,8 +268,14 @@ export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tar
   saldosBuf[0] = saldoActual;
 
   for (let d = 1; d <= horizDias; d++) {
-    // saldo(t) = saldo(t-1) + flujoBase + tendencia*t  (tendencia integrada)
-    saldosBuf[d] = saldosBuf[d - 1] + flujoDiarioBase + tendenciaDiaria * d;
+    // Cuotas comprometidas que caen en el mes de este día, prorrateadas.
+    const mesDia = addDays(hoy, d).slice(0, 7);
+    const cuotaDia = (egresoExtraPorMes.get(mesDia) || 0) / 30;
+    // Tendencia ACOTADA: extrapolamos el cambio de ritmo a lo sumo ~30 días y
+    // luego lo mantenemos constante (no extrapolar un trend mensual de forma
+    // cuadrática a 90 días → era la mayor fuente de imprecisión).
+    const flujoDia = flujoDiarioBase + tendenciaDiaria * Math.min(d, 30);
+    saldosBuf[d] = saldosBuf[d - 1] + flujoDia - cuotaDia;
   }
 
   let primerDiaNegativo = -1;
@@ -309,77 +344,88 @@ export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tar
  * Predice cuando cada tarjeta llegara a 50/80/100% del limite segun ritmo
  * de gasto de los ultimos 90 dias.
  */
-export function predecirSaturacionTarjetas({ gastos = [], tarjetas = [], resumenes = [] } = {}) {
+export function predecirSaturacionTarjetas({ gastos = [], tarjetas = [], resumenes = [], cuotasPendientes = [] } = {}) {
   const hoy = hoyISO();
+  const hace30 = addDays(hoy, -30);
   const hace90 = addDays(hoy, -90);
 
-  // Indexar gastos por tarjeta_id en los ultimos 90 dias
-  const sumPorTarjeta = new Map();
+  // Ritmo de consumo por tarjeta en ventanas de 30 y 90 días.
+  const sum30 = new Map(), sum90 = new Map();
   for (const g of gastos) {
     if (g.deleted || !g.tarjeta_id || !g.fecha) continue;
-    if (g.fecha < hace90 || g.fecha > hoy) continue;
-    sumPorTarjeta.set(g.tarjeta_id,
-      (sumPorTarjeta.get(g.tarjeta_id) || 0) + montoEfectivo(g));
+    if (g.fecha > hoy) continue;
+    const m = montoEfectivo(g);
+    if (g.fecha >= hace90) sum90.set(g.tarjeta_id, (sum90.get(g.tarjeta_id) || 0) + m);
+    if (g.fecha >= hace30) sum30.set(g.tarjeta_id, (sum30.get(g.tarjeta_id) || 0) + m);
   }
 
-  // Indexar resumen actual por tarjeta
+  // Resumen actual real (campo total_resumen) por tarjeta.
   const resumenPorTarjeta = new Map();
   for (const r of resumenes) {
     if (!r || !r.tarjeta_id) continue;
-    const total = Number(r.total ?? r.total_periodo ?? r.monto ?? 0) || 0;
+    const total = Number(r.total_resumen ?? r.total ?? r.total_periodo ?? r.monto ?? 0) || 0;
     resumenPorTarjeta.set(r.tarjeta_id, (resumenPorTarjeta.get(r.tarjeta_id) || 0) + total);
+  }
+
+  // Cuota mensual comprometida por tarjeta (consumo que cae igual cada mes).
+  const cuotaMensual = new Map();
+  for (const c of (cuotasPendientes || [])) {
+    if (!c || !c.tarjeta_id || (c.cuotas_pendientes || 0) <= 0) continue;
+    cuotaMensual.set(c.tarjeta_id, (cuotaMensual.get(c.tarjeta_id) || 0) + (c.monto_cuota || 0));
   }
 
   const out = [];
   for (const t of tarjetas) {
     if (t.deleted) continue;
-    const sum90 = sumPorTarjeta.get(t.id) || 0;
-    const ritmoDiario = sum90 / 90;
     const limiteTotal = (Number(t.limite_un_pago) || 0) + (Number(t.limite_cuotas) || 0);
-    const resumenActual = resumenPorTarjeta.get(t.id) || 0;
+    const base = resumenPorTarjeta.get(t.id) || 0;             // ya consumido
+    // Ritmo diario ponderado a lo reciente (más peso a 30d).
+    const r30 = (sum30.get(t.id) || 0) / 30;
+    const r90 = (sum90.get(t.id) || 0) / 90;
+    const ritmoDiario = 0.6 * r30 + 0.4 * r90;
+    const cuotasMes = cuotaMensual.get(t.id) || 0;
+    // Consumo efectivo por día = ritmo de compras nuevas + prorrateo de cuotas.
+    const ritmoEfectivo = ritmoDiario + cuotasMes / 30;
 
-    // Si no hay ritmo o no hay limite, no se puede proyectar
-    if (ritmoDiario <= 0 || limiteTotal <= 0) {
-      out.push({
-        tarjeta_id: t.id,
-        tarjeta_nombre: t.nombre,
-        dias_para_50: null,
-        dias_para_80: null,
-        dias_para_100: null,
-        ritmo_diario: r2(ritmoDiario),
-        alerta: null,
-      });
+    if (limiteTotal <= 0) {
+      out.push({ tarjeta_id: t.id, tarjeta_nombre: t.nombre, dias_para_50: null, dias_para_80: null,
+        dias_para_100: null, ritmo_diario: r2(ritmoDiario), alerta: null,
+        porcentaje_actual: null, margen_disponible: null, consumo_proyectado_30d: null,
+        saturacion_fin_ciclo_pct: null, cuotas_mensuales: r2(cuotasMes), ritmo_efectivo: r2(ritmoEfectivo) });
       continue;
     }
 
-    // dias = (limite * pct - resumen_actual) / ritmo
-    const calcDias = (pct) => {
-      const objetivo = limiteTotal * pct;
-      const restante = objetivo - resumenActual;
+    // días hasta % del límite considerando consumo nuevo + cuotas comprometidas.
+    const diasParaPct = (pct) => {
+      if (ritmoEfectivo <= 0) return null;
+      const restante = limiteTotal * pct - base;
       if (restante <= 0) return 0;
-      const d = restante / ritmoDiario;
-      return d > 0 ? Math.round(d) : 0;
+      return Math.round(restante / ritmoEfectivo);
     };
+    const d50 = diasParaPct(0.50), d80 = diasParaPct(0.80), d100 = diasParaPct(1.00);
 
-    const d50 = calcDias(0.50);
-    const d80 = calcDias(0.80);
-    const d100 = calcDias(1.00);
+    const pctActual = (base / limiteTotal) * 100;
+    const consumo30 = base + ritmoEfectivo * 30;
+    const satFinCiclo = (consumo30 / limiteTotal) * 100;
 
     let alerta = null;
-    if (d100 !== null && d100 < 30) alerta = 'Saturacion inminente';
-    else if (d80 !== null && d80 < 15) alerta = 'Acercandose al limite';
+    if (d100 != null && d100 < 30) alerta = 'Saturación inminente';
+    else if (d80 != null && d80 < 15) alerta = 'Acercándose al límite';
+    else if (satFinCiclo >= 90) alerta = 'Cierre del ciclo casi al tope';
 
     out.push({
-      tarjeta_id: t.id,
-      tarjeta_nombre: t.nombre,
-      dias_para_50: d50,
-      dias_para_80: d80,
-      dias_para_100: d100,
+      tarjeta_id: t.id, tarjeta_nombre: t.nombre,
+      dias_para_50: d50, dias_para_80: d80, dias_para_100: d100,
       ritmo_diario: r2(ritmoDiario),
+      ritmo_efectivo: r2(ritmoEfectivo),
+      cuotas_mensuales: r2(cuotasMes),
+      porcentaje_actual: r2(pctActual),
+      margen_disponible: r2(limiteTotal - base),
+      consumo_proyectado_30d: r2(consumo30),
+      saturacion_fin_ciclo_pct: r2(satFinCiclo),
       alerta,
     });
   }
-
   return out;
 }
 
