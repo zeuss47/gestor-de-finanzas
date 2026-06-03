@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.51",
-    "build":  68,
-    "modified":  "2026-06-03T08:43:08Z",
-    "commit":  "M css/styles.css, M index.html, M js/app.js, tests/_shots/rot_dashboard.png, tests/_shots/rot_set...",
-    "notes":  "Auto-update 2026-06-03 05:43"
+    "version":  "1.52",
+    "build":  69,
+    "modified":  "2026-06-03T13:05:18Z",
+    "commit":  "M css/styles.css, tests/_shots/rot_drawer.png, tests/_shots/rot_gasto.png",
+    "notes":  "Auto-update 2026-06-03 10:05"
 }
