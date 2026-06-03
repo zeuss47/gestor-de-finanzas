@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.46",
-    "build":  63,
-    "modified":  "2026-06-03T06:55:04Z",
-    "commit":  "M css/styles.css",
-    "notes":  "Auto-update 2026-06-03 03:55"
+    "version":  "1.47",
+    "build":  64,
+    "modified":  "2026-06-03T07:15:52Z",
+    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js, tests/visual-harness.mjs",
+    "notes":  "Auto-update 2026-06-03 04:15"
 }

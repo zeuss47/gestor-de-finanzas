@@ -2528,16 +2528,14 @@
         </fieldset>
 
         <fieldset class="space-y-2 mt-4">
-          <legend>Color de acento</legend>
-          <input name="color_primario" type="color" class="block w-full h-10 p-1 rounded-xl cursor-pointer"
-                 style="background:var(--surface-2);border:1px solid var(--border)" />
-          <div class="grid grid-cols-6 gap-2 mt-2">
-            <button type="button" class="color-preset" data-color="#00f0ff" style="background:#00f0ff"></button>
-            <button type="button" class="color-preset" data-color="#ff00ea" style="background:#ff00ea"></button>
-            <button type="button" class="color-preset" data-color="#39ff14" style="background:#39ff14"></button>
-            <button type="button" class="color-preset" data-color="#ffea00" style="background:#ffea00"></button>
-            <button type="button" class="color-preset" data-color="#ff2d92" style="background:#ff2d92"></button>
-            <button type="button" class="color-preset" data-color="#b537ff" style="background:#b537ff"></button>
+          <legend>Colores del sistema</legend>
+          <p class="text-xs mb-2" style="color:var(--ink-muted)">
+            Personalizá cada color de la app. Los cambios se ven al instante y combinan con el tema claro/oscuro.
+          </p>
+          <input type="hidden" name="color_primario" />
+          <div id="colores-sistema" class="space-y-2"></div>
+          <div class="flex gap-2 mt-3">
+            <button type="button" id="colores-reset" class="btn-secondary text-xs flex-1">↺ Restablecer colores</button>
           </div>
         </fieldset>
 

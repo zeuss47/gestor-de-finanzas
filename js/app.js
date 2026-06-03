@@ -385,13 +385,98 @@ function aplicarTema() {
   // "oscuro" es el default visual; "claro" aplica la clase light
   const esClaro = tema === 'claro' || (tema === 'auto' && !matchMedia('(prefers-color-scheme: dark)').matches);
   html.classList.toggle('light', esClaro);
-  const color = state.ajustes?.ui?.color_primario || '#6366f1';
-  document.documentElement.style.setProperty('--brand', color);
-  // El glow y el "soft" se derivan del color elegido para que todo combine
-  // (FAB, nav, widgets) en vez de quedar un cyan fijo que no matchea.
-  document.documentElement.style.setProperty('--brand-glow', `${color}88`);
-  document.documentElement.style.setProperty('--brand-soft', `${color}26`);
+  aplicarColoresPersonalizados(esClaro);
   document.getElementById('meta-theme')?.setAttribute('content', esClaro ? '#f0f4ff' : '#07090f');
+}
+
+/* ============ Sistema de colores personalizable ============
+   El usuario puede personalizar todos los colores del sistema. Definimos cada
+   color con su valor por defecto (oscuro/claro) y las variables CSS que afecta.
+   `bg`/`soft`/`-2` se DERIVAN del color base para mantener coherencia.        */
+const PALETA_SISTEMA = [
+  { id: 'brand',   nombre: 'Acento principal',  desc: 'Botones, links, resaltados', def: '#00f0ff', defLight: '#4f46e5',
+    vars: c => ({ '--brand': c, '--brand-glow': c + '88', '--brand-soft': c + '26', '--info': c, '--info-bg': c + '1a' }) },
+  { id: 'brand2',  nombre: 'Acento secundario', desc: 'Gradientes, segundo neón',   def: '#ff00ea', defLight: '#ec4899',
+    vars: c => ({ '--brand-2': c, '--neon-pink': c }) },
+  { id: 'brand3',  nombre: 'Acento terciario',  desc: 'Detalles, badges',           def: '#ffea00', defLight: '#f59e0b',
+    vars: c => ({ '--brand-3': c }) },
+  { id: 'success', nombre: 'Éxito / Ingresos',  desc: 'Saldos positivos, ingresos', def: '#00ff9f', defLight: '#059669',
+    vars: c => ({ '--success': c, '--success-2': _ajustarLuminancia(c, 1.3), '--success-bg': c + '1a', '--neon-green': c }) },
+  { id: 'danger',  nombre: 'Peligro / Gastos',  desc: 'Gastos, alertas, eliminar',  def: '#ff2d6e', defLight: '#dc2626',
+    vars: c => ({ '--danger': c, '--danger-2': _ajustarLuminancia(c, 1.3), '--danger-bg': c + '1a' }) },
+  { id: 'warning', nombre: 'Advertencia',       desc: 'Avisos, vencimientos',       def: '#ffb800', defLight: '#d97706',
+    vars: c => ({ '--warning': c, '--warning-2': _ajustarLuminancia(c, 1.3), '--warning-bg': c + '1a' }) },
+];
+
+/** Aplica los colores (custom o por defecto del tema) a las variables CSS. */
+function aplicarColoresPersonalizados(esClaro) {
+  const custom = state.ajustes?.ui?.colores || {};
+  const root = document.documentElement.style;
+  let brandVal = '#00f0ff', brand2Val = '#ff00ea';
+  for (const c of PALETA_SISTEMA) {
+    // legacy: color_primario sigue siendo el acento principal si no hay custom.brand
+    const fallback = (c.id === 'brand' && state.ajustes?.ui?.color_primario) || (esClaro ? c.defLight : c.def);
+    const valor = custom[c.id] || fallback;
+    if (c.id === 'brand')  brandVal  = valor;
+    if (c.id === 'brand2') brand2Val = valor;
+    const vars = c.vars(valor);
+    for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
+  }
+  // Glows decorativos del fondo, derivados del acento (adaptan al color y al
+  // tema: más sutiles en claro para que no ensucien el fondo blanco).
+  const aG = esClaro ? '14' : '26';   // alpha radial 1 (hex)
+  const bG = esClaro ? '0d' : '18';   // alpha radial 2
+  root.setProperty('--bg-glow-a', brandVal  + aG);
+  root.setProperty('--bg-glow-b', brand2Val + bG);
+  root.setProperty('--bg-grid',   brandVal  + (esClaro ? '08' : '06'));
+}
+
+/** Color efectivo actual de un id de la paleta (custom o default del tema). */
+function _colorActual(id, esClaro) {
+  const c = PALETA_SISTEMA.find(x => x.id === id);
+  if (!c) return '#000000';
+  const custom = state.ajustes?.ui?.colores || {};
+  return custom[id] || (c.id === 'brand' && state.ajustes?.ui?.color_primario) || (esClaro ? c.defLight : c.def);
+}
+
+/** Renderiza el panel de colores personalizables en Ajustes → General. */
+function renderColoresSistema() {
+  const cont = document.getElementById('colores-sistema');
+  if (!cont) return;
+  const esClaro = document.documentElement.classList.contains('light');
+  cont.innerHTML = PALETA_SISTEMA.map(c => {
+    const val = _colorActual(c.id, esClaro);
+    return `
+      <div class="color-row" data-color-id="${c.id}">
+        <label class="color-swatch-wrap" title="Elegir color">
+          <span class="color-swatch-preview" style="background:${escapeHtml(val)}"></span>
+          <input type="color" class="color-swatch-input" value="${escapeHtml(val)}" data-color-input="${c.id}">
+        </label>
+        <div class="color-row-info">
+          <span class="color-row-name">${escapeHtml(c.nombre)}</span>
+          <span class="color-row-desc">${escapeHtml(c.desc)}</span>
+        </div>
+        <span class="color-row-hex">${escapeHtml(val.toUpperCase())}</span>
+      </div>`;
+  }).join('');
+
+  cont.querySelectorAll('[data-color-input]').forEach(inp => {
+    // 'input' = preview en vivo mientras arrastra el picker (sin escribir a DB)
+    inp.oninput = () => {
+      const id = inp.dataset.colorInput;
+      if (!state.ajustes.ui.colores) state.ajustes.ui.colores = {};
+      state.ajustes.ui.colores[id] = inp.value;
+      if (id === 'brand') state.ajustes.ui.color_primario = inp.value; // legacy sync
+      const row = inp.closest('.color-row');
+      row.querySelector('.color-swatch-preview').style.background = inp.value;
+      row.querySelector('.color-row-hex').textContent = inp.value.toUpperCase();
+      aplicarTema();
+    };
+    // 'change' = al soltar el picker, persistimos a IndexedDB (y se sincroniza)
+    inp.onchange = async () => {
+      try { await DB.put('ajustes', state.ajustes); notificarCambioLocal(); } catch {}
+    };
+  });
 }
 
 /* ============ Carga inicial ============ */
@@ -3271,7 +3356,7 @@ function abrirSettings() {
   if (form.elements.gh_ruta)            form.elements.gh_ruta.value            = aj.github?.ruta_datos || 'data';
   if (form.elements.sync_intervalo)     form.elements.sync_intervalo.value     = String(aj.sync_intervalo ?? 300000);
   actualizarSyncStatusCard();
-  if (form.elements.color_primario)     form.elements.color_primario.value     = aj.ui?.color_primario || '#00f0ff';
+  renderColoresSistema();
   if (form.elements.moneda)             form.elements.moneda.value             = aj.moneda || 'ARS';
   if (form.elements.nombre_usuario)     form.elements.nombre_usuario.value     = aj.nombre_usuario || '';
   if (form.elements.sensibilidad_ia)    form.elements.sensibilidad_ia.value    = aj.sensibilidad_ia || 'moderado';
@@ -3387,7 +3472,8 @@ async function guardarSettings(form) {
     ruta_datos: form.elements.gh_ruta?.value || 'data',
   };
   aj.sync_intervalo = parseInt(form.elements.sync_intervalo?.value) || 300000;
-  aj.ui.color_primario = form.elements.color_primario?.value || '#00f0ff';
+  // Los colores (aj.ui.colores y color_primario) ya se guardaron en vivo desde
+  // renderColoresSistema() al elegirlos; no los pisamos acá.
   aj.moneda            = form.elements.moneda?.value || 'ARS';
   aj.nombre_usuario    = form.elements.nombre_usuario?.value || '';
   aj.sensibilidad_ia   = form.elements.sensibilidad_ia?.value || 'moderado';
@@ -6441,12 +6527,14 @@ async function init() {
   document.querySelectorAll('#settings-tabs .settings-tab').forEach(b =>
     b.addEventListener('click', () => cambiarSettingsTab(b.dataset.stab)));
 
-  // Color presets
-  document.querySelectorAll('.color-preset').forEach(b =>
-    b.addEventListener('click', () => {
-      const input = document.querySelector('#dlg-settings [name="color_primario"]');
-      if (input) input.value = b.dataset.color;
-    }));
+  // Restablecer colores del sistema a los defaults del tema
+  document.getElementById('colores-reset')?.addEventListener('click', async () => {
+    if (state.ajustes?.ui) { state.ajustes.ui.colores = {}; state.ajustes.ui.color_primario = ''; }
+    aplicarTema();
+    renderColoresSistema();
+    try { await DB.put('ajustes', state.ajustes); notificarCambioLocal(); } catch {}
+    toast('Colores restablecidos');
+  });
 
   // Export JSON
   document.getElementById('btn-export-json')?.addEventListener('click', async () => {
