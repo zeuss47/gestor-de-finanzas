@@ -267,13 +267,187 @@ function pronostico3Meses(ctx) {
   return out;
 }
 
+/* ─── Estrategia inversora (Bogle / Graham / Buffett / Dalio) ──
+ *
+ * Convierte el excedente mensual en un PLAN DE ACCIÓN ordenado por prioridad
+ * absoluta. Es una cascada: cada peldaño consume el excedente disponible antes
+ * de pasar al siguiente. Determinista y 100% local.
+ *
+ *   1. Buffett — Ratio de ahorro mínimo: chequea que el excedente alcance el
+ *      % mínimo del ingreso. Si no, indica cuánto recortar de gastos variables.
+ *   2. Graham — Fondo de emergencia: hasta cubrir N meses de gastos fijos, TODO
+ *      el excedente va al colchón. Prohibido invertir.
+ *   3. Buffett — Deuda mala: si hay deuda con interés alto (tarjetas/cuotas que
+ *      superan el umbral), se amortiza antes de invertir.
+ *   4. Dalio — All Weather: el remanente se reparte según la distribución.
+ */
+
+const ALLWEATHER_LABELS = {
+  renta_variable: { label: 'Renta variable indexada', icon: '📈' },
+  bonos_largo:    { label: 'Bonos de largo plazo',     icon: '🏛️' },
+  bonos_medio:    { label: 'Bonos de mediano plazo',   icon: '📊' },
+  oro:            { label: 'Oro',                       icon: '🥇' },
+  commodities:    { label: 'Commodities',              icon: '🛢️' },
+};
+
+const CONFIG_INVERSORA_DEFAULT = {
+  activa: true,
+  ahorro_minimo_pct: 20,
+  meses_fondo_emergencia: 6,
+  umbral_deuda_mala_pct: 8,
+  distribucion: { renta_variable: 30, bonos_largo: 40, bonos_medio: 15, oro: 7.5, commodities: 7.5 },
+};
+
+function planGestionMensual(ctx, configRaw) {
+  const cfg = { ...CONFIG_INVERSORA_DEFAULT, ...(configRaw || {}) };
+  cfg.distribucion = { ...CONFIG_INVERSORA_DEFAULT.distribucion, ...(configRaw?.distribucion || {}) };
+  const fmt = (n) => '$' + r0(n).toLocaleString('es-AR');
+
+  const { ingresoMes, gastosHabituales, compromisoMensual, saldoLiquido, metas = [] } = ctx;
+  const gastosFijos = gastosHabituales + compromisoMensual;
+  const disponible  = ingresoMes - gastosFijos;       // excedente mensual
+
+  // ── Fondo de emergencia: de las metas marcadas, o derivado de gastos fijos ──
+  const metasEmergencia = (metas || []).filter(m => !m.deleted && m.es_emergencia);
+  const fondoActual = metasEmergencia.reduce((a, m) => a + (m.monto_actual || 0), 0);
+  const objetivoMetas = metasEmergencia.reduce((a, m) => a + (m.monto_objetivo || 0), 0);
+  const objetivoDerivado = gastosFijos * cfg.meses_fondo_emergencia;
+  const fondoObjetivo = objetivoMetas > 0 ? objetivoMetas : objetivoDerivado;
+  const faltaFondo = Math.max(0, fondoObjetivo - fondoActual);
+  const mesesCubiertos = gastosFijos > 0 ? fondoActual / gastosFijos : (fondoActual > 0 ? 99 : 0);
+
+  // ── Deuda mala (proxy): compromiso mensual de tarjetas/cuotas ──
+  // El sistema no guarda tasa por deuda; el crédito rotativo y las cuotas suelen
+  // superar el umbral, así que el compromiso mensual se trata como deuda a cancelar.
+  const deudaMalaMensual = compromisoMensual;
+
+  const pasos = [];
+  const ahorroMinimo = ingresoMes * (cfg.ahorro_minimo_pct / 100);
+
+  // Estado de déficit: no hay excedente para gestionar
+  if (ingresoMes <= 0) {
+    return { disponible: 0, estado: 'sin_datos', mensaje: 'Cargá tus ingresos para activar el plan de gestión.', pasos: [], inversion: null, config: cfg };
+  }
+  if (disponible <= 0) {
+    return {
+      disponible: r0(disponible), estado: 'deficit',
+      mensaje: `Tu flujo mensual es negativo o nulo (${fmt(disponible)}). Antes de ahorrar o invertir, equilibrá ingresos y gastos.`,
+      pasos: [{
+        n: 1, clave: 'deficit', icon: '🚨', titulo: 'Equilibrá tu flujo primero',
+        detalle: `Gastás ${fmt(gastosFijos)} sobre un ingreso de ${fmt(ingresoMes)}. No queda excedente para gestionar.`,
+        monto: 0, accion: `Recortá al menos ${fmt(Math.abs(disponible) + 1)} de gastos o subí ingresos.`,
+      }],
+      inversion: null, config: cfg,
+    };
+  }
+
+  let restante = disponible;
+
+  // ── PASO 1 — Buffett: ratio de ahorro mínimo ──
+  const cumpleAhorro = disponible >= ahorroMinimo;
+  pasos.push({
+    n: 1, clave: 'ahorro_minimo', icon: cumpleAhorro ? '✅' : '⚠',
+    titulo: `Ahorro mínimo (regla Buffett ${cfg.ahorro_minimo_pct}%)`,
+    detalle: cumpleAhorro
+      ? `Tu excedente (${fmt(disponible)}) supera el mínimo del ${cfg.ahorro_minimo_pct}% del ingreso (${fmt(ahorroMinimo)}). Vas bien.`
+      : `Tu excedente (${fmt(disponible)}) está por debajo del ${cfg.ahorro_minimo_pct}% objetivo (${fmt(ahorroMinimo)}). Te faltan ${fmt(ahorroMinimo - disponible)}.`,
+    monto: r0(ahorroMinimo),
+    accion: cumpleAhorro ? null : `Recortá ${fmt(ahorroMinimo - disponible)} de gastos variables para llegar al mínimo.`,
+    estado: cumpleAhorro ? 'ok' : 'alerta',
+  });
+
+  // ── PASO 2 — Graham: fondo de emergencia (puerta) ──
+  if (faltaFondo > 0) {
+    const aporte = Math.min(restante, faltaFondo);
+    restante -= aporte;
+    const mesesParaCubrir = aporte > 0 ? Math.ceil(faltaFondo / aporte) : null;
+    pasos.push({
+      n: 2, clave: 'fondo_emergencia', icon: '🛟',
+      titulo: 'Fondo de emergencia (prioridad absoluta)',
+      detalle: `Cubrís ${mesesCubiertos.toFixed(1)} de ${cfg.meses_fondo_emergencia} meses de gastos fijos. Objetivo ${fmt(fondoObjetivo)}, tenés ${fmt(fondoActual)}, faltan ${fmt(faltaFondo)}.`,
+      monto: r0(aporte),
+      accion: `Destiná ${fmt(aporte)} este mes al fondo${mesesParaCubrir ? ` (completo en ~${mesesParaCubrir} ${mesesParaCubrir === 1 ? 'mes' : 'meses'})` : ''}. Hasta cubrirlo, no inviertas.`,
+      estado: 'gate',
+    });
+  } else {
+    pasos.push({
+      n: 2, clave: 'fondo_emergencia', icon: '✅',
+      titulo: 'Fondo de emergencia cubierto',
+      detalle: `Ya tenés ${cfg.meses_fondo_emergencia}+ meses de gastos fijos cubiertos (${fmt(fondoActual)}). Podés avanzar a deuda e inversión.`,
+      monto: 0, accion: null, estado: 'ok',
+    });
+  }
+
+  // ── PASO 3 — Buffett: deuda mala antes de invertir ──
+  if (restante > 0 && deudaMalaMensual > 0) {
+    const aporte = restante; // todo el remanente a amortizar mientras haya deuda
+    restante = 0;
+    pasos.push({
+      n: 3, clave: 'deuda_mala', icon: '🔻',
+      titulo: 'Amortizar deuda antes de invertir',
+      detalle: `Tenés ${fmt(deudaMalaMensual)}/mes comprometidos en tarjetas/cuotas. Toda deuda con interés sobre el ${cfg.umbral_deuda_mala_pct}% anual rinde más cancelarla que cualquier inversión.`,
+      monto: r0(aporte),
+      accion: `Usá el excedente libre (${fmt(aporte)}) para adelantar pagos y bajar el compromiso mensual.`,
+      estado: 'gate',
+    });
+  } else if (deudaMalaMensual > 0) {
+    pasos.push({
+      n: 3, clave: 'deuda_mala', icon: 'ℹ️',
+      titulo: 'Deuda pendiente',
+      detalle: `Tenés ${fmt(deudaMalaMensual)}/mes en tarjetas/cuotas, pero el excedente ya se consumió en el fondo de emergencia. Priorizá la deuda cuando liberes margen.`,
+      monto: 0, accion: null, estado: 'info',
+    });
+  }
+
+  // ── PASO 4 — Dalio: distribución All Weather del remanente ──
+  let inversion = null;
+  if (restante > 0) {
+    const dist = cfg.distribucion;
+    const sumaPct = Object.values(dist).reduce((a, b) => a + (Number(b) || 0), 0) || 100;
+    const items = Object.keys(ALLWEATHER_LABELS)
+      .filter(k => (dist[k] || 0) > 0)
+      .map(k => {
+        const pct = (dist[k] || 0);
+        return { clave: k, ...ALLWEATHER_LABELS[k], pct, monto: r0(restante * pct / sumaPct) };
+      });
+    inversion = { total: r0(restante), estrategia: 'All Weather (Ray Dalio)', items };
+    pasos.push({
+      n: 4, clave: 'inversion', icon: '🌦️',
+      titulo: 'Invertir el excedente — All Weather (Dalio)',
+      detalle: `Te queda ${fmt(restante)} libre para invertir. Repartilo según la cartera All Weather, balanceada para cualquier clima económico.`,
+      monto: r0(restante), accion: null, estado: 'invertir',
+    });
+  }
+
+  // Mensaje resumen según el peldaño donde se detuvo el dinero
+  let estado, mensaje;
+  if (faltaFondo > 0) {
+    estado = 'fondo';
+    mensaje = `Prioridad: armar el fondo de emergencia. Destiná ${fmt(Math.min(disponible, faltaFondo))}/mes hasta cubrir ${cfg.meses_fondo_emergencia} meses.`;
+  } else if (deudaMalaMensual > 0 && inversion === null) {
+    estado = 'deuda';
+    mensaje = `Fondo cubierto. Ahora enfocá el excedente en cancelar deuda antes de invertir.`;
+  } else if (inversion) {
+    estado = 'inversion';
+    mensaje = `Fondo cubierto y sin deuda bloqueante. Invertí ${fmt(inversion.total)}/mes con la cartera All Weather.`;
+  } else {
+    estado = 'ok';
+    mensaje = `Plan al día. Seguí aportando al fondo y revisá tus metas.`;
+  }
+
+  return { disponible: r0(disponible), estado, mensaje, pasos, inversion, config: cfg };
+}
+
+export { planGestionMensual };
+
 /* ─── API principal ────────────────────────────────────────── */
 
 export function analizarSaludFinanciera(data = {}) {
   const {
-    gastos = [], ingresos = [], tarjetas = [],
+    gastos = [], ingresos = [], tarjetas = [], metas = [],
     capacidad = {}, estado = {}, resumenes = [],
     diagnosticos = [], proyeccion = {}, saturacion = [],
+    configInversora = null,
     hoy = new Date(),
   } = data;
 
@@ -302,12 +476,16 @@ export function analizarSaludFinanciera(data = {}) {
 
   const ctx = {
     ingresoMes, gastosHabituales, compromisoMensual, capacidadLibre,
-    saldoLiquido, tendenciaMensual, cuotasPendientes,
+    saldoLiquido, tendenciaMensual, cuotasPendientes, metas,
     subscores, categorias, saturacion, proyeccion, diagnosticos, hoy,
   };
 
   const estrategias = generarEstrategias(ctx);
   const pronostico = pronostico3Meses(ctx);
+  // Plan de gestión mensual (estrategia inversora Bogle/Graham/Buffett/Dalio)
+  const plan = (configInversora?.activa !== false)
+    ? planGestionMensual(ctx, configInversora)
+    : null;
 
   const tasaAhorroPct = Math.round(subscores._aux.tasaAhorro * 100);
   const resumen = ingresoMes <= 0
@@ -335,6 +513,7 @@ export function analizarSaludFinanciera(data = {}) {
     },
     estrategias,
     pronostico,
+    plan,
     resumen,
   };
 }

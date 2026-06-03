@@ -297,6 +297,22 @@ const AJUSTES_DEFAULT = {
     },
   },
   sensibilidad_ia: 'moderado',
+  // Estrategia inversora local (Bogle/Graham/Buffett/Dalio). La IA usa estos
+  // parámetros para armar el "Plan de gestión mensual" del excedente.
+  estrategia_inversora: {
+    activa: true,
+    ahorro_minimo_pct: 20,        // Regla Buffett: % mínimo del ingreso a ahorrar/invertir
+    meses_fondo_emergencia: 6,    // Graham: colchón antes de invertir
+    umbral_deuda_mala_pct: 8,     // Deuda con interés anual mayor a esto = "deuda mala"
+    // Distribución All Weather (Ray Dalio) del excedente invertible (en %).
+    distribucion: {
+      renta_variable: 30,
+      bonos_largo: 40,
+      bonos_medio: 15,
+      oro: 7.5,
+      commodities: 7.5,
+    },
+  },
   moneda: 'ARS',
   tipos_cambio: {
     USD: { nombre: 'Dólar oficial', valor: 1100, simbolo: '🇺🇸' },
@@ -330,12 +346,15 @@ const AJUSTES_DEFAULT = {
     ],
     // Gastos habituales = contadores con valor fijo (ej: "Vianda" $5000).
     // Cada toque en acción rápida registra un gasto de ese valor.
+    // cuenta_id por ítem: null = solo cuenta (no descuenta de ninguna cuenta);
+    // un id de cuenta = descuenta de esa cuenta en cada registro.
     habituales: [
-      { id: 'vianda',  nombre: 'Vianda',  icono: '🍱', color: '#fb923c', valor: 5000, categoria: 'comida' },
-      { id: 'cafe',    nombre: 'Café',    icono: '☕', color: '#a16207', valor: 2500, categoria: 'kiosco' },
+      { id: 'vianda',  nombre: 'Vianda',  icono: '🍱', color: '#fb923c', valor: 5000, categoria: 'comida',  cuenta_id: null },
+      { id: 'cafe',    nombre: 'Café',    icono: '☕', color: '#a16207', valor: 2500, categoria: 'kiosco',  cuenta_id: null },
     ],
   },
-  // Si se elige una cuenta, los gastos habituales se descuentan de ella.
+  // [Obsoleto] Cuenta global de habituales. Se mantiene solo para migrar
+  // instalaciones viejas a la config por-ítem (h.cuenta_id). Ya no se edita.
   habituales_cuenta_id: null,
   // Auto-actualización de la app (chequea version.json y aplica en silencio).
   auto_update: true,
@@ -547,6 +566,7 @@ async function reloadAll() {
     cuentas: state.cuentas, metas: state.metas,
     capacidad: state.capacidad, estado: state.estado, resumenes: state.resumenes,
     diagnosticos: state.diagnosticos, proyeccion: state.proyeccion, saturacion: state.saturacion,
+    configInversora: state.ajustes?.estrategia_inversora,
   });
 
   renderWidgets();
@@ -1227,6 +1247,22 @@ function renderIA(el) {
       </div>`;
   }
 
+  // ── Resumen compacto del plan de gestión mensual ──
+  const planBox = el.querySelector('[data-bind="plan-mini"]');
+  if (planBox) {
+    const plan = salud?.plan;
+    if (plan && plan.estado !== 'sin_datos') {
+      const ICON = { deficit:'🚨', fondo:'🛟', deuda:'🔻', inversion:'🌦️', ok:'✅' };
+      planBox.innerHTML = `
+        <div class="plan-mini">
+          <span class="plan-mini-icon">${ICON[plan.estado] || '📋'}</span>
+          <span class="plan-mini-txt"><b>Plan del mes:</b> ${escapeHtml(plan.mensaje)}</span>
+        </div>`;
+    } else {
+      planBox.innerHTML = '';
+    }
+  }
+
   // Botón "Ver análisis completo"
   el.querySelector('[data-action="ver-salud"]')?.addEventListener('click', abrirSaludFinanciera);
 
@@ -1248,10 +1284,79 @@ function _saludBaseData() {
     cuentas: state.cuentas, metas: state.metas,
     capacidad: state.capacidad, estado: state.estado, resumenes: state.resumenes,
     diagnosticos: state.diagnosticos, proyeccion: state.proyeccion, saturacion: state.saturacion,
+    configInversora: state.ajustes?.estrategia_inversora,
   };
 }
 
 const _FMT0 = (n) => '$' + Math.round(n || 0).toLocaleString('es-AR');
+
+/** Parsea un número y lo acota a [min,max], con fallback si no es válido. */
+function _numEntre(val, min, max, fallback) {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+/** HTML del "Plan de gestión mensual" (estrategia inversora Bogle/Graham/Buffett/Dalio). */
+function _planGestionHTML(plan) {
+  if (!plan) return '';
+  if (plan.estado === 'sin_datos') {
+    return `<p class="salud-section-title">📋 Plan de gestión mensual</p>
+      <p class="text-sm" style="color:var(--ink-muted)">${escapeHtml(plan.mensaje)}</p>`;
+  }
+  const ESTADO_COLOR = {
+    deficit: 'var(--danger)', fondo: 'var(--warning)', deuda: 'var(--warning)',
+    inversion: 'var(--success)', ok: 'var(--brand)',
+  };
+  const PASO_COLOR = {
+    ok: 'var(--success)', alerta: 'var(--warning)', gate: 'var(--warning)',
+    info: 'var(--ink-muted)', invertir: 'var(--success)', deficit: 'var(--danger)',
+  };
+  const headColor = ESTADO_COLOR[plan.estado] || 'var(--brand)';
+
+  const pasosHtml = plan.pasos.map(p => {
+    const col = PASO_COLOR[p.estado] || 'var(--brand)';
+    return `
+      <div class="plan-paso" style="border-left-color:${col}">
+        <div class="plan-paso-head">
+          <span class="plan-paso-icon">${p.icon}</span>
+          <span class="plan-paso-tit">${escapeHtml(p.titulo)}</span>
+          ${p.monto > 0 ? `<span class="plan-paso-monto" style="color:${col}">${_FMT0(p.monto)}</span>` : ''}
+        </div>
+        <p class="plan-paso-det">${escapeHtml(p.detalle)}</p>
+        ${p.accion ? `<p class="plan-paso-acc">💬 ${escapeHtml(p.accion)}</p>` : ''}
+      </div>`;
+  }).join('');
+
+  // Distribución de inversión (All Weather)
+  let invHtml = '';
+  if (plan.inversion && plan.inversion.items.length) {
+    const barras = plan.inversion.items.map(it => `
+      <div class="plan-inv-row">
+        <span class="plan-inv-label">${it.icon} ${escapeHtml(it.label)}</span>
+        <span class="plan-inv-pct">${it.pct}%</span>
+        <span class="plan-inv-monto">${_FMT0(it.monto)}</span>
+        <div class="plan-inv-bar"><div class="plan-inv-fill" style="width:${it.pct}%"></div></div>
+      </div>`).join('');
+    invHtml = `
+      <div class="plan-inversion">
+        <div class="plan-inv-head">
+          <span>🌦️ ${escapeHtml(plan.inversion.estrategia)}</span>
+          <b>${_FMT0(plan.inversion.total)}/mes</b>
+        </div>
+        ${barras}
+      </div>`;
+  }
+
+  return `
+    <p class="salud-section-title">📋 Plan de gestión mensual</p>
+    <div class="plan-banner" style="border-color:${headColor}">
+      <span class="plan-banner-disp">Excedente: <b style="color:${headColor}">${_FMT0(plan.disponible)}/mes</b></span>
+      <span class="plan-banner-msg">${escapeHtml(plan.mensaje)}</span>
+    </div>
+    <div class="plan-pasos">${pasosHtml}</div>
+    ${invHtml}`;
+}
 
 function abrirSaludFinanciera() {
   const dlg = document.getElementById('dlg-salud');
@@ -1318,6 +1423,8 @@ function abrirSaludFinanciera() {
 
     <p class="salud-section-title">Estrategias y medidas (${salud.estrategias.length})</p>
     <div class="space-y-2">${estrHtml}</div>
+
+    ${_planGestionHTML(salud.plan)}
 
     <p class="salud-section-title">Pronóstico 3 meses</p>
     <div class="salud-pronostico">${pronoHtml}</div>
@@ -3398,6 +3505,13 @@ function abrirSettings() {
   // Auto-update (default ON)
   if (form.elements.auto_update) form.elements.auto_update.checked = aj.auto_update !== false;
 
+  // Estrategia inversora (IA)
+  const ei = aj.estrategia_inversora || AJUSTES_DEFAULT.estrategia_inversora;
+  if (form.elements.ei_activa)       form.elements.ei_activa.checked     = ei.activa !== false;
+  if (form.elements.ei_ahorro_min)   form.elements.ei_ahorro_min.value   = ei.ahorro_minimo_pct ?? 20;
+  if (form.elements.ei_meses_fondo)  form.elements.ei_meses_fondo.value  = ei.meses_fondo_emergencia ?? 6;
+  if (form.elements.ei_umbral_deuda) form.elements.ei_umbral_deuda.value = ei.umbral_deuda_mala_pct ?? 8;
+
   // Render catálogos y cuentas
   renderCatalogoSettings('gasto');
   renderCatalogoSettings('ingreso');
@@ -3513,10 +3627,21 @@ async function guardarSettings(form) {
   aj.ui.widgets_visibles = [...form.querySelectorAll('#widgets-toggle input:checked')]
     .map(i => i.dataset.widget);
 
-  // Auto-update + cuenta para gastos habituales
+  // Auto-update
   aj.auto_update = !!form.elements.auto_update?.checked;
-  aj.habituales_cuenta_id = form.elements.habituales_cuenta_id?.value || null;
-  // catalogos.habituales ya se editó en vivo en renderHabitualesSettings()
+  // catalogos.habituales (incl. cuenta_id por ítem) ya se editó en vivo en
+  // renderHabitualesSettings(); el global habituales_cuenta_id quedó obsoleto.
+
+  // Estrategia inversora (IA) — preserva la distribución All Weather existente
+  const eiPrev = aj.estrategia_inversora || AJUSTES_DEFAULT.estrategia_inversora;
+  aj.estrategia_inversora = {
+    ...AJUSTES_DEFAULT.estrategia_inversora,
+    ...eiPrev,
+    activa: !!form.elements.ei_activa?.checked,
+    ahorro_minimo_pct: _numEntre(form.elements.ei_ahorro_min?.value, 0, 100, 20),
+    meses_fondo_emergencia: _numEntre(form.elements.ei_meses_fondo?.value, 1, 24, 6),
+    umbral_deuda_mala_pct: _numEntre(form.elements.ei_umbral_deuda?.value, 0, 100, 8),
+  };
 
   await saveAjustes({ ...aj });
   await reloadAll();
@@ -3742,7 +3867,10 @@ function _conteoHabitualMes(habitualId, mes = new Date().toISOString().slice(0,7
 async function registrarGastoHabitual(habitualId) {
   const h = getHabituales().find(x => x.id === habitualId);
   if (!h) return;
-  const cuentaId = state.ajustes?.habituales_cuenta_id || null;
+  // Cuenta por ítem. Si el ítem nunca se configuró (no tiene la propiedad),
+  // caemos al global obsoleto por compatibilidad con instalaciones viejas.
+  const cuentaId = ('cuenta_id' in h) ? (h.cuenta_id || null)
+                                      : (state.ajustes?.habituales_cuenta_id || null);
   const g = {
     id: uuid(), updated_at: nowTs(), deleted: false,
     fecha: new Date().toISOString().slice(0,10),
@@ -6911,7 +7039,7 @@ async function init() {
   document.getElementById('add-habitual')?.addEventListener('click', () => {
     state.ajustes.catalogos = state.ajustes.catalogos || {};
     if (!Array.isArray(state.ajustes.catalogos.habituales)) state.ajustes.catalogos.habituales = [];
-    state.ajustes.catalogos.habituales.push({ id: 'hab_' + Date.now(), nombre: 'Nuevo', icono: '🔁', color: '#00f0ff', valor: 1000, categoria: 'general' });
+    state.ajustes.catalogos.habituales.push({ id: 'hab_' + Date.now(), nombre: 'Nuevo', icono: '🔁', color: '#00f0ff', valor: 1000, categoria: 'general', cuenta_id: null });
     renderHabitualesSettings();
   });
   // Buscar actualizaciones manualmente
@@ -6930,12 +7058,20 @@ function renderHabitualesSettings() {
   const catsGasto = state.ajustes?.catalogos?.categorias_gasto?.length
     ? state.ajustes.catalogos.categorias_gasto
     : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.catalogos.categorias_gasto);
+  const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+
+  // Migración: ítems viejos sin cuenta_id heredan la cuenta global obsoleta
+  // (una sola vez) para no cambiar el comportamiento existente.
+  const globalLegacy = state.ajustes?.habituales_cuenta_id || null;
+  lista.forEach(h => { if (!('cuenta_id' in h)) h.cuenta_id = globalLegacy; });
 
   cont.innerHTML = lista.length ? '' :
     `<p class="text-xs text-center py-3" style="color:var(--ink-muted)">Sin gastos habituales. Tocá "+ Agregar".</p>`;
 
   lista.forEach((h, idx) => {
     const optsCat = catsGasto.map(c => `<option value="${escapeHtml(c.id||c.nombre)}" ${(h.categoria===(c.id||c.nombre))?'selected':''}>${escapeHtml(c.icono||'')} ${escapeHtml(c.nombre)}</option>`).join('');
+    const optsCuenta = `<option value="" ${!h.cuenta_id?'selected':''}>Solo contar (no descuenta)</option>` +
+      cuentas.map(c => `<option value="${c.id}" ${h.cuenta_id===c.id?'selected':''}>Descontar de ${escapeHtml(c.nombre)}</option>`).join('');
     cont.insertAdjacentHTML('beforeend', `
       <div class="hab-edit-card" data-idx="${idx}">
         <div class="hab-edit-top">
@@ -6954,6 +7090,10 @@ function renderHabitualesSettings() {
             <span>Categoría</span>
             <select class="input" data-hab-cat="${idx}">${optsCat}</select>
           </label>
+          <label class="hab-edit-field hab-edit-field-cuenta">
+            <span>Descontar de</span>
+            <select class="input" data-hab-cuenta="${idx}">${optsCuenta}</select>
+          </label>
         </div>
       </div>`);
   });
@@ -6961,23 +7101,12 @@ function renderHabitualesSettings() {
   cont.querySelectorAll('[data-hab-nombre]').forEach(inp => inp.oninput = e => { lista[+e.target.dataset.habNombre].nombre = e.target.value; });
   cont.querySelectorAll('[data-hab-valor]').forEach(inp => inp.oninput = e => { lista[+e.target.dataset.habValor].valor = Number(e.target.value)||0; });
   cont.querySelectorAll('[data-hab-cat]').forEach(sel => sel.onchange = e => { lista[+e.target.dataset.habCat].categoria = e.target.value; });
+  cont.querySelectorAll('[data-hab-cuenta]').forEach(sel => sel.onchange = e => { lista[+e.target.dataset.habCuenta].cuenta_id = e.target.value || null; });
   cont.querySelectorAll('[data-hab-emoji]').forEach(el => el.onclick = () => mostrarPickerEmojiHabitual(+el.dataset.habEmoji));
   cont.querySelectorAll('[data-hab-color]').forEach(el => el.onclick = () => mostrarPickerColorHabitual(+el.dataset.habColor));
   cont.querySelectorAll('[data-hab-del]').forEach(btn => btn.onclick = () => {
     lista.splice(+btn.dataset.habDel, 1); renderHabitualesSettings();
   });
-
-  // Poblar el select de cuenta para descontar. Preserva lo seleccionado en el
-  // DOM (si el usuario ya eligió pero aún no guardó) para no perder la elección
-  // al re-renderizar tras agregar/eliminar habituales.
-  const selCuenta = document.getElementById('sel-habituales-cuenta');
-  if (selCuenta) {
-    const seleccionActual = selCuenta.value || state.ajustes?.habituales_cuenta_id || '';
-    const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
-    selCuenta.innerHTML = `<option value="">No descontar de ninguna</option>` +
-      cuentas.map(c => `<option value="${c.id}" ${seleccionActual===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
-    selCuenta.value = seleccionActual;
-  }
 }
 
 /** Picker de emoji simple para un habitual (reutiliza prompt para no duplicar UI). */

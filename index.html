@@ -698,6 +698,9 @@
     <!-- Top estrategias / diagnósticos -->
     <div data-bind="diagnosticos" class="space-y-2 mt-3"></div>
 
+    <!-- Plan de gestión mensual (estrategia inversora) -->
+    <div data-bind="plan-mini"></div>
+
     <button type="button" data-action="ver-salud" class="btn-secondary w-full text-sm mt-3"
             style="border-color:var(--brand);color:var(--brand)">
       🧠 Ver análisis completo y simulador
@@ -2552,6 +2555,33 @@
         </fieldset>
 
         <fieldset class="space-y-2 mt-4">
+          <legend class="flex items-center gap-2"><span>🧠</span> Estrategia inversora (IA)</legend>
+          <p class="text-xs mb-2" style="color:var(--ink-muted)">
+            La IA local arma un <b>plan de gestión mensual</b> de tu excedente siguiendo principios Bogle/Graham/Buffett/Dalio: primero el ahorro mínimo, después el fondo de emergencia, luego cancelar deuda y por último invertir.
+          </p>
+          <label class="flex items-center gap-2 text-sm cursor-pointer mb-1">
+            <input type="checkbox" name="ei_activa" checked /> Mostrar el plan de gestión en el análisis IA
+          </label>
+          <div class="grid grid-cols-3 gap-2 mt-1">
+            <label class="hab-edit-field">
+              <span>Ahorro mín. %</span>
+              <input type="number" name="ei_ahorro_min" class="input" min="0" max="100" step="1" placeholder="20" />
+            </label>
+            <label class="hab-edit-field">
+              <span>Meses fondo</span>
+              <input type="number" name="ei_meses_fondo" class="input" min="1" max="24" step="1" placeholder="6" />
+            </label>
+            <label class="hab-edit-field">
+              <span>Deuda mala % int.</span>
+              <input type="number" name="ei_umbral_deuda" class="input" min="0" max="100" step="0.5" placeholder="8" />
+            </label>
+          </div>
+          <p class="text-xs mt-2" style="color:var(--ink-muted)">
+            Distribución del excedente invertible: <b>All Weather (Ray Dalio)</b> — 30% renta variable · 40% bonos largos · 15% bonos medios · 7,5% oro · 7,5% commodities.
+          </p>
+        </fieldset>
+
+        <fieldset class="space-y-2 mt-4">
           <legend>Actualizaciones</legend>
           <label class="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" name="auto_update" checked /> Actualizar automáticamente
@@ -2831,18 +2861,12 @@
             <span>🔁</span> Gastos habituales
           </legend>
           <p class="text-xs mb-2" style="color:var(--ink-muted)">
-            Items con valor fijo que cargás seguido (ej: vianda, café). Aparecen como contadores en acción rápida y en el widget. Cada toque registra un gasto del valor configurado.
+            Items con valor fijo que cargás seguido (ej: vianda, café). Aparecen como contadores en acción rápida y en el widget. Cada toque registra un gasto del valor configurado. En cada ítem podés elegir si <b>descuenta de una cuenta</b> o si <b>solo cuenta</b> (sin afectar saldos).
           </p>
           <div id="habituales-list" class="space-y-1.5"></div>
           <button type="button" id="add-habitual" class="btn-secondary w-full text-xs mt-2">
             + Agregar gasto habitual
           </button>
-          <label class="flex items-center gap-2 text-sm cursor-pointer mt-3">
-            <span style="color:var(--ink-muted)">Descontar de la cuenta:</span>
-            <select name="habituales_cuenta_id" id="sel-habituales-cuenta" class="input" style="flex:1;padding:.3rem .5rem;font-size:.8rem">
-              <option value="">No descontar de ninguna</option>
-            </select>
-          </label>
         </fieldset>
 
       </div>
