@@ -423,6 +423,25 @@ function buscarTotalConsumosUSD(texto, lineas) {
   return nums.length >= 2 ? num(nums[nums.length - 1][1]) : 0;
 }
 
+/**
+ * Saldo TOTAL a pagar en USD ("SALDO ACTUAL U$S 31,99" en BBVA, "SALDO U$S
+ * -0,56" en Macro). Puede ser negativo = saldo acreedor (a favor del cliente).
+ * Devuelve número con signo, o 0 si no hay deuda/saldo en dólares.
+ */
+function buscarSaldoUSD(texto, lineas) {
+  // 1) Etiqueta dedicada "SALDO [ACTUAL] U$S  31,99"  (también "-0,56" Macro)
+  const m = texto.match(/SALDO\s+(?:ACTUAL\s+)?U\$S[^0-9\-]{0,20}(-?\d{1,3}(?:\.\d{3})*,\d{2}-?)/i);
+  if (m) return parsearMonto(m[1]);
+  // 2) Línea de totales con 2 montos: "SALDO ACTUAL 888.286,87 31,99" → 2º = USD
+  const linea = (lineas || []).find(l =>
+    /SALDO\s+ACTUAL/i.test(l) && (l.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g) || []).length >= 2);
+  if (linea) {
+    const nums = linea.match(/-?\d{1,3}(?:\.\d{3})*,\d{2}-?/g);
+    return parsearMonto(nums[nums.length - 1]);
+  }
+  return 0;
+}
+
 function detectarBanco(texto) {
   // Contamos ocurrencias en vez de tomar el primer match: un resumen BBVA
   // menciona "BBVA" en cada pie de página, pero también nombra a otros bancos
@@ -523,6 +542,7 @@ export function _parsearTexto({ texto, lineas, filas }) {
   if (!pagoMinimo) pagoMinimo = buscarMontoTabla(lineas, /PAGO\s+M[IÍ]NIMO/i, 'last');
   const totalConsumos    = buscarTotalConsumos(texto);
   const totalConsumosUSD = buscarTotalConsumosUSD(texto, lineas);
+  const saldoTotalUSD    = buscarSaldoUSD(texto, lineas);
 
   // Montos del encabezado que NUNCA son consumos: si una fila de la tabla de
   // totales (cierre/venc/saldo/pago-mínimo) se cuela como movimiento, su monto
@@ -556,6 +576,7 @@ export function _parsearTexto({ texto, lineas, filas }) {
     proximoCierre,
     proximoVencimiento,
     saldoTotal,
+    saldoTotalUSD,
     pagoMinimo,
     totalConsumos,
     totalConsumosUSD,

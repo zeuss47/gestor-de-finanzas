@@ -282,3 +282,41 @@ export function rangoCicloActual(tarjeta, hoy = new Date()) {
   const { cierre } = fechasCiclo(tarjeta, hoy);
   return { inicio, fin: cierre };
 }
+
+/**
+ * Estado de un ciclo según su fecha de cierre, vencimiento y si está pagado.
+ * Cumple la clasificación del módulo de ingesta:
+ *   - 'abierto'             → todavía no cerró (se siguen sumando consumos)
+ *   - 'cerrado_pendiente'   → cerró pero aún no venció y no se pagó
+ *   - 'vencido'             → pasó el vencimiento sin pago registrado
+ *   - 'pagado'             → marcado como pagado
+ *
+ * @param {{fechaCierre?:string, fechaVencimiento?:string, cierre?:Date,
+ *          vencimiento?:Date, pagado?:boolean, hoy?:Date}} args  fechas ISO o Date
+ * @returns {{estado, etiqueta, diasParaCierre, diasParaVencimiento}}
+ */
+export function estadoCiclo({ fechaCierre, fechaVencimiento, cierre, vencimiento, pagado = false, hoy = new Date() }) {
+  const cierreISO = fechaCierre || (cierre ? toISO(cierre) : '');
+  const vencISO   = fechaVencimiento || (vencimiento ? toISO(vencimiento) : '');
+  const hoyISO    = toISO(hoy);
+
+  let estado, etiqueta;
+  if (pagado) {
+    estado = 'pagado';            etiqueta = 'Pagado';
+  } else if (cierreISO && hoyISO <= cierreISO) {
+    estado = 'abierto';           etiqueta = 'Abierto';
+  } else if (vencISO && hoyISO <= vencISO) {
+    estado = 'cerrado_pendiente'; etiqueta = 'Cerrado - Pendiente de pago';
+  } else {
+    estado = 'vencido';           etiqueta = 'Vencido';
+  }
+
+  const aDate = (iso) => iso ? new Date(iso + 'T12:00:00') : null;
+  const hoyD = aDate(hoyISO);
+  return {
+    estado,
+    etiqueta,
+    diasParaCierre:      cierreISO ? diasEntre(hoyD, aDate(cierreISO)) : null,
+    diasParaVencimiento: vencISO   ? diasEntre(hoyD, aDate(vencISO))   : null,
+  };
+}

@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.32",
-    "build":  49,
-    "modified":  "2026-06-01T00:21:50Z",
-    "commit":  "M css/styles.css, M index.html, M js/app.js",
-    "notes":  "Auto-update 2026-05-31 21:21"
+    "version":  "1.33",
+    "build":  50,
+    "modified":  "2026-06-03T00:34:56Z",
+    "commit":  "M js/app.js, M js/cards.js, M js/pdf-statement-parser.js, M tests/test-resumen-bbva.mjs, tests/te...",
+    "notes":  "Auto-update 2026-06-02 21:34"
 }

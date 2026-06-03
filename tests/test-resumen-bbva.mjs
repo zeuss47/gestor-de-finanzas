@@ -103,6 +103,7 @@ check('cierre anterior = 2026-04-30', r.cierreAnterior === '2026-04-30', `(fue $
 check('próximo cierre = 2026-07-02', r.proximoCierre === '2026-07-02', `(fue ${r.proximoCierre})`);
 check('próximo venc = 2026-07-13', r.proximoVencimiento === '2026-07-13', `(fue ${r.proximoVencimiento})`);
 check('saldo = 888.286,87', eq(r.saldoTotal, 888286.87, 0.01), `(fue ${r.saldoTotal})`);
+check('saldo USD = 31,99', eq(r.saldoTotalUSD, 31.99, 0.01), `(fue ${r.saldoTotalUSD})`);
 check('pago mínimo = 154.320', eq(r.pagoMinimo, 154320, 0.01), `(fue ${r.pagoMinimo})`);
 
 console.log('── Consumos ──');

@@ -15,7 +15,7 @@
  */
 
 import { DB, uuid, nowTs } from './db.js';
-import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto, cuotaEnPeriodo } from './cards.js';
+import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto, cuotaEnPeriodo, estadoCiclo } from './cards.js';
 import { calcularCapacidad, simularCompra, cuotasPendientes } from './credito.js';
 import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
@@ -3423,9 +3423,21 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
   cont.innerHTML = ciclos.map((c, idx) => {
     const [y, m] = c.periodo.split('-');
     const label = `${_CICLO_MESES[parseInt(m, 10) - 1]} ${y}`;
-    const estado = c.esFuturo ? 'proximo' : c.esPagado ? 'pagado' : 'pendiente';
-    const colorMap = { pagado: 'var(--success)', pendiente: 'var(--warning)', proximo: 'var(--ink-muted)' };
-    const badgeMap = { pagado: '✓ PAGADO', pendiente: '⏳ PENDIENTE', proximo: '📅 PRÓXIMO' };
+    // Estado del ciclo via lógica centralizada (abierto / cerrado_pendiente / vencido / pagado)
+    const ec = estadoCiclo({
+      fechaCierre: c.resumenMes.fecha_cierre,
+      fechaVencimiento: c.resumenMes.fecha_vencimiento,
+      pagado: c.esPagado,
+      hoy,
+    });
+    // Para meses futuros (el ciclo todavía no empezó) mostramos "PRÓXIMO"
+    const estado = (c.esFuturo && ec.estado === 'abierto') ? 'proximo' : ec.estado;
+    const colorMap = { pagado: 'var(--success)', cerrado_pendiente: 'var(--warning)', vencido: 'var(--danger)', abierto: 'var(--brand)', proximo: 'var(--ink-muted)' };
+    const badgeMap = { pagado: '✓ PAGADO', cerrado_pendiente: '⏳ CERRADO', vencido: '⚠ VENCIDO', abierto: '🟢 ABIERTO', proximo: '📅 PRÓXIMO' };
+    // Días restantes para el evento relevante
+    const restante = estado === 'abierto'
+      ? (ec.diasParaCierre >= 0 ? `cierra en ${ec.diasParaCierre} día${ec.diasParaCierre === 1 ? '' : 's'}` : '')
+      : (estado === 'cerrado_pendiente' && ec.diasParaVencimiento >= 0 ? `vence en ${ec.diasParaVencimiento} día${ec.diasParaVencimiento === 1 ? '' : 's'}` : '');
     const total = c.resumenMes.total_resumen;
     const actualBadge = c.esActual ? '<span style="color:var(--brand);font-size:.6rem;margin-left:.25rem">● actual</span>' : '';
     const nGastos = (c.resumenMes.movimientos_ids || []).length;
@@ -3436,7 +3448,7 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
           <span class="td-ciclo-caret">▸</span>
           <div class="td-ciclo-info">
             <span class="td-ciclo-mes">${label}${actualBadge}</span>
-            <span class="td-ciclo-venc">Cierra ${_ddmm(c.resumenMes.fecha_cierre)} · Vence ${_ddmm(c.resumenMes.fecha_vencimiento)} · ${nGastos} gasto${nGastos === 1 ? '' : 's'}</span>
+            <span class="td-ciclo-venc">Cierra ${_ddmm(c.resumenMes.fecha_cierre)} · Vence ${_ddmm(c.resumenMes.fecha_vencimiento)}${restante ? ` · ${restante}` : ''} · ${nGastos} gasto${nGastos === 1 ? '' : 's'}</span>
           </div>
           <div class="td-ciclo-monto">${FMT.format(total)}</div>
           <div class="td-ciclo-badge" style="color:${colorMap[estado]}">${badgeMap[estado]}</div>
@@ -6966,7 +6978,8 @@ function _rsbRenderStatements() {
           </div>
           <div class="rsb-statement-meta">
             <span title="Cierre → Vencimiento">📅 ${_rsbDdmm(r.fechaCierre)} → ${_rsbDdmm(r.fechaVencimiento)}</span>
-            ${r.saldoTotal ? `<span title="Saldo a pagar" class="brand">💳 ${FMT.format(r.saldoTotal)}</span>` : ''}
+            ${r.saldoTotal ? `<span title="Saldo a pagar en pesos" class="brand">💳 ${FMT.format(r.saldoTotal)}</span>` : ''}
+            ${r.saldoTotalUSD ? `<span title="Saldo a pagar en dólares">💵 US$ ${Math.abs(r.saldoTotalUSD).toLocaleString('es-AR', { minimumFractionDigits: 2 })}${r.saldoTotalUSD < 0 ? ' a favor' : ''}</span>` : ''}
             ${r.pagoMinimo ? `<span title="Pago mínimo">mín ${FMT.format(r.pagoMinimo)}</span>` : ''}
           </div>
           ${(r.validacion && !r.validacion.confiable) ? `
