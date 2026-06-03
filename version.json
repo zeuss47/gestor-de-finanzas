@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.35",
-    "build":  52,
-    "modified":  "2026-06-03T01:31:46Z",
-    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js, _wiz1.png, _wiz2.png",
-    "notes":  "Auto-update 2026-06-02 22:31"
+    "version":  "1.36",
+    "build":  53,
+    "modified":  "2026-06-03T01:51:41Z",
+    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js",
+    "notes":  "Auto-update 2026-06-02 22:51"
 }

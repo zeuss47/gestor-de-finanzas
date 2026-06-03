@@ -96,6 +96,9 @@ const FMT = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS',
 /* ============ Estado de navegación por tabs ============ */
 let currentTab = 'home';
 let _movMesFiltro = '';
+let _movCatFiltro = '';      // categoría activa en filtro historial
+let _movSubcatFiltro = '';   // subcategoría activa en filtro historial
+let _movTxtFiltro = '';      // búsqueda de texto libre
 
 const WIDGETS_ANALISIS = new Set([
   'prediccion', 'ia_local', 'comparador', 'flujo_mensual',
@@ -717,10 +720,15 @@ function renderTarjetas(el) {
         <p class="text-sm">Sin tarjetas. Tocá "+ Nueva".</p>
       </div>`;
   }
+  // Determinar qué tarjeta tiene el ciclo MÁS próximo a cerrar → highlight
+  const cicloMasProximo = state.resumenes.reduce((prev, r) =>
+    (!prev || r.dias_para_cierre < prev.dias_para_cierre) ? r : prev, null);
+
   for (const r of state.resumenes) {
     const t   = state.tarjetas.find(x => x.id === r.tarjeta_id);
     const pct = Math.min(100, r.porcentaje_limite_usado);
     const urgente = r.dias_para_cierre <= 2 || r.dias_para_vencimiento <= 2;
+    const esCicloActivo = cicloMasProximo && r.tarjeta_id === cicloMasProximo.tarjeta_id;
     const claseUrgente = urgente ? 'pulse-warn' : '';
     // Colores derivados del color de la tarjeta
     const colorBase = t.color || '#6366f1';
@@ -730,13 +738,15 @@ function renderTarjetas(el) {
     const badgeVenc   = diasV <= 1 ? 'badge-danger' : diasV <= 5 ? 'badge-warning' : 'badge-muted';
 
     box.insertAdjacentHTML('beforeend', `
-      <div class="credit-card ${claseUrgente}" data-tarjeta-id="${t.id}"
+      <div class="credit-card ${claseUrgente}${esCicloActivo ? ' ciclo-activo-highlight' : ''}"
+           data-tarjeta-id="${t.id}"
            style="background:linear-gradient(135deg,${colorBase}dd 0%,${colorBase}88 100%);cursor:pointer">
         <!-- fila superior -->
         <div class="flex items-start justify-between mb-3 relative z-10">
           <div>
             <p class="font-semibold text-white text-base leading-tight">${escapeHtml(t.nombre)}</p>
             ${t.banco ? `<p class="text-white/60 text-xs mt-0.5">${escapeHtml(t.banco)}</p>` : ''}
+            ${esCicloActivo ? `<span class="ciclo-activo-badge mt-1">● Ciclo activo</span>` : ''}
           </div>
           <span class="badge badge-muted text-white/80" style="background:rgba(255,255,255,0.18);border:none;font-size:.6rem">${(() => {
             const [y, m] = r.periodo.split('-');
@@ -2378,7 +2388,7 @@ function renderMovimientos() {
   const selMes = document.getElementById('mov-mes-filter');
   if (!list) return;
 
-  // input[type="month"]: si no tiene valor aún, poner el mes actual o el último con datos
+  // ── Mes por defecto ─────────────────────────────────────────
   const mesActual = new Date().toISOString().slice(0,7);
   if (!selMes.value) {
     const meses = new Set();
@@ -2391,81 +2401,227 @@ function renderMovimientos() {
     selMes.value = _movMesFiltro || (mesList.length ? mesList[0] : mesActual);
   }
   selMes.onchange = () => { _movMesFiltro = selMes.value; renderMovimientos(); };
-
   const mes = selMes.value || mesActual;
   _movMesFiltro = mes;
 
-  const gastosMes   = state.gastos.filter(g => g.fecha?.startsWith(mes)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  const ingresosMes = state.ingresos.filter(i => i.periodo_aplicacion===mes || i.fecha?.startsWith(mes)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  // ── Búsqueda de texto ───────────────────────────────────────
+  const txtInput = document.getElementById('mov-txt-search');
+  if (txtInput && !txtInput._wired) {
+    txtInput._wired = true;
+    txtInput.oninput = () => { _movTxtFiltro = txtInput.value.toLowerCase(); renderMovimientos(); };
+  }
+
+  // ── Chips de categoría ──────────────────────────────────────
+  _renderFiltrosCategoria(mes);
+
+  // ── Datos filtrados ─────────────────────────────────────────
+  let gastosMes = state.gastos
+    .filter(g => !g.deleted && g.fecha?.startsWith(mes))
+    .sort((a,b) => b.fecha.localeCompare(a.fecha));
+  let ingresosMes = state.ingresos
+    .filter(i => !i.deleted && (i.periodo_aplicacion===mes || i.fecha?.startsWith(mes)))
+    .sort((a,b) => b.fecha.localeCompare(a.fecha));
+
+  // Aplicar filtro de categoría
+  if (_movCatFiltro) {
+    gastosMes = gastosMes.filter(g => (g.categoria||'general') === _movCatFiltro);
+    ingresosMes = []; // ingresos no tienen cat de gasto
+  }
+  // Aplicar filtro de subcategoría
+  if (_movSubcatFiltro) {
+    gastosMes = gastosMes.filter(g => g.subcategoria === _movSubcatFiltro);
+  }
+  // Aplicar texto libre
+  if (_movTxtFiltro) {
+    const txt = _movTxtFiltro;
+    gastosMes   = gastosMes.filter(g =>
+      (g.descripcion||'').toLowerCase().includes(txt) ||
+      (g.categoria||'').toLowerCase().includes(txt) ||
+      (g.subcategoria||'').toLowerCase().includes(txt));
+    ingresosMes = ingresosMes.filter(i =>
+      (i.descripcion||'').toLowerCase().includes(txt));
+  }
 
   list.innerHTML = '';
   empty.classList.toggle('hidden', gastosMes.length + ingresosMes.length > 0);
 
-  const SVG_TRASH = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  const SVG_TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px">
     <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
     <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+  const SVG_EDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
-  // Ingresos
+  // ── Ingresos ────────────────────────────────────────────────
   for (const i of ingresosMes) {
     const total = (i.sueldo_neto || 0) + (i.bonos || 0);
     list.insertAdjacentHTML('beforeend', `
-      <div class="mov-item flex items-center gap-3 bg-surf-alt rounded-2xl px-3 py-3 border border-black/5 dark:border-white/10">
-        <span class="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-lg flex-shrink-0">💰</span>
-        <div class="flex-1 min-w-0">
-          <p class="font-semibold text-sm truncate">${escapeHtml(i.descripcion || 'Ingreso')}</p>
-          <p class="text-[11px] text-ink-muted">${i.fecha} · período ${i.periodo_aplicacion}</p>
+      <div class="mov-row-gasto" data-id="${i.id}" data-tipo="ingreso">
+        <div class="mov-row-icon" style="background:rgba(0,255,159,.1)">💰</div>
+        <div class="mov-row-body">
+          <div class="mov-row-desc">${escapeHtml(i.descripcion || 'Ingreso')}</div>
+          <div class="mov-row-meta">
+            <span>${i.fecha}</span>
+            <span>período ${i.periodo_aplicacion || '—'}</span>
+            ${i.sueldo_bruto ? `<span>bruto ${FMT.format(i.sueldo_bruto)}</span>` : ''}
+          </div>
         </div>
-        <div class="text-right flex-shrink-0">
-          <p class="font-bold text-sm text-emerald-600 dark:text-emerald-400">${FMT.format(total)}</p>
-          ${i.sueldo_bruto ? `<p class="text-[10px] text-ink-muted">bruto ${FMT.format(i.sueldo_bruto)}</p>` : ''}
+        <div class="mov-row-right">
+          <span class="mov-row-monto income">${FMT.format(total)}</span>
+          <div class="mov-row-actions">
+            <button class="mov-row-btn edit" data-edit-ing="${i.id}" title="Editar">${SVG_EDIT}</button>
+            <button class="mov-row-btn del"  data-del-ing="${i.id}" title="Eliminar">${SVG_TRASH}</button>
+          </div>
         </div>
-        <button class="p-1.5 text-ink-muted hover:text-red-500 transition flex-shrink-0" data-del-ing="${i.id}">${SVG_TRASH}</button>
       </div>`);
   }
 
-  // Gastos
+  // ── Gastos ──────────────────────────────────────────────────
+  const allCats = state.ajustes?.catalogos?.categorias_gasto?.length
+    ? state.ajustes.catalogos.categorias_gasto
+    : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.categorias_gasto);
+
   for (const g of gastosMes) {
-    const icon     = CAT_ICON[g.categoria] || '📌';
-    const monto    = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
-    const cuotas   = g.tipo === 'cuotas' ? ` C${g.cuota_numero}/${g.cuotas_total}` : '';
-    const tipoTag  = TIPO_TAG[g.tipo] || '';
-    const tarjeta  = g.tarjeta_id ? state.tarjetas.find(t=>t.id===g.tarjeta_id) : null;
-    const metodo   = tarjeta ? `💳 ${escapeHtml(tarjeta.nombre)}` : (METODO_LABEL[g.metodo_pago] || g.metodo_pago);
+    if (g.es_pago_tarjeta) continue; // ocultar pagos de tarjeta en historial
+    const catObj  = allCats.find(c => c.id === g.categoria || c.nombre?.toLowerCase() === (g.categoria||'').toLowerCase());
+    const icon    = catObj?.icono || CAT_ICON[g.categoria] || '📌';
+    const catColor= catObj?.color || '#94a3b8';
+    const monto   = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
+    const cuotas  = g.tipo === 'cuotas' ? `cuota ${g.cuota_numero}/${g.cuotas_total}` : '';
+    const tarjeta = g.tarjeta_id ? state.tarjetas.find(t=>t.id===g.tarjeta_id) : null;
+    const metodo  = tarjeta ? `💳 ${escapeHtml(tarjeta.nombre)}` : (METODO_LABEL[g.metodo_pago] || g.metodo_pago || 'efectivo');
+    const monedaFmt = (g.moneda && g.moneda !== 'ARS')
+      ? `${g.moneda} ${(g.monto||0).toLocaleString('es-AR',{minimumFractionDigits:2})}`
+      : FMT.format(monto);
+
     list.insertAdjacentHTML('beforeend', `
-      <div class="mov-item flex items-center gap-3 bg-surf-alt rounded-2xl px-3 py-3 border border-black/5 dark:border-white/10">
-        <span class="w-9 h-9 rounded-xl bg-surf flex items-center justify-center text-lg flex-shrink-0">${icon}</span>
-        <div class="flex-1 min-w-0">
-          <p class="font-semibold text-sm truncate">(${escapeHtml(g.categoria || 'general')}) - ${escapeHtml(g.descripcion)}${tipoTag}${cuotas ? `<span class="text-ink-muted"> · ${cuotas}</span>` : ''}</p>
-          <p class="text-[11px] text-ink-muted truncate">${g.fecha} · ${metodo}</p>
-          ${g.compartido ? `<p class="text-[10px] text-sky-600 dark:text-sky-400">👫 Compartido · ${escapeHtml(g.compartido.persona)}</p>` : ''}
+      <div class="mov-row-gasto" data-id="${g.id}" data-tipo="gasto">
+        <div class="mov-row-icon" style="background:${catColor}18;border:1px solid ${catColor}33">${icon}</div>
+        <div class="mov-row-body">
+          <div class="mov-row-desc">${escapeHtml(g.descripcion || '—')}</div>
+          <div class="mov-row-meta">
+            <span>${g.fecha}</span>
+            <span>${escapeHtml(metodo)}</span>
+            ${cuotas ? `<span>${cuotas}</span>` : ''}
+            ${g.compartido ? `<span>👫 ${escapeHtml(g.compartido.persona)}</span>` : ''}
+          </div>
+          <div class="mov-row-meta" style="margin-top:.2rem">
+            <span class="mov-cat-badge" style="background:${catColor}14;color:${catColor};border-color:${catColor}33">
+              ${icon} ${escapeHtml(catObj?.nombre || g.categoria || 'general')}
+            </span>
+            ${g.subcategoria ? `<span class="mov-subcat-badge">${escapeHtml(g.subcategoria)}</span>` : ''}
+          </div>
         </div>
-        <div class="text-right flex-shrink-0">
-          <p class="font-bold text-sm">${FMT.format(monto)}</p>
-          ${g.compartido ? `<p class="text-[10px] text-ink-muted">total ${FMT.format(g.monto)}</p>` : ''}
+        <div class="mov-row-right">
+          <span class="mov-row-monto">${monedaFmt}</span>
+          ${g.compartido ? `<span style="font-size:.68rem;color:var(--ink-muted)">total ${FMT.format(g.monto)}</span>` : ''}
+          <div class="mov-row-actions">
+            <button class="mov-row-btn edit" data-edit-gas="${g.id}" title="Editar">${SVG_EDIT}</button>
+            <button class="mov-row-btn del"  data-del-gas="${g.id}"  title="Eliminar">${SVG_TRASH}</button>
+          </div>
         </div>
-        <button class="p-1.5 text-ink-muted hover:text-red-500 transition flex-shrink-0" data-del-gas="${g.id}">${SVG_TRASH}</button>
       </div>`);
   }
 
-  // Handlers de eliminación
+  // ── Handlers ────────────────────────────────────────────────
   list.querySelectorAll('[data-del-gas]').forEach(btn => {
-    btn.onclick = async () => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
       if (!confirm('¿Eliminar este gasto?')) return;
       await DB.softDelete('gastos', btn.dataset.delGas);
-      notificarCambioLocal();
-      toast('Gasto eliminado');
-      await reloadAll();
+      notificarCambioLocal(); toast('Gasto eliminado'); await reloadAll();
     };
   });
   list.querySelectorAll('[data-del-ing]').forEach(btn => {
-    btn.onclick = async () => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
       if (!confirm('¿Eliminar este ingreso?')) return;
       await DB.softDelete('ingresos', btn.dataset.delIng);
-      notificarCambioLocal();
-      toast('Ingreso eliminado');
-      await reloadAll();
+      notificarCambioLocal(); toast('Ingreso eliminado'); await reloadAll();
     };
   });
+  list.querySelectorAll('[data-edit-gas]').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const g = await DB.get('gastos', btn.dataset.editGas);
+      if (!g) return;
+      openDialog('dlg-gasto', {
+        _editing_id: g.id, descripcion: g.descripcion,
+        monto: g.monto, fecha: g.fecha,
+        categoria: g.categoria || '',
+        subcategoria: g.subcategoria || '',
+        cuenta_id: g.cuenta_id || '',
+      });
+    };
+  });
+  list.querySelectorAll('[data-edit-ing]').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const i = await DB.get('ingresos', btn.dataset.editIng);
+      if (!i) return;
+      openDialog('dlg-ingreso', {
+        _editing_id: i.id, descripcion: i.descripcion || '',
+        sueldo_neto: i.sueldo_neto, fecha: i.fecha,
+        periodo_aplicacion: i.periodo_aplicacion || '',
+        cuenta_id: i.cuenta_id || '',
+        sueldo_bruto: i.sueldo_bruto || '', descuentos: i.descuentos || '', bonos: i.bonos || '',
+      });
+    };
+  });
+}
+
+/** Renderiza los chips de categoría para filtrar el historial. */
+function _renderFiltrosCategoria(mes) {
+  const wrap    = document.getElementById('mov-cat-chips');
+  const subWrap = document.getElementById('mov-subcat-chips');
+  if (!wrap) return;
+
+  // Categorías presentes en el mes
+  const allCats = state.ajustes?.catalogos?.categorias_gasto?.length
+    ? state.ajustes.catalogos.categorias_gasto
+    : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.categorias_gasto);
+  const catsEnMes = new Set(
+    state.gastos.filter(g => !g.deleted && !g.es_pago_tarjeta && g.fecha?.startsWith(mes))
+      .map(g => g.categoria || 'general')
+  );
+
+  wrap.innerHTML = `<button class="mov-filtro-todos${!_movCatFiltro?' active':''}" id="mov-cat-todos">Todos</button>` +
+    allCats.filter(c => catsEnMes.has(c.id) || catsEnMes.has(c.nombre?.toLowerCase())).map(c => {
+      const id = c.id || c.nombre;
+      return `<button class="mov-filtro-chip${_movCatFiltro===id?' active':''}" data-cat="${escapeHtml(id)}"
+               style="${_movCatFiltro===id?`--chip-color:${c.color};border-color:${c.color};color:${c.color}`:''}"
+              >${escapeHtml(c.icono||'📌')} ${escapeHtml(c.nombre)}</button>`;
+    }).join('');
+
+  wrap.querySelector('#mov-cat-todos')?.addEventListener('click', () => {
+    _movCatFiltro = ''; _movSubcatFiltro = '';
+    renderMovimientos();
+  });
+  wrap.querySelectorAll('[data-cat]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _movCatFiltro = _movCatFiltro === btn.dataset.cat ? '' : btn.dataset.cat;
+      _movSubcatFiltro = '';
+      renderMovimientos();
+    });
+  });
+
+  // Subcategorías de la categoría activa
+  if (_movCatFiltro && subWrap) {
+    const catObj = allCats.find(c => (c.id||c.nombre) === _movCatFiltro);
+    const subcats = catObj?.subcategorias || [];
+    if (subcats.length) {
+      subWrap.hidden = false;
+      subWrap.innerHTML = `<button class="mov-filtro-todos${!_movSubcatFiltro?' active':''}">Todas</button>` +
+        subcats.map(s => `<button class="mov-filtro-chip subcat${_movSubcatFiltro===s?' active':''}" data-subcat="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('');
+      subWrap.querySelector('.mov-filtro-todos')?.addEventListener('click', () => { _movSubcatFiltro = ''; renderMovimientos(); });
+      subWrap.querySelectorAll('[data-subcat]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          _movSubcatFiltro = _movSubcatFiltro === btn.dataset.subcat ? '' : btn.dataset.subcat;
+          renderMovimientos();
+        });
+      });
+    } else { subWrap.hidden = true; }
+  } else if (subWrap) { subWrap.hidden = true; }
 }
 
 /* ============ Diálogos ============ */
@@ -3007,23 +3163,21 @@ async function guardarSettings(form) {
 const syncCallbacks = {
   onStart: (motivo) => {
     setSyncIndicator('progress');
-    // Solo mostramos un mini-toast con icono si fue manual; el resto es silencioso.
-    if (motivo === 'manual') toast('🔄', 800);
+    document.getElementById('btn-sync')?.classList.add('syncing');
+    if (motivo === 'manual') mostrarAnimacionSync(false);
   },
-  onProgress: () => {
-    // Silencio total. El usuario solo ve el dot animado en el sidebar.
-  },
+  onProgress: () => {},
   onSuccess: async (result, motivo) => {
     await reloadAll();
     setSyncIndicator('ok');
     actualizarTimestampSync();
-    // Mini toast solo si fue manual; las demás syncs son silenciosas.
-    if (motivo === 'manual') toast('✓', 1200);
-    // Re-chequear margen tras pulls remotos (otro dispositivo cargó datos)
+    document.getElementById('btn-sync')?.classList.remove('syncing');
+    if (motivo === 'manual') mostrarAnimacionSync(true);
     try { await chequeoMargenDisponible(); } catch {}
   },
   onError: (err, motivo) => {
     setSyncIndicator('error');
+    document.getElementById('btn-sync')?.classList.remove('syncing');
     if (err.message === 'offline') {
       if (motivo === 'manual') toast('Sin conexión — se sincronizará al volver online', 2500);
       setSyncIndicator('offline');
@@ -3051,18 +3205,77 @@ function setSyncIndicator(estado) {
 }
 
 function actualizarTimestampSync() {
-  const el = document.getElementById('sb-sync-time');
-  if (!el) return;
   ultimaSync().then(ts => {
-    if (!ts) { el.textContent = ''; return; }
+    // Sidebar
+    const sbEl = document.getElementById('sb-sync-time');
+    // Header inline
+    const hdEl = document.getElementById('btn-sync-time-label');
+    if (!ts) {
+      if (sbEl) sbEl.textContent = '';
+      if (hdEl) hdEl.textContent = '';
+      return;
+    }
     const dt = new Date(ts * 1000);
     const ahora = Date.now();
     const diffMin = Math.round((ahora - ts * 1000) / 60_000);
-    if (diffMin < 1)       el.textContent = 'recién';
-    else if (diffMin < 60) el.textContent = `hace ${diffMin}m`;
-    else if (diffMin < 1440) el.textContent = `hace ${Math.round(diffMin/60)}h`;
-    else el.textContent = dt.toLocaleDateString('es-AR');
+    let label;
+    if (diffMin < 1)       label = 'recién';
+    else if (diffMin < 60) label = `${diffMin}m`;
+    else if (diffMin < 1440) label = `${Math.round(diffMin/60)}h`;
+    else label = dt.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit' });
+    if (sbEl) sbEl.textContent = label;
+    if (hdEl) hdEl.textContent = label;
   });
+}
+
+/** Animación de "billete volando" pantalla completa durante el sync. */
+function mostrarAnimacionSync(ok = true) {
+  const overlay = document.getElementById('flying-money-overlay');
+  if (!overlay) return;
+  const title = document.getElementById('fmo-title');
+  const sub   = document.getElementById('fmo-sub');
+  if (title) title.textContent = ok ? '¡Sincronizado!' : 'Sincronizando…';
+  if (sub) sub.textContent = ok ? 'Datos actualizados' : 'Contactando GitHub…';
+
+  // Crear billetes animados
+  const BILLS = ['💵','💸','🪙','💶','💴'];
+  const W = window.innerWidth, H = window.innerHeight;
+  overlay.querySelectorAll('.flying-bill').forEach(b => b.remove());
+  const count = 7;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'flying-bill';
+    el.textContent = BILLS[i % BILLS.length];
+    // Punto de origen: área del botón de sync (arriba derecha) o centro
+    const ox = W * (.5 + (Math.random()-.5)*.4);
+    const oy = H * (.4 + (Math.random()-.5)*.5);
+    // Trayectoria parabólica
+    const midX = (Math.random() - .5) * 200;
+    const midY = -80 - Math.random() * 120;
+    const endX = (Math.random() - .5) * 400;
+    const endY = (Math.random() > .5 ? -1 : 1) * (200 + Math.random() * 200);
+    const rot0 = (Math.random()-.5)*40;
+    const rot1 = rot0 + (Math.random()-.5)*120;
+    const rot2 = rot1 + (Math.random()-.5)*180;
+    el.style.cssText = `
+      left:${ox}px; top:${oy}px;
+      --bx0:0px; --by0:0px; --br0:${rot0}deg;
+      --bx1:${midX}px; --by1:${midY}px; --br1:${rot1}deg;
+      --bx2:${endX}px; --by2:${endY}px; --br2:${rot2}deg;
+      animation-delay: ${i * 0.12}s;
+      font-size: ${1.4 + Math.random()*.8}rem;
+    `;
+    overlay.appendChild(el);
+  }
+
+  overlay.classList.add('show');
+  setTimeout(() => {
+    overlay.style.animation = 'fmo-out .4s ease forwards';
+    setTimeout(() => {
+      overlay.classList.remove('show');
+      overlay.style.animation = '';
+    }, 400);
+  }, ok ? 2600 : 1800);
 }
 
 // Sync manual (botón)

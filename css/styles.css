@@ -657,6 +657,183 @@ html.light #bottom-nav::before { background: rgba(240,244,255,0.85); }
   animation-delay: 0.05s;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   HISTORIAL — Filtros, búsqueda y filas detalladas
+══════════════════════════════════════════════════════════════ */
+.mov-search-wrap {
+  position: relative; display: flex; align-items: center;
+}
+.mov-search-icon {
+  position: absolute; left: .5rem; width: 14px; height: 14px;
+  color: var(--ink-muted); pointer-events: none;
+}
+.mov-search-input {
+  width: 120px; padding: .3rem .6rem .3rem 1.75rem;
+  border-radius: .65rem; font-size: .78rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--ink); outline: none; transition: width .2s ease, border-color .2s;
+}
+.mov-search-input:focus { width: 160px; border-color: var(--brand); }
+.mov-search-input::placeholder { color: var(--ink-muted); }
+
+.mov-filtros-section { margin-bottom: .6rem; display: flex; flex-direction: column; gap: .4rem; }
+.mov-filtros-row {
+  display: flex; flex-wrap: wrap; gap: .35rem;
+}
+.mov-filtro-chip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .3rem .65rem; border-radius: 999px; cursor: pointer;
+  font-size: .75rem; font-weight: 500; border: 1.5px solid var(--border);
+  background: var(--surface-2); color: var(--ink-2);
+  transition: all .15s ease; user-select: none;
+}
+.mov-filtro-chip:hover { border-color: var(--brand-2); color: var(--ink); }
+.mov-filtro-chip.active {
+  background: rgba(0,240,255,.1); border-color: var(--brand);
+  color: var(--brand); font-weight: 600;
+}
+.mov-filtro-chip.subcat.active {
+  background: rgba(255,0,234,.08); border-color: var(--brand-2);
+  color: var(--brand-2);
+}
+.mov-filtro-todos {
+  font-size: .7rem; color: var(--ink-muted);
+  padding: .25rem .5rem; border-radius: 999px;
+  border: 1px dashed var(--border); background: none; cursor: pointer;
+  transition: all .15s;
+}
+.mov-filtro-todos:hover { color: var(--ink); border-color: var(--ink-2); }
+.mov-filtro-todos.active { color: var(--brand); border-color: var(--brand); }
+
+/* Filas de historial detalladas */
+.mov-row-gasto {
+  display: flex; align-items: flex-start; gap: .65rem;
+  background: var(--surface, rgba(0,240,255,.025));
+  border: 1px solid var(--border); border-radius: 1rem;
+  padding: .7rem .85rem; cursor: pointer;
+  transition: border-color .15s, background .15s;
+  position: relative;
+}
+.mov-row-gasto:hover { border-color: var(--border-2); background: var(--surface-2); }
+.mov-row-icon {
+  width: 36px; height: 36px; border-radius: .7rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; background: var(--surface-3);
+}
+.mov-row-body { flex: 1; min-width: 0; }
+.mov-row-desc {
+  font-size: .85rem; font-weight: 600; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mov-row-meta {
+  font-size: .68rem; color: var(--ink-muted);
+  display: flex; flex-wrap: wrap; gap: .25rem .5rem; margin-top: .15rem;
+}
+.mov-cat-badge {
+  display: inline-flex; align-items: center; gap: .2rem;
+  padding: .1rem .45rem; border-radius: 999px; font-size: .65rem;
+  font-weight: 600; letter-spacing: .02em;
+  background: rgba(0,240,255,.08); color: var(--brand); border: 1px solid var(--border);
+}
+.mov-subcat-badge {
+  display: inline-flex; align-items: center; gap: .2rem;
+  padding: .1rem .45rem; border-radius: 999px; font-size: .65rem; font-weight: 500;
+  background: rgba(255,0,234,.06); color: var(--brand-2); border: 1px solid rgba(255,0,234,.18);
+}
+.mov-row-right { flex-shrink: 0; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: .25rem; }
+.mov-row-monto { font-size: .9rem; font-weight: 700; color: var(--ink); }
+.mov-row-monto.income { color: var(--success, #00ff9f); }
+.mov-row-actions {
+  display: flex; gap: .25rem; margin-top: .2rem;
+}
+.mov-row-btn {
+  background: none; border: none; cursor: pointer;
+  padding: .25rem; border-radius: .4rem; color: var(--ink-muted);
+  transition: color .15s, background .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.mov-row-btn:hover { color: var(--ink); background: var(--surface-3); }
+.mov-row-btn.del:hover { color: var(--danger); }
+.mov-row-btn.edit:hover { color: var(--brand); }
+
+/* ══════════════════════════════════════════════════════════════
+   SYNC — Timestamp inline en btn-sync + animación billete
+══════════════════════════════════════════════════════════════ */
+#btn-sync {
+  position: relative; flex-direction: column; gap: .05rem;
+  width: auto !important; padding: .3rem .55rem !important;
+  min-width: 2.25rem;
+}
+#btn-sync-time-label {
+  font-size: .52rem; color: var(--ink-muted); line-height: 1;
+  white-space: nowrap; letter-spacing: .01em;
+}
+/* Spin durante sync */
+#btn-sync.syncing svg { animation: spin-sync .7s linear infinite; }
+@keyframes spin-sync {
+  to { transform: rotate(360deg); }
+}
+/* ── Overlay billete volando ─────────────────────────────────── */
+#flying-money-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(5,6,20,.82); backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+#flying-money-overlay.show { display: flex; animation: fmo-in .25s ease; }
+@keyframes fmo-in { from { opacity:0 } to { opacity:1 } }
+@keyframes fmo-out { to { opacity:0 } }
+
+.flying-bill {
+  position: absolute;
+  animation: bill-fly 2.4s cubic-bezier(.16,1,.3,1) forwards;
+  will-change: transform, opacity;
+  font-size: 2rem;
+  filter: drop-shadow(0 0 12px var(--brand));
+}
+@keyframes bill-fly {
+  0%   { transform: translate(var(--bx0), var(--by0)) rotate(var(--br0)) scale(.6); opacity: 0; }
+  15%  { opacity: 1; }
+  60%  { transform: translate(var(--bx1), var(--by1)) rotate(var(--br1)) scale(1.15); opacity: 1; }
+  85%  { opacity: .9; }
+  100% { transform: translate(var(--bx2), var(--by2)) rotate(var(--br2)) scale(.4); opacity: 0; }
+}
+.flying-bill-txt {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  text-align: center; pointer-events: none;
+}
+.flying-bill-txt h2 {
+  font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; font-weight: 800;
+  color: var(--brand); letter-spacing: -.02em;
+  text-shadow: 0 0 24px var(--brand-glow);
+  animation: sync-txt-pulse 2.4s ease-in-out forwards;
+}
+.flying-bill-txt p {
+  font-size: .78rem; color: var(--ink-muted); margin-top: .25rem;
+}
+@keyframes sync-txt-pulse {
+  0%   { opacity:0; transform: scale(.8); }
+  20%  { opacity:1; transform: scale(1.05); }
+  80%  { opacity:1; }
+  100% { opacity:0; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD — Ciclo activo resaltado
+══════════════════════════════════════════════════════════════ */
+.ciclo-activo-highlight {
+  border: 1.5px solid var(--brand) !important;
+  box-shadow: 0 0 0 3px rgba(0,240,255,.12), 0 4px 20px rgba(0,240,255,.08) !important;
+  background: rgba(0,240,255,.04) !important;
+}
+.ciclo-activo-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .2rem .6rem; border-radius: 999px; font-size: .68rem;
+  font-weight: 700; letter-spacing: .03em;
+  background: rgba(0,240,255,.12); color: var(--brand);
+  border: 1px solid var(--brand); animation: pulse-glow 2s ease-in-out infinite;
+}
+
 /* btn-add central — animación tipo "loma": sube suavemente como una colina */
 @keyframes btn-add-loma {
   0%   { transform: translateY(0)   scale(1);    box-shadow: 0 0 0 4px rgba(99,102,241,0.15), 0 8px 24px var(--brand-glow); }
