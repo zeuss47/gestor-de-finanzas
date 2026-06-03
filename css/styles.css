@@ -818,10 +818,13 @@ html.light #bottom-nav::before { background: #eef2ff; }
 /* ══════════════════════════════════════════════════════════════
    DASHBOARD — Ciclo activo resaltado
 ══════════════════════════════════════════════════════════════ */
-/* El ciclo activo se distingue por un CONTORNO con glow ESTÁTICO (sin pulso).
-   No tocamos `animation` para que la tarjeta conserve el mismo float/shine que
-   las demás (antes el !important pisaba la animación y quedaba buggy). */
+/* El ciclo activo. En MODO OSCURO no lleva borde luminoso: se ve igual que las
+   demás tarjetas (solo la sombra de profundidad normal). En modo claro sí
+   mantiene un contorno con glow para distinguirlo del fondo claro. */
 .ciclo-activo-highlight {
+  box-shadow: 0 8px 26px rgba(0,0,0,.28) !important;
+}
+html.light .ciclo-activo-highlight {
   border: 1.5px solid var(--brand) !important;
   box-shadow: 0 0 0 2px var(--brand-soft),
               0 0 18px 2px var(--brand-glow),
