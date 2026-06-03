@@ -42,7 +42,87 @@ const state = {
   version: null,     // info del archivo version.json
 };
 
-/* ============ Versión / Build ============ */
+/* ============ Versión / Build / Auto-update ============ */
+let _swReg = null;
+let _hayActualizacionSW = false;
+let _chequeoActIniciado = false;
+
+/**
+ * Chequea version.json y, si hay un build más nuevo que el cargado, dispara la
+ * actualización del Service Worker. Según el ajuste `auto_update`:
+ *  - ON  → aplica en silencio (recarga cuando el SW nuevo toma control).
+ *  - OFF → muestra un toast/badge para que el usuario actualice cuando quiera.
+ */
+async function chequearActualizacion(manual = false) {
+  try {
+    const r = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const v = await r.json();
+    const buildActual = state.version?.build || parseInt(localStorage.getItem('app_last_build') || '0');
+    if (v.build && buildActual && v.build > buildActual) {
+      // Hay versión nueva: pedir al SW que se actualice (descarga el shell nuevo)
+      try { await _swReg?.update(); } catch {}
+      const auto = state.ajustes?.auto_update !== false; // default ON
+      if (auto) {
+        // Silencioso: el SW nuevo se activará y controllerchange recargará.
+        aplicarActualizacionSiCorresponde();
+        // Si no hay SW (o ya estaba en control), forzamos una recarga suave.
+        if (!_hayActualizacionSW) setTimeout(() => location.reload(), 800);
+      } else {
+        mostrarBannerActualizacion(v);
+      }
+    } else if (manual) {
+      toast('✓ Ya tenés la última versión', 2000);
+    }
+  } catch (e) {
+    if (manual) toast('No se pudo verificar actualizaciones', 2500);
+  }
+}
+
+/** Aplica la actualización del SW (skip waiting) si el usuario tiene auto-update. */
+function aplicarActualizacionSiCorresponde() {
+  const auto = state.ajustes?.auto_update !== false;
+  if (!auto || !_hayActualizacionSW) return;
+  // Evitar recargar si el usuario está en medio de un formulario abierto.
+  const dlgAbierto = [...document.querySelectorAll('dialog')].some(d => d.open);
+  if (dlgAbierto) return; // se aplicará al cerrar / próximo chequeo
+  const waiting = _swReg?.waiting;
+  if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
+}
+
+/** Banner no intrusivo cuando hay update y auto-update está apagado. */
+function mostrarBannerActualizacion(v) {
+  if (document.getElementById('update-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.className = 'update-banner';
+  banner.innerHTML = `
+    <span>✨ Nueva versión v${escapeHtml(String(v.version))} disponible</span>
+    <button id="update-banner-btn">Actualizar</button>
+    <button id="update-banner-x" aria-label="Cerrar">✕</button>`;
+  document.body.appendChild(banner);
+  banner.querySelector('#update-banner-btn').onclick = () => {
+    _hayActualizacionSW = true;
+    const waiting = _swReg?.waiting;
+    if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
+    else location.reload();
+  };
+  banner.querySelector('#update-banner-x').onclick = () => banner.remove();
+}
+
+function iniciarChequeoActualizaciones() {
+  if (_chequeoActIniciado) return;
+  _chequeoActIniciado = true;
+  // Cada 10 minutos si la pestaña está visible
+  setInterval(() => {
+    if (document.visibilityState === 'visible') chequearActualizacion(false);
+  }, 10 * 60_000);
+  // Al volver a la app (focus / visible) también chequeamos
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') chequearActualizacion(false);
+  });
+}
+
 async function cargarVersion() {
   try {
     // Cache-bust con timestamp del momento de carga para que siempre traiga la última
@@ -163,13 +243,14 @@ const AJUSTES_DEFAULT = {
   ui: {
     tema: 'auto',
     color_primario: '#4f46e5',
-    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
-    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
     widgets_tamanos: {
       estado_global: 'lg',
       sueldo:        'lg',
       cuentas:       'md',
       tarjetas:      'md',
+      habituales:    'md',
       simulacion_credito: 'md',
       prediccion:    'lg',
       ia_local:      'md',
@@ -215,7 +296,17 @@ const AJUSTES_DEFAULT = {
       { id: 'venta',        nombre: 'Venta',        icono: '🏷', color: '#ec4899' },
       { id: 'otros',        nombre: 'Otros',        icono: '✨', color: '#94a3b8' },
     ],
+    // Gastos habituales = contadores con valor fijo (ej: "Vianda" $5000).
+    // Cada toque en acción rápida registra un gasto de ese valor.
+    habituales: [
+      { id: 'vianda',  nombre: 'Vianda',  icono: '🍱', color: '#fb923c', valor: 5000, categoria: 'comida' },
+      { id: 'cafe',    nombre: 'Café',    icono: '☕', color: '#a16207', valor: 2500, categoria: 'kiosco' },
+    ],
   },
+  // Si se elige una cuenta, los gastos habituales se descuentan de ella.
+  habituales_cuenta_id: null,
+  // Auto-actualización de la app (chequea version.json y aplica en silencio).
+  auto_update: true,
 };
 
 async function loadAjustes() {
@@ -325,6 +416,7 @@ async function reloadAll() {
   });
 
   renderWidgets();
+  renderQuickHabituales();
   if (currentTab === 'gastos') renderMovimientos();
   actualizarSidebar();
   actualizarKpiStrip();
@@ -400,6 +492,7 @@ const RENDERERS = {
   comparador:         renderComparador,
   prediccion:         renderPrediccion,
   balance:            renderBalance,
+  habituales:         renderWidgetHabituales,
 };
 
 const TPL = {
@@ -419,6 +512,7 @@ const TPL = {
   comparador:         'tpl-widget-comparador',
   prediccion:         'tpl-widget-prediccion',
   balance:            'tpl-widget-balance',
+  habituales:         'tpl-widget-habituales',
 };
 
 function renderWidgets() {
@@ -3161,9 +3255,13 @@ function abrirSettings() {
   // Inicializar tabs (siempre arrancar en General)
   cambiarSettingsTab('general');
 
+  // Auto-update (default ON)
+  if (form.elements.auto_update) form.elements.auto_update.checked = aj.auto_update !== false;
+
   // Render catálogos y cuentas
   renderCatalogoSettings('gasto');
   renderCatalogoSettings('ingreso');
+  renderHabitualesSettings();
   renderCuentasSettings();
   renderTarjetasSettings();
 
@@ -3206,6 +3304,11 @@ async function guardarSettings(form) {
 
   aj.ui.widgets_visibles = [...form.querySelectorAll('#widgets-toggle input:checked')]
     .map(i => i.dataset.widget);
+
+  // Auto-update + cuenta para gastos habituales
+  aj.auto_update = !!form.elements.auto_update?.checked;
+  aj.habituales_cuenta_id = form.elements.habituales_cuenta_id?.value || null;
+  // catalogos.habituales ya se editó en vivo en renderHabitualesSettings()
 
   await saveAjustes({ ...aj });
   await reloadAll();
@@ -3414,6 +3517,120 @@ async function quickAction(slug) {
     ocio:        { descripcion: 'Ocio',        categoria: 'ocio' },
   };
   openDialog('dlg-gasto', presets[slug] || {});
+}
+
+/* ============ Gastos habituales (contadores con valor fijo) ====== */
+/** Devuelve la lista de gastos habituales configurados. */
+function getHabituales() {
+  return state.ajustes?.catalogos?.habituales || [];
+}
+
+/** Cantidad de veces que se registró un habitual en el mes actual. */
+function _conteoHabitualMes(habitualId, mes = new Date().toISOString().slice(0,7)) {
+  return state.gastos.filter(g => !g.deleted && g.habitual_id === habitualId && (g.fecha||'').startsWith(mes)).length;
+}
+
+/** Registra un gasto a partir de un habitual (un "tic" del contador). */
+async function registrarGastoHabitual(habitualId) {
+  const h = getHabituales().find(x => x.id === habitualId);
+  if (!h) return;
+  const cuentaId = state.ajustes?.habituales_cuenta_id || null;
+  const g = {
+    id: uuid(), updated_at: nowTs(), deleted: false,
+    fecha: new Date().toISOString().slice(0,10),
+    monto: Number(h.valor) || 0,
+    moneda: 'ARS',
+    descripcion: h.nombre,
+    categoria: h.categoria || 'general',
+    subcategoria: null,
+    metodo_pago: cuentaId ? 'debito' : 'efectivo',
+    tipo: 'unico',
+    tarjeta_id: null,
+    cuenta_id: cuentaId,            // si hay cuenta configurada, se descuenta
+    cuotas_total: 1, cuota_numero: 1,
+    compartido: null,
+    es_amortizacion_anual: false,
+    es_habitual: true,
+    habitual_id: h.id,
+    adjunto_ref: null,
+  };
+  await DB.put('gastos', g);
+  notificarCambioLocal();
+  toast(`${h.icono || '✓'} ${h.nombre} +1 · ${FMT.format(g.monto)}`, 1600);
+  await reloadAll();
+}
+
+/** Deshace el último registro de un habitual en el mes (resta uno). */
+async function quitarGastoHabitual(habitualId) {
+  const mes = new Date().toISOString().slice(0,7);
+  const ultimo = state.gastos
+    .filter(g => !g.deleted && g.habitual_id === habitualId && (g.fecha||'').startsWith(mes))
+    .sort((a,b) => (b.updated_at||0) - (a.updated_at||0))[0];
+  if (!ultimo) { toast('No hay registros este mes', 1500); return; }
+  await DB.softDelete('gastos', ultimo.id);
+  notificarCambioLocal();
+  toast('−1 registro', 1200);
+  await reloadAll();
+}
+
+/** Renderiza los chips-contador de habituales en la barra de acción rápida. */
+function renderQuickHabituales() {
+  const cont = document.getElementById('qa-habituales');
+  if (!cont) return;
+  const habituales = getHabituales();
+  cont.innerHTML = habituales.map(h => {
+    const n = _conteoHabitualMes(h.id);
+    return `<button class="quick-btn quick-habitual" data-habitual="${escapeHtml(h.id)}"
+      style="${n>0?`border-color:${h.color};`:''}" title="${escapeHtml(h.nombre)} · ${FMT.format(h.valor||0)} c/u">
+      ${escapeHtml(h.icono||'🔁')} ${escapeHtml(h.nombre)}${n>0?`<span class="qa-count" style="background:${h.color}">${n}</span>`:''}
+    </button>`;
+  }).join('');
+  cont.querySelectorAll('[data-habitual]').forEach(btn => {
+    btn.onclick = () => registrarGastoHabitual(btn.dataset.habitual);
+    // Mantener apretado / click derecho resta uno
+    btn.oncontextmenu = (e) => { e.preventDefault(); quitarGastoHabitual(btn.dataset.habitual); };
+  });
+}
+
+/** Widget de gestión de gastos habituales: conteo del mes + total + +/-. */
+function renderWidgetHabituales(el) {
+  const box = el.querySelector('[data-bind="habituales-list"]');
+  if (!box) return;
+  const habituales = getHabituales();
+  if (!habituales.length) {
+    box.innerHTML = `<div class="flex flex-col items-center py-5 gap-1.5" style="color:var(--ink-muted)">
+      <span class="text-2xl opacity-40">🔁</span>
+      <p class="text-xs text-center">Sin gastos habituales.<br>Creálos en Ajustes → Catálogos.</p>
+    </div>`;
+    return;
+  }
+  const mes = new Date().toISOString().slice(0,7);
+  let totalMes = 0;
+  box.innerHTML = habituales.map(h => {
+    const n = _conteoHabitualMes(h.id, mes);
+    const subtotal = n * (Number(h.valor)||0);
+    totalMes += subtotal;
+    return `
+      <div class="habitual-row">
+        <span class="habitual-icon" style="background:${h.color}1a;border:1px solid ${h.color}44">${escapeHtml(h.icono||'🔁')}</span>
+        <div class="habitual-info">
+          <span class="habitual-nombre">${escapeHtml(h.nombre)}</span>
+          <span class="habitual-sub">${FMT.format(h.valor||0)} c/u · ${n} este mes</span>
+        </div>
+        <span class="habitual-subtotal">${FMT.format(subtotal)}</span>
+        <div class="habitual-counter">
+          <button class="habitual-btn" data-hab-menos="${escapeHtml(h.id)}" title="Quitar uno">−</button>
+          <span class="habitual-count">${n}</span>
+          <button class="habitual-btn plus" data-hab-mas="${escapeHtml(h.id)}" title="Agregar uno">+</button>
+        </div>
+      </div>`;
+  }).join('') + `
+    <div class="habitual-total">
+      <span>Total del mes</span><b>${FMT.format(totalMes)}</b>
+    </div>`;
+
+  box.querySelectorAll('[data-hab-mas]').forEach(b => b.onclick = (e) => { e.stopPropagation(); registrarGastoHabitual(b.dataset.habMas); });
+  box.querySelectorAll('[data-hab-menos]').forEach(b => b.onclick = (e) => { e.stopPropagation(); quitarGastoHabitual(b.dataset.habMenos); });
 }
 
 /* ============ Helpers ============ */
@@ -5762,18 +5979,40 @@ async function init() {
   // Cargar version.json (no bloqueante: si falla, seguimos)
   cargarVersion();
 
-  // Service Worker
+  // Service Worker + auto-update
   if ('serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.register('./sw.js');
-      // Solicitar background sync (si el navegador lo soporta)
+      _swReg = reg;
       if ('sync' in reg) {
         try { await reg.sync.register('sync-data'); } catch {}
       }
+      // Cuando un SW nuevo termina de instalarse y queda esperando, lo aplicamos
+      // según la preferencia de auto-update del usuario.
+      reg.addEventListener('updatefound', () => {
+        const nuevo = reg.installing;
+        if (!nuevo) return;
+        nuevo.addEventListener('statechange', () => {
+          if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+            _hayActualizacionSW = true;
+            aplicarActualizacionSiCorresponde();
+          }
+        });
+      });
     } catch (e) {
       console.warn('SW register failed', e);
     }
+    // Recargar una sola vez cuando el SW nuevo toma control
+    let _recargando = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_recargando) return;
+      _recargando = true;
+      location.reload();
+    });
   }
+
+  // Chequeo periódico de actualizaciones (cada 10 min si la app está visible)
+  iniciarChequeoActualizaciones();
 
   // Si venimos de un reset, NO hacer pull inicial: evita que el merge LWW
   // restaure datos del repo antes de que el usuario lo decida.
@@ -6328,6 +6567,81 @@ async function init() {
   document.getElementById('add-tarjeta-btn')?.addEventListener('click', () => {
     openDialog('dlg-tarjeta');
   });
+  // Gastos habituales
+  document.getElementById('add-habitual')?.addEventListener('click', () => {
+    state.ajustes.catalogos = state.ajustes.catalogos || {};
+    if (!Array.isArray(state.ajustes.catalogos.habituales)) state.ajustes.catalogos.habituales = [];
+    state.ajustes.catalogos.habituales.push({ id: 'hab_' + Date.now(), nombre: 'Nuevo', icono: '🔁', color: '#00f0ff', valor: 1000, categoria: 'general' });
+    renderHabitualesSettings();
+  });
+  // Buscar actualizaciones manualmente
+  document.getElementById('btn-check-update')?.addEventListener('click', () => chequearActualizacion(true));
+}
+
+/* ============ Editor de gastos habituales en Settings ============ */
+function renderHabitualesSettings() {
+  const cont = document.getElementById('habituales-list');
+  if (!cont) return;
+  if (!Array.isArray(state.ajustes?.catalogos?.habituales)) {
+    state.ajustes.catalogos = state.ajustes.catalogos || {};
+    state.ajustes.catalogos.habituales = [];
+  }
+  const lista = state.ajustes.catalogos.habituales;
+  const catsGasto = state.ajustes?.catalogos?.categorias_gasto?.length
+    ? state.ajustes.catalogos.categorias_gasto
+    : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.catalogos.categorias_gasto);
+
+  cont.innerHTML = lista.length ? '' :
+    `<p class="text-xs text-center py-2" style="color:var(--ink-muted)">Sin gastos habituales</p>`;
+
+  lista.forEach((h, idx) => {
+    const optsCat = catsGasto.map(c => `<option value="${escapeHtml(c.id||c.nombre)}" ${(h.categoria===(c.id||c.nombre))?'selected':''}>${escapeHtml(c.icono||'')} ${escapeHtml(c.nombre)}</option>`).join('');
+    cont.insertAdjacentHTML('beforeend', `
+      <div class="habitual-edit-row" data-idx="${idx}">
+        <span class="habitual-edit-emoji" data-hab-emoji="${idx}" style="background:${h.color}1a;border:1px solid ${h.color}44">${escapeHtml(h.icono||'🔁')}</span>
+        <input class="input habitual-edit-nombre" data-hab-nombre="${idx}" value="${escapeHtml(h.nombre||'')}" placeholder="Nombre" maxlength="24" />
+        <div class="input-with-prefix habitual-edit-valor"><span class="input-prefix">$</span>
+          <input type="number" class="input" data-hab-valor="${idx}" value="${h.valor||0}" min="0" step="100" placeholder="0" /></div>
+        <select class="input habitual-edit-cat" data-hab-cat="${idx}">${optsCat}</select>
+        <span class="habitual-edit-color" data-hab-color="${idx}" style="background:${h.color}" title="Color"></span>
+        <button type="button" class="catalog-item-del" data-hab-del="${idx}" title="Eliminar">✕</button>
+      </div>`);
+  });
+
+  cont.querySelectorAll('[data-hab-nombre]').forEach(inp => inp.oninput = e => { lista[+e.target.dataset.habNombre].nombre = e.target.value; });
+  cont.querySelectorAll('[data-hab-valor]').forEach(inp => inp.oninput = e => { lista[+e.target.dataset.habValor].valor = Number(e.target.value)||0; });
+  cont.querySelectorAll('[data-hab-cat]').forEach(sel => sel.onchange = e => { lista[+e.target.dataset.habCat].categoria = e.target.value; });
+  cont.querySelectorAll('[data-hab-emoji]').forEach(el => el.onclick = e => mostrarPickerEmojiHabitual(+el.dataset.habEmoji));
+  cont.querySelectorAll('[data-hab-color]').forEach(el => el.onclick = e => mostrarPickerColorHabitual(+el.dataset.habColor));
+  cont.querySelectorAll('[data-hab-del]').forEach(btn => btn.onclick = () => {
+    lista.splice(+btn.dataset.habDel, 1); renderHabitualesSettings();
+  });
+
+  // Poblar el select de cuenta para descontar
+  const selCuenta = document.getElementById('sel-habituales-cuenta');
+  if (selCuenta) {
+    const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+    selCuenta.innerHTML = `<option value="">No descontar de ninguna</option>` +
+      cuentas.map(c => `<option value="${c.id}" ${state.ajustes?.habituales_cuenta_id===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
+  }
+}
+
+/** Picker de emoji simple para un habitual (reutiliza prompt para no duplicar UI). */
+function mostrarPickerEmojiHabitual(idx) {
+  const h = state.ajustes.catalogos.habituales[idx];
+  const e = prompt('Emoji para este gasto habitual:', h.icono || '🔁');
+  if (e !== null) { h.icono = e.trim() || '🔁'; renderHabitualesSettings(); }
+}
+/** Picker de color simple para un habitual. */
+function mostrarPickerColorHabitual(idx) {
+  const h = state.ajustes.catalogos.habituales[idx];
+  const inp = document.createElement('input');
+  inp.type = 'color'; inp.value = h.color || '#00f0ff';
+  inp.style.cssText = 'position:fixed;left:-9999px';
+  document.body.appendChild(inp);
+  inp.addEventListener('input', () => { h.color = inp.value; });
+  inp.addEventListener('change', () => { h.color = inp.value; inp.remove(); renderHabitualesSettings(); });
+  inp.click();
 }
 
 /* ============ Editor de catálogos en Settings ============ */

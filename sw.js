@@ -116,20 +116,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Imágenes y fuentes: cache-first (no cambian con frecuencia)
+  // Imágenes y fuentes: STALE-WHILE-REVALIDATE.
+  // Servimos al instante lo cacheado (cero parpadeo) y, en paralelo, traemos la
+  // versión nueva y la guardamos para la próxima. Así los assets no críticos se
+  // actualizan solos en background sin que se note en pantalla.
   if (['image', 'font'].includes(request.destination)) {
     event.respondWith((async () => {
       const cache = await caches.open(SHELL_CACHE);
       const cached = await cache.match(request);
-      if (cached) return cached;
-      try {
-        const net = await fetch(request);
+      const fetchPromise = fetch(request).then((net) => {
         if (net.ok && net.type === 'basic') cache.put(request, net.clone());
         return net;
-      } catch {
-        return cached || Response.error();
-      }
+      }).catch(() => null);
+      // Devolvemos lo cacheado de inmediato; si no hay, esperamos la red.
+      return cached || (await fetchPromise) || Response.error();
     })());
+    return;
+  }
+
+  // version.json: network-first, sin cache, para detectar updates al instante.
+  if (url.pathname.endsWith('version.json')) {
+    event.respondWith(fetch(request, { cache: 'no-store' }).catch(() =>
+      caches.open(SHELL_CACHE).then(c => c.match(request)) ));
+    return;
   }
 });
 

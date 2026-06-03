@@ -893,6 +893,81 @@ html.light #bottom-nav::before { background: rgba(240,244,255,0.85); }
   transition: background .2s, border-color .2s, color .2s;
 }
 .quick-btn:hover { background: var(--surface-3); border-color: var(--brand); color: var(--brand-3); }
+/* #qa-habituales usa display:contents para que sus chips fluyan en la fila */
+#qa-habituales { display: contents; }
+.quick-habitual { display: inline-flex; align-items: center; gap: .35rem; }
+.quick-habitual .qa-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 .3rem;
+  border-radius: 999px; font-size: .68rem; font-weight: 800; color: #fff;
+  background: var(--brand); line-height: 1;
+}
+
+/* ── Widget de gastos habituales ──────────────────────────────── */
+.habitual-row {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .5rem .25rem; border-bottom: 1px solid var(--border);
+}
+.habitual-row:last-of-type { border-bottom: none; }
+.habitual-icon {
+  width: 34px; height: 34px; border-radius: .65rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 1.05rem;
+}
+.habitual-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.habitual-nombre { font-size: .85rem; font-weight: 600; color: var(--ink); }
+.habitual-sub { font-size: .66rem; color: var(--ink-muted); }
+.habitual-subtotal { font-size: .8rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.habitual-counter { display: flex; align-items: center; gap: .3rem; flex-shrink: 0; }
+.habitual-btn {
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--ink); font-size: 1rem; line-height: 1; display: flex;
+  align-items: center; justify-content: center; transition: all .12s;
+}
+.habitual-btn:hover { border-color: var(--brand); color: var(--brand); }
+.habitual-btn.plus { background: var(--brand); color: #04121a; border-color: var(--brand); font-weight: 700; }
+.habitual-btn.plus:hover { filter: brightness(1.12); }
+.habitual-count { min-width: 20px; text-align: center; font-weight: 700; font-size: .85rem; }
+.habitual-total {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: .6rem; padding-top: .55rem; border-top: 1px dashed var(--border);
+  font-size: .78rem; color: var(--ink-2);
+}
+.habitual-total b { color: var(--brand); font-size: .9rem; }
+
+/* Editor de habituales en Settings */
+.habitual-edit-row {
+  display: grid; grid-template-columns: auto 1fr 90px 1fr auto auto;
+  align-items: center; gap: .4rem;
+  padding: .4rem; border-radius: .6rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.habitual-edit-emoji {
+  width: 32px; height: 32px; border-radius: .5rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 1rem;
+}
+.habitual-edit-row .input { padding: .35rem .5rem; font-size: .78rem; }
+.habitual-edit-valor .input { padding-left: 1.1rem; }
+.habitual-edit-color {
+  width: 26px; height: 26px; border-radius: .45rem; cursor: pointer;
+  border: 2px solid var(--border);
+}
+
+/* ── Banner de actualización disponible ───────────────────────── */
+.update-banner {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  z-index: 9998; display: flex; align-items: center; gap: .6rem;
+  padding: .6rem .9rem; border-radius: 999px;
+  background: rgba(0,240,255,.12); border: 1px solid var(--brand);
+  backdrop-filter: blur(16px); color: var(--ink);
+  font-size: .8rem; box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  animation: dlg-in .3s ease;
+}
+.update-banner button {
+  border: none; cursor: pointer; font-size: .78rem; padding: .25rem .6rem;
+  border-radius: 999px; background: var(--brand); color: #04121a; font-weight: 700;
+}
+.update-banner button#update-banner-x { background: transparent; color: var(--ink-muted); padding: .25rem .4rem; }
 
 /* ── Dialog ──────────────────────────────────────────────────── */
 dialog {

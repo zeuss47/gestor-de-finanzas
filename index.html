@@ -465,6 +465,8 @@
     <div class="max-w-md mx-auto px-4">
       <div class="flex gap-2 overflow-x-auto pb-2 pointer-events-auto" id="quick-actions">
         <button id="qa-docs" class="quick-btn" style="border-color:var(--brand);color:var(--brand)">📄 Cargar PDF</button>
+        <!-- Contadores de gastos habituales (dinámico) -->
+        <span id="qa-habituales" class="contents"></span>
         <button data-quick="kiosco"      class="quick-btn">🥤 Kiosco</button>
         <button data-quick="combustible" class="quick-btn">⛽ Nafta</button>
         <button data-quick="super"       class="quick-btn">🛒 Súper</button>
@@ -613,6 +615,17 @@
       <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--border)" title="Crear desde Ajustes → Cuentas">⚙</span>
     </header>
     <div data-bind="accounts-list" class="space-y-2"></div>
+  </article>
+</template>
+
+<!-- Gastos habituales (contadores) -->
+<template id="tpl-widget-habituales">
+  <article class="widget card-glass p-5">
+    <header class="flex items-center justify-between mb-4">
+      <h2 class="ff-display text-sm font-semibold uppercase tracking-wider" style="color:var(--ink-muted)">🔁 Gastos habituales</h2>
+      <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--border)" title="Configurar en Ajustes → Catálogos">⚙</span>
+    </header>
+    <div data-bind="habituales-list" class="space-y-2"></div>
   </article>
 </template>
 
@@ -2531,6 +2544,19 @@
           </select>
         </fieldset>
 
+        <fieldset class="space-y-2 mt-4">
+          <legend>Actualizaciones</legend>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" name="auto_update" checked /> Actualizar automáticamente
+          </label>
+          <p class="text-xs" style="color:var(--ink-muted)">
+            La app verifica si hay una versión nueva y la aplica sola, sin interrumpirte. Si lo desactivás, te avisamos con un botón para actualizar cuando quieras.
+          </p>
+          <button type="button" id="btn-check-update" class="btn-secondary w-full text-xs mt-1">
+            🔄 Buscar actualizaciones ahora
+          </button>
+        </fieldset>
+
       </div>
 
       <!-- TAB: WIDGETS (visibles + orden) -->
@@ -2790,6 +2816,26 @@
           <button type="button" id="add-cat-ingreso" class="btn-secondary w-full text-xs mt-2">
             + Agregar categoría de ingreso
           </button>
+        </fieldset>
+
+        <!-- Gastos habituales (contadores con valor fijo) -->
+        <fieldset class="space-y-2 mt-5">
+          <legend class="flex items-center gap-2">
+            <span>🔁</span> Gastos habituales
+          </legend>
+          <p class="text-xs mb-2" style="color:var(--ink-muted)">
+            Items con valor fijo que cargás seguido (ej: vianda, café). Aparecen como contadores en acción rápida y en el widget. Cada toque registra un gasto del valor configurado.
+          </p>
+          <div id="habituales-list" class="space-y-1.5"></div>
+          <button type="button" id="add-habitual" class="btn-secondary w-full text-xs mt-2">
+            + Agregar gasto habitual
+          </button>
+          <label class="flex items-center gap-2 text-sm cursor-pointer mt-3">
+            <span style="color:var(--ink-muted)">Descontar de la cuenta:</span>
+            <select name="habituales_cuenta_id" id="sel-habituales-cuenta" class="input" style="flex:1;padding:.3rem .5rem;font-size:.8rem">
+              <option value="">No descontar de ninguna</option>
+            </select>
+          </label>
         </fieldset>
 
       </div>
