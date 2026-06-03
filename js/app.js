@@ -238,9 +238,11 @@ function _calcAplicar() {
 
 function _calcPosicionar() {
   if (!_calc.pop || !_calc.input) return;
-  const r = _calc.input.getBoundingClientRect();
   const pop = _calc.pop;
   pop.hidden = false;
+  // Dentro de un diálogo se posiciona por CSS (.in-dialog, anclado al pie).
+  if (pop.classList.contains('in-dialog')) { pop.style.left = pop.style.top = ''; return; }
+  const r = _calc.input.getBoundingClientRect();
   const pw = pop.offsetWidth, ph = pop.offsetHeight;
   let left = Math.min(r.left, window.innerWidth - pw - 8);
   left = Math.max(8, left);
@@ -253,6 +255,13 @@ function _calcPosicionar() {
 
 function _calcAbrir(input) {
   _calcCrearPop();
+  // Re-parentar la calculadora DENTRO del diálogo abierto: los <dialog> con
+  // showModal() viven en el top-layer y tapan cualquier elemento de la página,
+  // así que la calc debe ser hija del diálogo para verse por encima (una sola
+  // interfaz). Si no hay diálogo, va al body.
+  const host = input.closest('dialog') || document.body;
+  if (_calc.pop.parentElement !== host) host.appendChild(_calc.pop);
+  _calc.pop.classList.toggle('in-dialog', host.tagName === 'DIALOG');
   _calc.input = input;
   _calc.expr = (input.value && parseFloat(input.value)) ? String(input.value) : '';
   _calc.fresh = !!_calc.expr;   // si precargó un valor, el 1er dígito reemplaza
@@ -308,6 +317,42 @@ function initCalculadora() {
   // Reposicionar al scrollear/resize
   window.addEventListener('resize', () => { if (_calc.input) _calcPosicionar(); });
   window.addEventListener('scroll', () => { if (_calc.input) _calcPosicionar(); }, true);
+}
+
+/* ============ Forzar orientación vertical ============
+ * En Android: screen.orientation.lock('portrait') bloquea de verdad.
+ * En iOS (no soporta lock): la contra-rotación CSS endereza el contenido. El
+ * sentido lo marca _marcarSentidoGiro en <html data-orient> según el ángulo,
+ * recalculado en cada cambio para que SIEMPRE quede derecho (sin el 180° viejo).
+ */
+function bloquearOrientacionVertical() {
+  const intentarLock = () => {
+    try {
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('portrait').catch(() => {});
+      }
+    } catch {}
+  };
+  const recalcular = () => { intentarLock(); _marcarSentidoGiro(); };
+  intentarLock();
+  _marcarSentidoGiro();
+  document.addEventListener('fullscreenchange', recalcular);
+  window.addEventListener('orientationchange', recalcular);
+  window.addEventListener('resize', _marcarSentidoGiro);
+  if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
+    screen.orientation.addEventListener('change', recalcular);
+  }
+}
+
+/** Marca el sentido del giro en <html data-orient> para que el CSS contra-rote
+ *  hacia el lado correcto (contenido siempre derecho). */
+function _marcarSentidoGiro() {
+  let ang = null;
+  if (screen.orientation && typeof screen.orientation.angle === 'number') ang = screen.orientation.angle;
+  else if (typeof window.orientation === 'number') ang = window.orientation;
+  // angle 270 (o -90) = landscape secundario → giro inverso. El resto usa l90.
+  const inverso = (ang === 270 || ang === -90);
+  document.documentElement.dataset.orient = inverso ? 'l270' : 'l90';
 }
 
 function iniciarChequeoActualizaciones() {
@@ -6737,9 +6782,8 @@ async function init() {
   // Calculadora emergente en los campos de monto (input[data-calc])
   initCalculadora();
 
-  // Nota: la app funciona en cualquier orientación (vertical y horizontal). No
-  // forzamos rotación — eso rompía el táctil al girar. La orientación la decide
-  // el SO / el bloqueo de rotación del teléfono.
+  // Forzar orientación vertical (lock en Android + contra-rotación en iOS)
+  bloquearOrientacionVertical();
 
   // Si venimos de un reset, NO hacer pull inicial: evita que el merge LWW
   // restaure datos del repo antes de que el usuario lo decida.
