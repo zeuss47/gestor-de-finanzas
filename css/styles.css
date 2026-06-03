@@ -2734,23 +2734,17 @@ button:focus-visible,
   font-size: .95rem;
 }
 
-/* ── Settings → Catálogos: panel mejorado ────────────────────── */
-[data-spanel="catalogos"] fieldset {
-  background: var(--surface);
-  border: 1px solid var(--border) !important;
-  border-radius: 1rem;
-  padding: .9rem .85rem;
-  margin-bottom: 1rem;
-}
-[data-spanel="catalogos"] fieldset legend {
-  display: inline-flex; align-items: center; gap: .45rem;
-  font-size: .82rem; font-weight: 700; text-transform: none;
-  letter-spacing: -.01em; color: var(--ink);
-  padding: .2rem .6rem; margin-bottom: .55rem;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 999px;
-}
-[data-spanel="catalogos"] fieldset legend > span:first-child { font-size: 1rem; }
+/* Evita que el <fieldset> crezca a min-content y se desborde del panel
+   (su contenido —selects/inputs— ahora puede encogerse al ancho del diálogo). */
+#dlg-settings fieldset { min-inline-size: 0; }
+#dlg-settings .settings-panel { min-width: 0; }
+#dlg-settings .settings-panel select,
+#dlg-settings .settings-panel input { min-width: 0; max-width: 100%; }
+
+/* ── Settings → Catálogos: mismo ancho/estilo que los demás paneles.
+   Solo separamos las secciones y damos a los "+ Agregar" un look dashed.   */
+[data-spanel="catalogos"] fieldset { margin-bottom: 1.25rem; min-width: 0; }
+[data-spanel="catalogos"] fieldset legend > span:first-child { font-size: .95rem; }
 [data-spanel="catalogos"] .btn-secondary {
   border-style: dashed; color: var(--brand); border-color: var(--border-2);
   transition: all .15s;

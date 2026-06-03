@@ -110,6 +110,25 @@ function mostrarBannerActualizacion(v) {
   banner.querySelector('#update-banner-x').onclick = () => banner.remove();
 }
 
+/**
+ * Bloquea la orientación a vertical. La Screen Orientation API solo permite
+ * lock cuando la app corre instalada (standalone) o en pantalla completa; en el
+ * navegador normal el manifest "orientation":"portrait" es lo que aplica al
+ * instalarla. Hacemos el intento de forma segura (ignora si no está permitido).
+ */
+function bloquearOrientacionVertical() {
+  const intentar = () => {
+    try {
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('portrait').catch(() => {});
+      }
+    } catch {}
+  };
+  intentar();
+  // Re-intentar al entrar en pantalla completa (ahí sí está permitido)
+  document.addEventListener('fullscreenchange', intentar);
+}
+
 function iniciarChequeoActualizaciones() {
   if (_chequeoActIniciado) return;
   _chequeoActIniciado = true;
@@ -818,6 +837,30 @@ function calcularSaldoCuenta(cuenta) {
   return saldo;
 }
 
+/** Ajusta la luminancia de un color hex. factor<1 oscurece, >1 aclara. */
+function _ajustarLuminancia(hex, factor) {
+  let h = String(hex || '#6366f1').replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const num = parseInt(h, 16);
+  let r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+  r = Math.min(255, Math.max(0, Math.round(r * factor)));
+  g = Math.min(255, Math.max(0, Math.round(g * factor)));
+  b = Math.min(255, Math.max(0, Math.round(b * factor)));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+/**
+ * Gradiente premium estilo "tarjeta Macro" generado desde el color elegido:
+ * oscuro (sombra) → color base → brillante (luz). Da volumen y combina con el
+ * brillo holográfico animado del .credit-card.
+ */
+function _gradienteTarjeta(color) {
+  const c = color || '#6366f1';
+  const oscuro = _ajustarLuminancia(c, 0.42);
+  const claro  = _ajustarLuminancia(c, 1.38);
+  return `linear-gradient(135deg, ${oscuro} 0%, ${c} 52%, ${claro} 100%)`;
+}
+
 /** Mapea el nombre del banco a su clase de identidad visual (gradiente). */
 function _bancoCardClass(banco) {
   const b = (banco || '').toLowerCase();
@@ -857,17 +900,16 @@ function renderTarjetas(el) {
     const urgente = r.dias_para_cierre <= 2 || r.dias_para_vencimiento <= 2;
     const esCicloActivo = cicloMasProximo && r.tarjeta_id === cicloMasProximo.tarjeta_id;
     const claseUrgente = urgente ? 'pulse-warn' : '';
-    // Identidad bancaria: si reconocemos el banco, usamos su gradiente; si no, el color custom
-    const bankClass = _bancoCardClass(t.banco);
+    // Gradiente generado desde el color elegido por el usuario (todas las tarjetas)
     const colorBase = t.color || '#6366f1';
-    const bgStyle = bankClass ? '' : `background:linear-gradient(135deg,${colorBase}dd 0%,${colorBase}88 100%);`;
+    const bgStyle = `background:${_gradienteTarjeta(colorBase)};`;
     const diasC = r.dias_para_cierre;
     const diasV = r.dias_para_vencimiento;
     const badgeCierre = diasC <= 1 ? 'badge-danger' : diasC <= 5 ? 'badge-warning' : 'badge-muted';
     const badgeVenc   = diasV <= 1 ? 'badge-danger' : diasV <= 5 ? 'badge-warning' : 'badge-muted';
 
     box.insertAdjacentHTML('beforeend', `
-      <div class="credit-card ${bankClass} ${claseUrgente}${esCicloActivo ? ' ciclo-activo-highlight' : ''}"
+      <div class="credit-card ${claseUrgente}${esCicloActivo ? ' ciclo-activo-highlight' : ''}"
            data-tarjeta-id="${t.id}"
            style="${bgStyle}cursor:pointer">
         <!-- fila superior -->
@@ -3863,10 +3905,10 @@ function abrirDrawerTarjeta(tarjetaId) {
   const cap     = state.capacidad;
   const capTarjeta = cap?.por_tarjeta?.find(p => p.tarjeta_id === tarjetaId);
 
-  // Header con colores de la tarjeta
+  // Header con colores de la tarjeta (mismo gradiente premium)
   const colorBase = tarjeta.color || '#00f0ff';
   const header = document.getElementById('td-header');
-  if (header) header.style.background = `linear-gradient(135deg, ${colorBase}dd 0%, ${colorBase}88 100%)`;
+  if (header) header.style.background = _gradienteTarjeta(colorBase);
 
   document.getElementById('td-nombre').textContent = tarjeta.nombre;
   document.getElementById('td-banco').textContent  = tarjeta.banco || tarjeta.tipo || '—';
@@ -4562,9 +4604,8 @@ function renderTarjetasMobile() {
   lista.innerHTML = tarjetas.map(t => {
     const r = resumenTarjeta(t, state.gastos);
     const pct = t.limite_un_pago ? Math.min(100, Math.round((r.total_resumen / t.limite_un_pago) * 100)) : 0;
-    const bankClass = _bancoCardClass(t.banco);
     const colorBase = t.color || '#6366f1';
-    const bgStyle = bankClass ? '' : `background:linear-gradient(135deg,${colorBase}dd 0%,${colorBase}88 100%);`;
+    const bgStyle = `background:${_gradienteTarjeta(colorBase)};`;
     const fmtCorto = (iso) => {
       if (!iso) return '—';
       const d = new Date(iso + 'T12:00:00');
@@ -4572,7 +4613,7 @@ function renderTarjetasMobile() {
       return `${d.getDate()}/${mn[d.getMonth()]}`;
     };
     return `<div>
-      <div class="credit-card ${bankClass}" style="${bgStyle}cursor:pointer" data-tm-detalle="${t.id}">
+      <div class="credit-card" style="${bgStyle}cursor:pointer" data-tm-detalle="${t.id}">
         <div class="flex items-start justify-between mb-2 relative z-10">
           <div>
             <p class="font-semibold text-white text-base leading-tight">${escapeHtml(t.nombre)}</p>
@@ -6093,6 +6134,9 @@ async function init() {
   // Chequeo periódico de actualizaciones (cada 10 min si la app está visible)
   iniciarChequeoActualizaciones();
 
+  // Bloquear orientación a vertical (solo aplica en PWA instalada / fullscreen)
+  bloquearOrientacionVertical();
+
   // Si venimos de un reset, NO hacer pull inicial: evita que el merge LWW
   // restaure datos del repo antes de que el usuario lo decida.
   const _vieneDeReset = new URLSearchParams(location.search).has('reset');
@@ -7455,7 +7499,7 @@ function updateCardPreview() {
   if (cpC)    cpC.textContent    = cierre;
   if (cpV)    cpV.textContent    = venc;
 
-  card.style.background = `linear-gradient(135deg, ${color}dd 0%, ${color}77 100%)`;
+  card.style.background = _gradienteTarjeta(color);
 }
 
 document.addEventListener('input', (e) => {
