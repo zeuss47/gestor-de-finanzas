@@ -4662,3 +4662,43 @@ body.view-analisis #main-widgets::before {
   .rsb-mov-badge { display: none; }
   .rsb-mov-monto { font-size: .8rem; }
 }
+
+/* ── Bloqueo de orientación: forzar vertical en teléfonos ──────────
+   En iOS el manifest "orientation":"portrait" y screen.orientation.lock
+   se ignoran, así que mostramos un overlay a pantalla completa cuando el
+   teléfono se gira a apaisado. Condiciones para NO molestar a desktop/tablet:
+     - orientation: landscape  → girado
+     - max-height: 600px       → alto chico = teléfono (tablets/desktop quedan fuera)
+     - pointer: coarse         → dispositivo táctil (excluye desktop con mouse) */
+#rotate-lock { display: none; }
+
+@media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
+  #rotate-lock {
+    display: flex;
+    position: fixed; inset: 0; z-index: 2147483647;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 1.5rem;
+    background: var(--bg);
+  }
+  .rotate-lock-inner {
+    max-width: 360px;
+    display: flex; flex-direction: column; align-items: center; gap: .65rem;
+  }
+  .rotate-lock-icon {
+    font-size: 3.2rem; line-height: 1;
+    animation: rotate-lock-wiggle 2s ease-in-out infinite;
+  }
+  .rotate-lock-title { font-size: 1.15rem; font-weight: 700; color: var(--ink); margin: 0; }
+  .rotate-lock-msg   { font-size: .85rem; color: var(--ink-2); line-height: 1.45; margin: 0; }
+
+  /* Evitar scroll del fondo y la barra inferior asomando bajo el overlay */
+  body { overflow: hidden; }
+  /* Si hay un diálogo abierto al girar, ocultarlo para no mostrar layout roto.
+     El overlay queda visible (atenuado por el backdrop) y reaparece al volver. */
+  dialog[open] { visibility: hidden; }
+}
+
+@keyframes rotate-lock-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-90deg); }
+}

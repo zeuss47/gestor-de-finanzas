@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.49",
-    "build":  66,
-    "modified":  "2026-06-03T08:26:31Z",
-    "commit":  "M css/styles.css, M index.html, M js/ai-advisor.js, M js/app.js, tests/_shots/habituales_editor.p...",
-    "notes":  "Auto-update 2026-06-03 05:26"
+    "version":  "1.50",
+    "build":  67,
+    "modified":  "2026-06-03T08:33:28Z",
+    "commit":  "M css/styles.css, M index.html, M js/app.js, tests/_shots/orientacion_landscape.png",
+    "notes":  "Auto-update 2026-06-03 05:33"
 }

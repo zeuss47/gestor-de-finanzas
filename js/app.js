@@ -125,8 +125,14 @@ function bloquearOrientacionVertical() {
     } catch {}
   };
   intentar();
-  // Re-intentar al entrar en pantalla completa (ahí sí está permitido)
+  // Re-intentar al entrar en pantalla completa (ahí sí está permitido) y cuando
+  // el dispositivo cambia de orientación (en Android vuelve a forzar vertical).
   document.addEventListener('fullscreenchange', intentar);
+  if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
+    screen.orientation.addEventListener('change', intentar);
+  } else {
+    window.addEventListener('orientationchange', intentar);
+  }
 }
 
 function iniciarChequeoActualizaciones() {
