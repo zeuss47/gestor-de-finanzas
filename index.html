@@ -1015,10 +1015,10 @@
 
 <!-- Gasto -->
 <dialog id="dlg-gasto">
-  <form method="dialog" class="form-modern" style="min-width:min(94vw,560px);max-width:600px">
+  <form method="dialog" class="form-modern" style="min-width:min(94vw,480px);max-width:520px">
     <input type="hidden" name="_editing_id" />
 
-    <!-- Header con icono -->
+    <!-- Header compacto -->
     <div class="form-modern-header">
       <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--brand),var(--neon-purple))">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1026,20 +1026,20 @@
         </svg>
       </div>
       <div>
-        <h3 class="ff-display text-xl font-bold tracking-tight">Nuevo movimiento</h3>
-        <p class="text-xs" style="color:var(--ink-muted)">Registrá un gasto o pago</p>
+        <h3 class="ff-display text-xl font-bold tracking-tight" id="dlg-gasto-titulo">Nuevo gasto</h3>
+        <p class="text-xs" style="color:var(--ink-muted)" id="lbl-descripcion-gasto">¿Qué compraste?</p>
       </div>
     </div>
 
-    <!-- Body scrolleable -->
+    <!-- Body: formulario simple -->
     <div class="form-modern-body">
 
-      <!-- Descripción y monto en formato HUD -->
+      <!-- Qué compraste -->
       <div class="form-section">
-        <label class="form-label" id="lbl-descripcion-gasto">¿En qué gastaste?</label>
-        <input name="descripcion" required placeholder="Ej: Supermercado, Netflix, Nafta…" class="input input-lg" />
+        <input name="descripcion" required placeholder="Ej: Supermercado, Nafta, Almuerzo…" class="input input-lg" autocomplete="off" />
       </div>
 
+      <!-- Monto y fecha en la misma fila -->
       <div class="grid grid-cols-2 gap-3">
         <div class="form-section">
           <label class="form-label">Monto</label>
@@ -1060,69 +1060,10 @@
         </div>
       </div>
 
-      <!-- Cotización (solo si moneda != ARS) -->
-      <div class="form-section" id="row-cotizacion" hidden>
-        <label class="form-label">Cotización del día <span style="color:var(--brand);font-weight:700;font-size:.65rem" id="cot-currency-label">USD</span></label>
-        <div class="input-with-prefix">
-          <span class="input-prefix">$</span>
-          <input name="cotizacion" type="number" step="0.01" placeholder="0" class="input input-lg" id="gasto-cotizacion" />
-        </div>
-        <p class="text-[10px] mt-1" style="color:var(--ink-muted)">
-          Esta cotización se usa solo como referencia. Al cerrar el resumen, se aplicará la cotización oficial del día del pago.
-        </p>
-        <div class="cotizacion-equivalente" id="cot-equiv" hidden>
-          Equivale a <b style="color:var(--brand)" id="cot-equiv-valor">$0</b> ARS aproximadamente
-        </div>
-      </div>
-
-      <!-- Selector visual de método de pago -->
-      <div class="form-section">
-        <label class="form-label">Método de pago</label>
-        <div class="method-grid">
-          <label class="method-card" data-method="efectivo">
-            <input type="radio" name="metodo_pago" value="efectivo" checked />
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="2" y="6" width="20" height="12" rx="2"/>
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M6 12h.01M18 12h.01"/>
-            </svg>
-            <span>Efectivo</span>
-          </label>
-          <label class="method-card" data-method="debito">
-            <input type="radio" name="metodo_pago" value="debito" />
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="2" y="5" width="20" height="14" rx="2"/>
-              <line x1="2" y1="10" x2="22" y2="10"/>
-              <line x1="6" y1="15" x2="10" y2="15"/>
-            </svg>
-            <span>Débito</span>
-          </label>
-          <label class="method-card" data-method="transferencia">
-            <input type="radio" name="metodo_pago" value="transferencia" />
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <polyline points="17 1 21 5 17 9"/>
-              <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-              <polyline points="7 23 3 19 7 15"/>
-              <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-            </svg>
-            <span>Transfer.</span>
-          </label>
-          <label class="method-card" data-method="credito">
-            <input type="radio" name="metodo_pago" value="credito" />
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="2" y="5" width="20" height="14" rx="2"/>
-              <line x1="2" y1="10" x2="22" y2="10"/>
-              <path d="M7 15h2M13 15h4"/>
-            </svg>
-            <span>Crédito</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Categoría: chips clickeables -->
+      <!-- Categoría: chips rápidos + subcategoría dinámica -->
       <div class="form-section">
         <label class="form-label">Categoría</label>
-        <div class="chip-row">
+        <div class="chip-row" id="chips-categoria-gasto">
           <label class="cat-chip"><input type="radio" name="cat_quick" value="comida"/><span>🛒 Comida</span></label>
           <label class="cat-chip"><input type="radio" name="cat_quick" value="combustible"/><span>⛽ Combustible</span></label>
           <label class="cat-chip"><input type="radio" name="cat_quick" value="hogar"/><span>🏠 Hogar</span></label>
@@ -1135,51 +1076,53 @@
           <label class="cat-chip"><input type="radio" name="cat_quick" value="kiosco"/><span>🥤 Kiosco</span></label>
         </div>
         <input name="categoria" placeholder="O escribí otra categoría…" class="input mt-2" data-bind-gasto="categoria" />
-      </div>
-
-      <!-- Selector visual de tipo de pago -->
-      <div class="form-section">
-        <label class="form-label">Tipo de pago</label>
-        <div class="type-pills">
-          <label class="type-pill"><input type="radio" name="tipo" value="unico" checked/><span>Un pago</span></label>
-          <label class="type-pill"><input type="radio" name="tipo" value="cuotas"/><span>📦 Cuotas</span></label>
-          <label class="type-pill"><input type="radio" name="tipo" value="recurrente"/><span>🔁 Recurrente</span></label>
-          <label class="type-pill"><input type="radio" name="tipo" value="amortizacion"/><span>📅 Amortización</span></label>
+        <!-- Subcategoría: aparece solo cuando la categoría tiene subcategorías definidas -->
+        <div id="row-subcategoria-gasto" hidden style="margin-top:.5rem">
+          <label class="form-label" style="margin-bottom:.25rem">Subcategoría</label>
+          <div class="chip-row" id="chips-subcategoria-gasto"></div>
+          <input name="subcategoria" placeholder="O escribí una subcategoría…" class="input mt-2" id="inp-subcategoria-gasto" />
         </div>
       </div>
 
-      <!-- Cuotas (oculto por defecto) -->
-      <div class="form-section" id="row-cuotas" hidden>
-        <label class="form-label">Configurar cuotas</label>
-        <div class="grid grid-cols-2 gap-2">
-          <input name="cuotas_total" type="number" min="1" placeholder="N° cuotas" class="input" />
-          <select name="tarjeta_id" class="input" id="sel-tarjeta-cuotas">
+      <!-- ¿Con qué pagás? — tarjeta o cuenta en una sola fila compacta -->
+      <div class="form-section">
+        <label class="form-label">¿Con qué pagás?</label>
+        <div class="gasto-pago-tabs">
+          <button type="button" class="gasto-pago-tab active" data-pago="cuenta">💳 Cuenta / Efectivo</button>
+          <button type="button" class="gasto-pago-tab" data-pago="credito">🃏 Tarjeta crédito</button>
+        </div>
+        <!-- Cuenta (efectivo/débito/transferencia) -->
+        <div id="pago-cuenta-wrap">
+          <select name="cuenta_id" class="input mt-2" id="sel-cuenta-gasto">
+            <option value="">Sin cuenta específica</option>
+          </select>
+          <input type="hidden" name="metodo_pago" value="efectivo" id="hid-metodo-pago" />
+        </div>
+        <!-- Tarjeta crédito -->
+        <div id="pago-credito-wrap" hidden>
+          <select name="tarjeta_id_simple" class="input mt-2" id="sel-tarjeta-simple">
             <option value="">Elegir tarjeta…</option>
           </select>
+          <input type="hidden" name="metodo_pago" id="hid-metodo-pago-cred" value="credito" />
         </div>
       </div>
 
-      <!-- Tarjeta simple -->
-      <div class="form-section" id="row-tarjeta" hidden>
-        <label class="form-label">Tarjeta</label>
-        <select name="tarjeta_id_simple" class="input">
-          <option value="">Sin tarjeta</option>
-        </select>
+      <!-- Cotización (solo si moneda != ARS) -->
+      <div class="form-section" id="row-cotizacion" hidden>
+        <label class="form-label">Cotización <span style="color:var(--brand);font-weight:700;font-size:.65rem" id="cot-currency-label">USD</span></label>
+        <div class="input-with-prefix">
+          <span class="input-prefix">$</span>
+          <input name="cotizacion" type="number" step="0.01" placeholder="0" class="input" id="gasto-cotizacion" />
+        </div>
+        <div class="cotizacion-equivalente" id="cot-equiv" hidden>
+          ≈ <b style="color:var(--brand)" id="cot-equiv-valor">$0</b> ARS
+        </div>
       </div>
 
-      <!-- Cuenta debitada (cuando NO es crédito) -->
-      <div class="form-section" id="row-cuenta" hidden>
-        <label class="form-label">Cuenta debitada</label>
-        <select name="cuenta_id" class="input">
-          <option value="">Sin cuenta</option>
-        </select>
-      </div>
-
-      <!-- Info-banner: cuándo se paga este gasto -->
+      <!-- Info ciclo tarjeta -->
       <div id="ciclo-info" class="ciclo-info-banner" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-5 h-5 flex-shrink-0">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
         <div class="flex-1 min-w-0">
           <p class="ciclo-info-title" id="ciclo-info-title">—</p>
@@ -1187,19 +1130,38 @@
         </div>
       </div>
 
-      <!-- Gasto compartido (collapsable) -->
+      <!-- Opciones avanzadas (colapsadas) -->
       <details class="form-collapse">
-        <summary>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          Gasto compartido
-        </summary>
-        <div class="grid grid-cols-2 gap-2 mt-3">
-          <input name="comp_persona" placeholder="¿Con quién?" class="input" />
-          <input name="comp_porc" type="number" min="0" max="100" placeholder="% del otro" class="input" />
+        <summary>Opciones avanzadas</summary>
+        <div style="display:flex;flex-direction:column;gap:.75rem;margin-top:.75rem">
+          <!-- Tipo de pago -->
+          <div>
+            <label class="form-label">Tipo de pago</label>
+            <div class="type-pills">
+              <label class="type-pill"><input type="radio" name="tipo" value="unico" checked/><span>Un pago</span></label>
+              <label class="type-pill"><input type="radio" name="tipo" value="cuotas"/><span>📦 Cuotas</span></label>
+              <label class="type-pill"><input type="radio" name="tipo" value="recurrente"/><span>🔁 Recurrente</span></label>
+              <label class="type-pill"><input type="radio" name="tipo" value="amortizacion"/><span>📅 Amort.</span></label>
+            </div>
+          </div>
+          <!-- Cuotas -->
+          <div id="row-cuotas" hidden>
+            <label class="form-label">Cuotas</label>
+            <div class="grid grid-cols-2 gap-2">
+              <input name="cuotas_total" type="number" min="1" placeholder="N° cuotas" class="input" />
+              <select name="tarjeta_id" class="input" id="sel-tarjeta-cuotas">
+                <option value="">Elegir tarjeta…</option>
+              </select>
+            </div>
+          </div>
+          <!-- Gasto compartido -->
+          <div>
+            <label class="form-label">Gasto compartido</label>
+            <div class="grid grid-cols-2 gap-2">
+              <input name="comp_persona" placeholder="¿Con quién?" class="input" />
+              <input name="comp_porc" type="number" min="0" max="100" placeholder="% del otro" class="input" />
+            </div>
+          </div>
         </div>
       </details>
 
@@ -1220,31 +1182,79 @@
 
 <!-- Ingreso -->
 <dialog id="dlg-ingreso">
-  <form method="dialog" class="p-5 space-y-3">
+  <form method="dialog" class="form-modern" style="min-width:min(94vw,420px);max-width:460px">
     <input type="hidden" name="_editing_id" />
-    <h3 class="text-lg font-semibold">Ingreso / Sueldo</h3>
-    <input name="descripcion" placeholder="Descripción" class="input" value="Sueldo" />
-    <div class="grid grid-cols-2 gap-2">
-      <input name="fecha" required type="date" class="input" />
-      <input name="periodo_aplicacion" required type="month" class="input" />
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,#10b981,#00f0ff)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Nuevo ingreso</h3>
+        <p class="text-xs" style="color:var(--ink-muted)">Registrá lo que recibiste</p>
+      </div>
     </div>
-    <div class="grid grid-cols-2 gap-2">
-      <input name="sueldo_bruto" type="number" step="0.01" placeholder="Bruto" class="input" />
-      <input name="descuentos"   type="number" step="0.01" placeholder="Descuentos" class="input" />
+    <div class="form-modern-body ingreso-form-simple">
+
+      <!-- Qué fue -->
+      <div class="form-section">
+        <label class="form-label">Concepto</label>
+        <input name="descripcion" placeholder="Ej: Sueldo, Freelance, Venta…" class="input input-lg" value="" autocomplete="off" />
+      </div>
+
+      <!-- Monto neto grande + fecha -->
+      <div class="form-section" style="text-align:center">
+        <label class="form-label" style="text-align:left">Monto recibido (neto)</label>
+        <div class="input-with-prefix" style="margin-top:.25rem">
+          <span class="input-prefix">$</span>
+          <input name="sueldo_neto" required type="number" step="0.01" placeholder="0" class="input input-lg" style="font-size:1.4rem;font-weight:700" />
+        </div>
+      </div>
+
+      <!-- Fecha y período -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="form-section">
+          <label class="form-label">Fecha</label>
+          <input name="fecha" required type="date" class="input" />
+        </div>
+        <div class="form-section">
+          <label class="form-label">Período</label>
+          <input name="periodo_aplicacion" required type="month" class="input" />
+        </div>
+      </div>
+
+      <!-- Cuenta -->
+      <div class="form-section">
+        <label class="form-label">Cuenta acreditada</label>
+        <select name="cuenta_id" class="input">
+          <option value="">Sin cuenta</option>
+        </select>
+      </div>
+
+      <!-- Opciones avanzadas colapsadas -->
+      <details class="form-collapse">
+        <summary>Desglose (bruto / descuentos / bonos)</summary>
+        <div class="grid grid-cols-3 gap-2 mt-3">
+          <div>
+            <label class="form-label">Bruto</label>
+            <input name="sueldo_bruto" type="number" step="0.01" placeholder="0" class="input" />
+          </div>
+          <div>
+            <label class="form-label">Descuentos</label>
+            <input name="descuentos" type="number" step="0.01" placeholder="0" class="input" />
+          </div>
+          <div>
+            <label class="form-label">Bonos</label>
+            <input name="bonos" type="number" step="0.01" placeholder="0" class="input" />
+          </div>
+        </div>
+      </details>
+
     </div>
-    <div class="grid grid-cols-2 gap-2">
-      <input name="bonos"       type="number" step="0.01" placeholder="Bonos" class="input" />
-      <input name="sueldo_neto" required type="number" step="0.01" placeholder="Neto *" class="input" />
-    </div>
-    <div class="form-section">
-      <label class="form-label">Cuenta acreditada</label>
-      <select name="cuenta_id" class="input">
-        <option value="">Sin cuenta</option>
-      </select>
-    </div>
-    <div class="flex gap-2 pt-2">
+    <div class="form-modern-footer">
       <button value="cancel" formnovalidate class="btn-secondary flex-1">Cancelar</button>
-      <button value="save"   class="btn-primary flex-1">Guardar</button>
+      <button value="save" class="btn-primary flex-1">✓ Guardar</button>
     </div>
   </form>
 </dialog>

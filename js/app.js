@@ -2505,13 +2505,13 @@ function prepararDialogoGasto(form) {
   if (cotInp) cotInp.value = '';
   setTimeout(actualizarRowCotizacion, 0);
 
-  // Poblar selects de tarjetas
+  // Poblar selects de tarjetas (cuotas + tab de crédito)
   const tarjetas = state.tarjetas.filter(t => !t.deleted && t.activa !== false);
   for (const sel of form.querySelectorAll('select[name="tarjeta_id"], select[name="tarjeta_id_simple"]')) {
     sel.innerHTML = `<option value="">Sin tarjeta</option>` +
       tarjetas.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
   }
-  // Poblar select de cuentas
+  // Poblar select de cuentas (tab de cuenta/efectivo)
   const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
   for (const sel of form.querySelectorAll('select[name="cuenta_id"]')) {
     sel.innerHTML = `<option value="">Sin cuenta</option>` +
@@ -2521,26 +2521,62 @@ function prepararDialogoGasto(form) {
   const fecha = form.elements.fecha;
   if (!fecha.value) fecha.value = new Date().toISOString().slice(0,10);
 
+  // ── Tabs de pago (nuevo form: cuenta vs crédito) ──────────────
+  const tabCuenta  = form.querySelector('.gasto-pago-tab[data-pago="cuenta"]');
+  const tabCredito = form.querySelector('.gasto-pago-tab[data-pago="credito"]');
+  const wrapCuenta = form.querySelector('#pago-cuenta-wrap');
+  const wrapCredito= form.querySelector('#pago-credito-wrap');
+  const hidMetodo  = form.querySelector('#hid-metodo-pago');
+  if (tabCuenta && tabCredito) {
+    const activarTab = (tab) => {
+      tabCuenta.classList.toggle('active', tab === 'cuenta');
+      tabCredito.classList.toggle('active', tab === 'credito');
+      if (wrapCuenta)  wrapCuenta.hidden  = tab !== 'cuenta';
+      if (wrapCredito) wrapCredito.hidden = tab !== 'credito';
+      if (hidMetodo) hidMetodo.value = tab === 'credito' ? 'credito' : 'efectivo';
+    };
+    tabCuenta.onclick  = () => activarTab('cuenta');
+    tabCredito.onclick = () => activarTab('credito');
+    activarTab('cuenta'); // default
+  }
+
   const refrescar = () => {
-    // form.elements.tipo es RadioNodeList con .value = valor del radio checked
     const v = form.elements.tipo?.value || 'unico';
-    form.querySelector('#row-cuotas').hidden  = v !== 'cuotas';
-    form.querySelector('#row-tarjeta').hidden = v === 'cuotas';
-    // Mostrar row-cuenta solo si el método NO es crédito
-    const metodo = form.elements.metodo_pago?.value || 'efectivo';
-    const rowC = form.querySelector('#row-cuenta');
-    if (rowC) rowC.hidden = (metodo === 'credito');
+    const rowCuotas = form.querySelector('#row-cuotas');
+    if (rowCuotas) rowCuotas.hidden = v !== 'cuotas';
   };
-  // Escuchar cambio en cualquiera de los 4 radios de tipo
   form.querySelectorAll('input[name="tipo"]').forEach(r => r.onchange = refrescar);
-  // Escuchar cambio en método de pago para mostrar/ocultar cuenta
-  form.querySelectorAll('input[name="metodo_pago"]').forEach(r => r.addEventListener('change', refrescar));
-  // Inicializar label de "¿En qué gastaste?" con la categoría actual (en edición o nuevo)
+  refrescar();
+
+  // Inicializar label y chip de categoría
   const catInicial = form.elements.categoria?.value || '';
   _actualizarLabelGasto(catInicial);
-  // Marcar el chip de categoría correspondiente si coincide
   form.querySelectorAll('input[name="cat_quick"]').forEach(r => r.checked = (r.value === catInicial));
-  refrescar();
+
+  // ── Subcategorías: cargar chips cuando se elige una categoría ──
+  _actualizarSubcategoriasGasto(form, catInicial);
+  form.querySelectorAll('input[name="cat_quick"]').forEach(r => {
+    r.addEventListener('change', () => _actualizarSubcategoriasGasto(form, r.value));
+  });
+  form.elements.categoria?.addEventListener('input', (e) => _actualizarSubcategoriasGasto(form, e.target.value));
+}
+
+/** Carga los chips de subcategoría cuando se selecciona una categoría en el form de gasto. */
+function _actualizarSubcategoriasGasto(form, catId) {
+  const row = form.querySelector('#row-subcategoria-gasto');
+  const chipsWrap = form.querySelector('#chips-subcategoria-gasto');
+  const inp = form.querySelector('#inp-subcategoria-gasto');
+  if (!row || !chipsWrap) return;
+  const cat = (state.ajustes?.categorias_gasto || []).find(c => c.id === catId || c.nombre?.toLowerCase() === catId?.toLowerCase());
+  const subcats = cat?.subcategorias || [];
+  if (!subcats.length) { row.hidden = true; if (inp) inp.value = ''; return; }
+  row.hidden = false;
+  chipsWrap.innerHTML = subcats.map(s => `
+    <label class="cat-chip"><input type="radio" name="subcat_quick" value="${escapeHtml(s)}"><span>${escapeHtml(s)}</span></label>
+  `).join('');
+  chipsWrap.querySelectorAll('input[name="subcat_quick"]').forEach(r => {
+    r.addEventListener('change', () => { if (inp) inp.value = r.value; });
+  });
 }
 
 async function handleSubmitGasto(form) {
@@ -2566,7 +2602,8 @@ async function handleSubmitGasto(form) {
     cotizacion_al_pagar: base.cotizacion_al_pagar || null,  // Se setea al cerrar período
     descripcion: fd.get('descripcion'),
     categoria: fd.get('categoria') || 'general',
-    metodo_pago: fd.get('metodo_pago'),
+    subcategoria: fd.get('subcategoria') || null,
+    metodo_pago: fd.get('metodo_pago') || 'efectivo',
     tipo,
     tarjeta_id: tipo === 'cuotas' ? (fd.get('tarjeta_id') || null) : (fd.get('tarjeta_id_simple') || null),
     cuenta_id: fd.get('cuenta_id') || null,
@@ -3576,61 +3613,59 @@ function abrirEditorCiclos(tarjetaId) {
 }
 
 async function guardarEditorCiclos() {
-  const t = state.tarjetas.find(x => x.id === _editorCiclosTarjetaId);
-  if (!t) return;
+  try {
+    const t = state.tarjetas.find(x => x.id === _editorCiclosTarjetaId);
+    if (!t) return;
 
-  const diaCierre = parseInt(document.getElementById('edc-dia-cierre').value, 10);
-  const diaVenc   = parseInt(document.getElementById('edc-dia-venc').value, 10);
-  if (diaCierre >= 1 && diaCierre <= 31) t.dia_cierre = diaCierre;
-  if (diaVenc   >= 1 && diaVenc   <= 31) t.dia_vencimiento = diaVenc;
+    const diaCierre = parseInt(document.getElementById('edc-dia-cierre').value, 10);
+    const diaVenc   = parseInt(document.getElementById('edc-dia-venc').value, 10);
+    if (diaCierre >= 1 && diaCierre <= 31) t.dia_cierre = diaCierre;
+    if (diaVenc   >= 1 && diaVenc   <= 31) t.dia_vencimiento = diaVenc;
 
-  // Filas en orden ascendente por período (para encadenar el inicio de cada ciclo)
-  const rows = [...document.querySelectorAll('#edc-lista .edc-row')]
-    .map(row => ({
-      periodo: row.dataset.periodo,
-      cierre:  row.querySelector('.edc-cierre').value,
-      venc:    row.querySelector('.edc-venc').value,
-    }))
-    .filter(r => r.cierre)
-    .sort((a, b) => a.periodo.localeCompare(b.periodo));
+    // Filas en orden ascendente por período
+    const rows = [...document.querySelectorAll('#edc-lista .edc-row')]
+      .map(row => ({
+        periodo: row.dataset.periodo,
+        cierre:  row.querySelector('.edc-cierre').value,
+        venc:    row.querySelector('.edc-venc').value,
+      }))
+      .filter(r => r.cierre)
+      .sort((a, b) => a.periodo.localeCompare(b.periodo));
 
-  // Validaciones: vencimiento posterior al cierre y cierres crecientes
-  let prev = null;
-  for (const r of rows) {
-    if (r.venc && r.venc <= r.cierre) {
-      toast(`El vencimiento de ${r.periodo} debe ser posterior al cierre`, 3000); return;
+    // Validaciones
+    for (const r of rows) {
+      if (r.venc && r.venc <= r.cierre) {
+        toast(`El vencimiento de ${r.periodo} debe ser posterior al cierre`, 3000); return;
+      }
     }
-    if (prev && r.cierre <= prev) {
-      toast(`El cierre de ${r.periodo} debe ser posterior al ciclo anterior`, 3000); return;
-    }
-    prev = r.cierre;
-  }
 
-  // Conservar ciclos custom fuera del rango editado; reconstruir los del rango.
-  const editados = new Set(rows.map(r => r.periodo));
-  const custom = (t.ciclos_custom || []).filter(c => !editados.has(c.periodo));
+    // Conservar ciclos custom fuera del rango editado
+    const editados = new Set(rows.map(r => r.periodo));
+    const custom = (t.ciclos_custom || []).filter(c => !editados.has(c.periodo));
 
-  // Sólo se guarda un ciclo custom cuando difiere del "día fijo"; si coincide,
-  // se deja seguir la regla del día (así cambiar el día fijo mueve a todos).
-  let prevCierre = null;
-  for (const r of rows) {
-    const def = _defaultCierreVenc(t.dia_cierre, t.dia_vencimiento, r.periodo);
-    const difiere = r.cierre !== def.cierre || (r.venc && r.venc !== def.venc);
-    const inicio = prevCierre ? _diaSiguiente(prevCierre) : _diaSiguiente(_unMesAntesISO(r.cierre));
-    if (difiere) {
+    // Guardar siempre las fechas explícitas que el usuario tocó en el rango visible.
+    // A diferencia de antes, NO comparamos con el día fijo: si el usuario abrió el
+    // editor y guardó, las fechas quedan como ciclo custom para que no cambien al
+    // modificar el día fijo más adelante.
+    let prevCierre = null;
+    for (const r of rows) {
+      const inicio = prevCierre ? _diaSiguiente(prevCierre) : _diaSiguiente(_unMesAntesISO(r.cierre));
       custom.push({ periodo: r.periodo, inicio, fin: r.cierre, vencimiento: r.venc || null });
+      prevCierre = r.cierre;
     }
-    prevCierre = r.cierre;
+
+    t.ciclos_custom = custom;
+    t.updated_at = nowTs();
+    await DB.put('tarjetas', t);
+
+    document.getElementById('dlg-editar-ciclos').close();
+    toast('✓ Fechas de los ciclos actualizadas');
+    await reloadAll();
+    abrirDrawerTarjeta(_editorCiclosTarjetaId);
+  } catch (err) {
+    console.error('[edc] Error al guardar:', err);
+    toast('Error al guardar fechas: ' + (err?.message || String(err)), 4000);
   }
-
-  t.ciclos_custom = custom;
-  t.updated_at = nowTs();
-  await DB.put('tarjetas', t);
-
-  document.getElementById('dlg-editar-ciclos').close();
-  toast('✓ Fechas de los ciclos actualizadas');
-  await reloadAll();
-  abrirDrawerTarjeta(_editorCiclosTarjetaId);
 }
 
 // Wiring del editor de ciclos
@@ -5900,10 +5935,17 @@ function renderCatalogoSettings(tipo) {
     item.dataset.idx = idx;
     item.dataset.tipo = tipo;
     item.draggable = true;
+    const subcats = cat.subcategorias || [];
     item.innerHTML = `
       <button type="button" class="catalog-item-drag" title="Arrastrá para reordenar" data-action="drag" tabindex="-1">⋮⋮</button>
       <span class="catalog-item-emoji" data-action="emoji" data-idx="${idx}" data-tipo="${tipo}" style="border-color:${cat.color}33;background:${cat.color}11">${cat.icono}</span>
-      <input class="catalog-item-name" type="text" value="${escapeHtml(cat.nombre)}" data-idx="${idx}" data-tipo="${tipo}" maxlength="32" placeholder="Nombre"/>
+      <div style="flex:1;min-width:0">
+        <input class="catalog-item-name" type="text" value="${escapeHtml(cat.nombre)}" data-idx="${idx}" data-tipo="${tipo}" maxlength="32" placeholder="Nombre"/>
+        <div class="subcat-list catalog-subcat-list" data-idx="${idx}" data-tipo="${tipo}">
+          ${subcats.map((s, si) => `<span class="subcat-chip">${escapeHtml(s)}<button type="button" data-action="delsubcat" data-idx="${idx}" data-tipo="${tipo}" data-si="${si}" title="Eliminar subcategoría">✕</button></span>`).join('')}
+          <button type="button" class="subcat-chip" data-action="addsubcat" data-idx="${idx}" data-tipo="${tipo}" style="cursor:pointer;border-style:dashed;color:var(--brand)">+ subcategoría</button>
+        </div>
+      </div>
       <span class="catalog-item-color" data-action="color" data-idx="${idx}" data-tipo="${tipo}" style="background:${cat.color}" title="Color"></span>
       <div class="catalog-item-order">
         <button type="button" class="catalog-order-btn" data-action="up"   data-idx="${idx}" data-tipo="${tipo}" title="Mover arriba"  ${idx === 0 ? 'disabled' : ''}>▴</button>
@@ -5981,13 +6023,38 @@ function renderCatalogoSettings(tipo) {
     });
   });
 
-  // Eliminar
+  // Eliminar categoría
   cont.querySelectorAll('[data-action="del"]').forEach(btn => {
-    btn.onclick = (e) => {
+    btn.onclick = () => {
       const idx = parseInt(btn.dataset.idx);
       const tp = btn.dataset.tipo;
       if (!confirm('¿Eliminar esta categoría?')) return;
       state.ajustes.catalogos[`categorias_${tp}`].splice(idx, 1);
+      renderCatalogoSettings(tp);
+    };
+  });
+
+  // ── Subcategorías ────────────────────────────────────────────
+  cont.querySelectorAll('[data-action="addsubcat"]').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.idx);
+      const tp = btn.dataset.tipo;
+      const nombre = prompt('Nombre de la subcategoría:');
+      if (!nombre?.trim()) return;
+      const cat = state.ajustes.catalogos[`categorias_${tp}`][idx];
+      if (!Array.isArray(cat.subcategorias)) cat.subcategorias = [];
+      if (!cat.subcategorias.includes(nombre.trim())) cat.subcategorias.push(nombre.trim());
+      renderCatalogoSettings(tp);
+    };
+  });
+  cont.querySelectorAll('[data-action="delsubcat"]').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.idx);
+      const tp  = btn.dataset.tipo;
+      const si  = parseInt(btn.dataset.si);
+      const cat = state.ajustes.catalogos[`categorias_${tp}`][idx];
+      if (!Array.isArray(cat.subcategorias)) return;
+      cat.subcategorias.splice(si, 1);
       renderCatalogoSettings(tp);
     };
   });
