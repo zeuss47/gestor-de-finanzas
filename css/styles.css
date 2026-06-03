@@ -619,43 +619,25 @@ html.light #bottom-nav { background: rgba(240,244,255,0.85); }
   background: linear-gradient(90deg, var(--brand), var(--brand-2));
 }
 
-/* ── Bottom nav: ola sincronizada con el btn-add ─────────────────
-   El ::before crea una "loma" detrás del botón central que sube y
-   baja con el mismo timing que btn-add-loma.                      */
-@keyframes nav-loma {
-  0%   { transform: translateY(0) scaleX(1); }
-  30%  { transform: translateY(-5px) scaleX(1.04); }
-  60%  { transform: translateY(-2.5px) scaleX(1.02); }
-  100% { transform: translateY(0) scaleX(1); }
-}
+/* ── Bottom nav: cradle OPACO detrás del FAB ─────────────────────
+   Un disco sólido en el color de fondo enmarca el botón central y, lo
+   más importante, ENMASCARA el contenido que scrollea detrás (antes el
+   gauge rojo de capacidad se transparentaba y daba un halo rosa).    */
 #bottom-nav::before {
   content: '';
   position: absolute;
-  top: -18px;
+  top: -26px;
   left: 50%;
   transform: translateX(-50%);
   width: 72px;
-  height: 36px;
-  background: rgba(7,9,15,0.85);
-  backdrop-filter: blur(28px);
-  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-  z-index: -1;
-  animation: nav-loma 2.8s ease-in-out infinite;
-  will-change: transform;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  z-index: 0;            /* sobre el contenido scrolleado, debajo del FAB */
+  pointer-events: none;
 }
-html.light #bottom-nav::before { background: rgba(240,244,255,0.85); }
-
-/* Los iconos izquierdo/derecho al btn-add vibran suavemente en oposición */
-@keyframes nav-icons-breathe {
-  0%,100% { transform: translateY(0); }
-  30%     { transform: translateY(2px); }
-  60%     { transform: translateY(1px); }
-}
-#bottom-nav .nav-btn:nth-child(2),
-#bottom-nav .nav-btn:nth-child(4) {
-  animation: nav-icons-breathe 2.8s ease-in-out infinite;
-  animation-delay: 0.05s;
-}
+html.light #bottom-nav::before { background: #eef2ff; }
 
 /* ══════════════════════════════════════════════════════════════
    HISTORIAL — Filtros, búsqueda y filas detalladas
@@ -850,33 +832,38 @@ html.light #bottom-nav::before { background: rgba(240,244,255,0.85); }
   50%      { box-shadow: 0 0 0 3px rgba(0,240,255,.6),  0 0 24px 6px rgba(0,240,255,.5); }
 }
 
-/* btn-add central — animación tipo "loma": sube suavemente como una colina */
-@keyframes btn-add-loma {
-  0%   { transform: translateY(0)   scale(1);    box-shadow: 0 0 0 4px rgba(99,102,241,0.15), 0 8px 24px var(--brand-glow); }
-  30%  { transform: translateY(-6px) scale(1.08); box-shadow: 0 0 0 8px rgba(99,102,241,0.18), 0 18px 36px var(--brand-glow); }
-  60%  { transform: translateY(-3px) scale(1.04); box-shadow: 0 0 0 6px rgba(99,102,241,0.14), 0 13px 28px var(--brand-glow); }
-  100% { transform: translateY(0)   scale(1);    box-shadow: 0 0 0 4px rgba(99,102,241,0.15), 0 8px 24px var(--brand-glow); }
+/* btn-add central — pulso de glow suave (solo box-shadow, sin mover el botón
+   para no revelar contenido detrás). Un único color coherente: el brand. */
+@keyframes btn-add-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--brand-glow), 0 6px 18px rgba(0,0,0,.4); }
+  50%      { box-shadow: 0 0 0 7px transparent, 0 8px 22px rgba(0,0,0,.45); }
 }
 #btn-add {
-  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
-  box-shadow: 0 0 0 4px rgba(99,102,241,0.15), 0 8px 24px var(--brand-glow);
-  border: none;
+  position: relative;
+  z-index: 2;                       /* por encima del cradle ::before */
+  /* Gloss arriba-izquierda + sheen claro→oscuro sobre el color de marca:
+     un solo tono limpio, sin magenta hardcodeado. */
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 46%),
+    linear-gradient(150deg, rgba(255,255,255,.16) 0%, rgba(0,0,0,.22) 100%),
+    var(--brand);
+  box-shadow: 0 0 0 0 var(--brand-glow), 0 6px 18px rgba(0,0,0,.4);
+  border: 2px solid rgba(255,255,255,.2);
   cursor: pointer;
   color: #fff;
-  animation: btn-add-loma 2.8s ease-in-out infinite;
-  will-change: transform;
+  animation: btn-add-pulse 2.6s ease-in-out infinite;
+  transition: transform .18s cubic-bezier(.34,1.56,.64,1), filter .18s;
+  will-change: box-shadow;
 }
 #btn-add:hover  {
-  animation: none;
-  transform: translateY(-5px) scale(1.07);
-  box-shadow: 0 0 0 8px rgba(99,102,241,0.22), 0 18px 36px var(--brand-glow);
-  transition: transform .18s ease, box-shadow .18s ease;
+  transform: scale(1.08);
+  filter: brightness(1.08);
 }
 #btn-add:active {
-  animation: none;
-  transform: scale(.91);
+  transform: scale(.9);
   transition: transform .1s ease;
 }
+@media (prefers-reduced-motion: reduce) { #btn-add { animation: none; } }
 
 /* ── Quick actions ────────────────────────────────────────────── */
 .quick-btn {
@@ -1594,30 +1581,38 @@ html.light select.input { color-scheme: light; }
   box-shadow: 0 0 12px currentColor;
 }
 
-#widgets-toggle label {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  padding: .55rem .75rem;
-  border-radius: 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: background .15s, border-color .15s;
+/* Filas de widgets: reordenar (↑/↓) + switch mostrar/ocultar */
+#widgets-toggle { display: flex; flex-direction: column; gap: .4rem; }
+.widget-toggle-row {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .45rem .6rem; border-radius: .7rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+  transition: opacity .15s, border-color .15s;
 }
-#widgets-toggle label:hover {
-  background: var(--surface-3);
-  border-color: var(--border-2);
+.widget-toggle-row.off { opacity: .5; }
+.widget-toggle-order { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.wt-move {
+  width: 22px; height: 16px; padding: 0; line-height: 1;
+  background: var(--surface-3); border: 1px solid var(--border);
+  color: var(--ink-muted); border-radius: 4px; cursor: pointer; font-size: .6rem;
+  display: flex; align-items: center; justify-content: center; transition: all .12s;
 }
-#widgets-toggle label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--brand);
-  cursor: pointer;
+.wt-move:hover:not(:disabled) { color: var(--brand); border-color: var(--brand); }
+.wt-move:disabled { opacity: .3; cursor: default; }
+#widgets-toggle .widget-icon { font-size: 1.05rem; flex-shrink: 0; }
+/* Switch tipo toggle */
+.wt-switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; cursor: pointer; }
+.wt-switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.wt-slider {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: var(--surface-3); border: 1px solid var(--border); transition: background .18s, border-color .18s;
 }
-#widgets-toggle .widget-icon {
-  font-size: 1rem;
+.wt-slider::before {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--ink-muted); transition: transform .18s, background .18s;
 }
+.wt-switch input:checked + .wt-slider { background: var(--brand-soft); border-color: var(--brand); }
+.wt-switch input:checked + .wt-slider::before { transform: translateX(16px); background: var(--brand); }
 
 /* ── Widget History Drawer (cyberpunk) ───────────────────────── */
 #dlg-widget-history {

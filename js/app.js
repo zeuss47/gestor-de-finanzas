@@ -387,6 +387,10 @@ function aplicarTema() {
   html.classList.toggle('light', esClaro);
   const color = state.ajustes?.ui?.color_primario || '#6366f1';
   document.documentElement.style.setProperty('--brand', color);
+  // El glow y el "soft" se derivan del color elegido para que todo combine
+  // (FAB, nav, widgets) en vez de quedar un cyan fijo que no matchea.
+  document.documentElement.style.setProperty('--brand-glow', `${color}88`);
+  document.documentElement.style.setProperty('--brand-soft', `${color}26`);
   document.getElementById('meta-theme')?.setAttribute('content', esClaro ? '#f0f4ff' : '#07090f');
 }
 
@@ -856,9 +860,11 @@ function _ajustarLuminancia(hex, factor) {
  */
 function _gradienteTarjeta(color) {
   const c = color || '#6366f1';
-  const oscuro = _ajustarLuminancia(c, 0.42);
-  const claro  = _ajustarLuminancia(c, 1.38);
-  return `linear-gradient(135deg, ${oscuro} 0%, ${c} 52%, ${claro} 100%)`;
+  // Look premium/profundo: del más oscuro al color pleno (el color es el punto
+  // MÁS brillante, no lo pasamos de rosca → evita el efecto neón saturado).
+  const oscuro = _ajustarLuminancia(c, 0.30);
+  const medio  = _ajustarLuminancia(c, 0.62);
+  return `linear-gradient(135deg, ${oscuro} 0%, ${medio} 58%, ${c} 100%)`;
 }
 
 /** Mapea el nombre del banco a su clase de identidad visual (gradiente). */
@@ -3276,38 +3282,8 @@ function abrirSettings() {
   if (form.elements.alertas_margen)     form.elements.alertas_margen.checked    = !!aj.notificaciones?.alertas_margen;
   if (form.elements.margen_minimo)      form.elements.margen_minimo.value       = aj.notificaciones?.margen_minimo ?? '';
 
-  // Toggles de widgets (con íconos)
-  const cont = form.querySelector('#widgets-toggle');
-  if (cont) {
-    cont.innerHTML = '';
-    const ICONS = {
-      estado_global: '💰', sueldo: '💼', cuentas: '🏦', tarjetas: '💳', simulacion_credito: '📊',
-      ia_local: '🧠', metas: '🎯', grafico: '📈',
-      resumen_anual: '📅', flujo_mensual: '🌊', categorias: '🍩',
-      tipo_cambio: '💱', calculadora: '🧮', comparador: '⚖',
-      prediccion: '🔮', balance: '📉',
-    };
-    const LABELS = {
-      estado_global: 'Estado global', sueldo: 'Sueldo y recibos',
-      cuentas: 'Cuentas bancarias',
-      tarjetas: 'Tarjetas',
-      simulacion_credito: 'Capacidad crediticia', ia_local: 'Análisis IA',
-      metas: 'Metas de ahorro', grafico: 'Evolución 6 meses',
-      resumen_anual: 'Resumen anual', flujo_mensual: 'Flujo mensual',
-      categorias: 'Gastos por categoría', tipo_cambio: 'Tipo de cambio',
-      calculadora: 'Calculadora', comparador: 'Comparador mensual',
-      prediccion: 'Predicción de gasto', balance: 'Balance general',
-    };
-    for (const id of Object.keys(TPL)) {
-      const checked = (aj.ui?.widgets_visibles || []).includes(id);
-      cont.insertAdjacentHTML('beforeend', `
-        <label>
-          <input type="checkbox" data-widget="${id}" ${checked?'checked':''}/>
-          <span class="widget-icon">${ICONS[id] || '◆'}</span>
-          <span class="text-sm flex-1">${LABELS[id] || id}</span>
-        </label>`);
-    }
-  }
+  // Toggles + reordenamiento de widgets (reacomodar el dashboard desde el cel)
+  renderWidgetsToggle();
 
   // Inicializar tabs (siempre arrancar en General)
   cambiarSettingsTab('general');
@@ -3323,6 +3299,73 @@ function abrirSettings() {
   renderTarjetasSettings();
 
   dlg.showModal();
+}
+
+const WIDGET_ICONS = {
+  estado_global: '💰', sueldo: '💼', cuentas: '🏦', tarjetas: '💳', habituales: '🔁',
+  simulacion_credito: '📊', ia_local: '🧠', metas: '🎯', grafico: '📈',
+  resumen_anual: '📅', flujo_mensual: '🌊', categorias: '🍩',
+  tipo_cambio: '💱', calculadora: '🧮', comparador: '⚖', prediccion: '🔮', balance: '📉',
+};
+const WIDGET_LABELS = {
+  estado_global: 'Estado global', sueldo: 'Sueldo y recibos', cuentas: 'Cuentas bancarias',
+  tarjetas: 'Tarjetas', habituales: 'Gastos habituales',
+  simulacion_credito: 'Capacidad crediticia', ia_local: 'Análisis IA',
+  metas: 'Metas de ahorro', grafico: 'Evolución 6 meses', resumen_anual: 'Resumen anual',
+  flujo_mensual: 'Flujo mensual', categorias: 'Gastos por categoría', tipo_cambio: 'Tipo de cambio',
+  calculadora: 'Calculadora', comparador: 'Comparador mensual', prediccion: 'Predicción de gasto',
+  balance: 'Balance general',
+};
+
+/**
+ * Lista de widgets en Settings: respeta el orden del dashboard y permite
+ * mostrar/ocultar (checkbox) y reordenar (botones ↑/↓). Reordenar reacomoda
+ * el dashboard al instante.
+ */
+function renderWidgetsToggle() {
+  const cont = document.getElementById('widgets-toggle');
+  if (!cont) return;
+  const aj = state.ajustes;
+  // Orden actual = widgets_orden + cualquier key de TPL que falte
+  const orden = [...(aj.ui?.widgets_orden || [])];
+  for (const k of Object.keys(TPL)) if (!orden.includes(k)) orden.push(k);
+
+  cont.innerHTML = orden.map((id, i) => {
+    const checked = (aj.ui?.widgets_visibles || []).includes(id);
+    return `
+      <div class="widget-toggle-row${checked ? '' : ' off'}" data-widget-row="${id}">
+        <div class="widget-toggle-order">
+          <button type="button" class="wt-move" data-wt-up="${id}" ${i === 0 ? 'disabled' : ''} title="Subir">▴</button>
+          <button type="button" class="wt-move" data-wt-down="${id}" ${i === orden.length - 1 ? 'disabled' : ''} title="Bajar">▾</button>
+        </div>
+        <span class="widget-icon">${WIDGET_ICONS[id] || '◆'}</span>
+        <span class="text-sm flex-1">${escapeHtml(WIDGET_LABELS[id] || id)}</span>
+        <label class="wt-switch">
+          <input type="checkbox" data-widget="${id}" ${checked ? 'checked' : ''}/>
+          <span class="wt-slider"></span>
+        </label>
+      </div>`;
+  }).join('');
+
+  // Persistir el nuevo orden y refrescar dashboard
+  const mover = async (id, delta) => {
+    const arr = aj.ui.widgets_orden = [...(aj.ui.widgets_orden || orden)];
+    // asegurar que estén todas las keys
+    for (const k of orden) if (!arr.includes(k)) arr.push(k);
+    const idx = arr.indexOf(id);
+    const j = idx + delta;
+    if (idx < 0 || j < 0 || j >= arr.length) return;
+    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    await DB.put('ajustes', aj);
+    renderWidgetsToggle();
+    renderWidgets();
+  };
+  cont.querySelectorAll('[data-wt-up]').forEach(b => b.onclick = () => mover(b.dataset.wtUp, -1));
+  cont.querySelectorAll('[data-wt-down]').forEach(b => b.onclick = () => mover(b.dataset.wtDown, +1));
+  // Reflejar visibilidad en vivo (estilo de la fila)
+  cont.querySelectorAll('input[data-widget]').forEach(chk => chk.onchange = () => {
+    chk.closest('.widget-toggle-row')?.classList.toggle('off', !chk.checked);
+  });
 }
 
 function cambiarSettingsTab(stab) {
