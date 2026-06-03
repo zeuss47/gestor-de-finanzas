@@ -93,7 +93,7 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
 
   // 2. Gastos fijos del mes en curso (sin tarjeta) — para el saldo líquido real
   const gastosFijosMes = gastos
-    .filter(g => !g.deleted && !g.tarjeta_id && !g.es_pago_tarjeta && g.fecha?.startsWith(mesActual))
+    .filter(g => !g.deleted && !g.tarjeta_id && !g.es_pago_tarjeta && !(g.es_habitual && !g.cuenta_id) && g.fecha?.startsWith(mesActual))
     .reduce((a, g) => {
       let m = g.monto;
       if (g.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0)/100);
@@ -110,7 +110,7 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
     mesesRef.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
   const sumaHabituales = gastos
-    .filter(g => !g.deleted && !g.tarjeta_id && !g.es_pago_tarjeta && mesesRef.some(mm => g.fecha?.startsWith(mm)))
+    .filter(g => !g.deleted && !g.tarjeta_id && !g.es_pago_tarjeta && !(g.es_habitual && !g.cuenta_id) && mesesRef.some(mm => g.fecha?.startsWith(mm)))
     .reduce((a, g) => {
       let m = g.monto;
       if (g.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0)/100);

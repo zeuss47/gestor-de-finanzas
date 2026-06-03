@@ -836,17 +836,18 @@ html.light #bottom-nav::before { background: rgba(240,244,255,0.85); }
 /* ══════════════════════════════════════════════════════════════
    DASHBOARD — Ciclo activo resaltado
 ══════════════════════════════════════════════════════════════ */
+/* El ciclo activo se distingue por un CONTORNO que pulsa (la misma animación
+   glow que antes tenía el badge), aplicada al borde de la tarjeta. */
 .ciclo-activo-highlight {
-  border: 1.5px solid var(--brand) !important;
-  box-shadow: 0 0 0 3px rgba(0,240,255,.12), 0 4px 20px rgba(0,240,255,.08) !important;
+  border: 1.5px solid rgba(255,255,255,.55) !important;
   background: rgba(0,240,255,.04) !important;
+  /* mantiene la flotación de la tarjeta + suma el glow pulsante del contorno */
+  animation: card-float 5.5s ease-in-out infinite,
+             ciclo-contorno-glow 2.2s ease-in-out infinite !important;
 }
-.ciclo-activo-badge {
-  display: inline-flex; align-items: center; gap: .3rem;
-  padding: .2rem .6rem; border-radius: 999px; font-size: .68rem;
-  font-weight: 700; letter-spacing: .03em;
-  background: rgba(0,240,255,.12); color: var(--brand);
-  border: 1px solid var(--brand); animation: pulse-glow 2s ease-in-out infinite;
+@keyframes ciclo-contorno-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0,240,255,.3),  0 0 8px 1px rgba(0,240,255,.3); }
+  50%      { box-shadow: 0 0 0 3px rgba(0,240,255,.6),  0 0 24px 6px rgba(0,240,255,.5); }
 }
 
 /* btn-add central — animación tipo "loma": sube suavemente como una colina */
@@ -2223,9 +2224,43 @@ dialog form.form-modern { padding: 0 !important; }
 #dlg-gasto { padding: 0; overflow: hidden; border-radius: 1.25rem; }
 
 /* Settings necesita ancho específico para mostrar todas las tabs */
+/* Ajustes responsive: se adapta a mobile / tablet / PC */
 #dlg-settings {
-  width: min(94vw, 560px) !important;
-  max-width: 580px;
+  width: min(96vw, 560px) !important;
+  max-width: 96vw;
+  max-height: 92vh;
+}
+/* display:flex SOLO cuando está abierto, para no romper el display:none nativo
+   del <dialog> cerrado (si no, se ve el contenido de fondo siempre). */
+#dlg-settings[open] {
+  display: flex; flex-direction: column;
+}
+/* Anulamos el min/max-width inline del form para que siga al diálogo */
+#dlg-settings > form {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100%;
+  display: flex; flex-direction: column;
+  max-height: 92vh;
+}
+/* El área de paneles scrollea; header (tabs) y footer (botones) quedan fijos */
+#dlg-settings .settings-panels-scroll {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+/* Tablet: más ancho */
+@media (min-width: 700px) {
+  #dlg-settings { width: min(92vw, 700px) !important; }
+}
+/* PC: ancho cómodo + paneles en 2 columnas para aprovechar el espacio */
+@media (min-width: 1080px) {
+  #dlg-settings { width: 820px !important; }
+  #dlg-settings .settings-panel:not(.hidden) {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0 1.25rem; align-items: start;
+  }
+  #dlg-settings .settings-panel:not(.hidden) > fieldset { margin-bottom: 1rem; }
+  /* Elementos que deben ocupar todo el ancho igual */
+  #dlg-settings .settings-panel:not(.hidden) > .span-2 { grid-column: 1 / -1; }
 }
 
 /* Drawers anchos: historial y detalle de tarjeta */

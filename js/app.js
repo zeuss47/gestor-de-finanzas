@@ -190,6 +190,7 @@ function switchTab(tab) {
   const root  = document.getElementById('main-widgets');
   const secMov = document.getElementById('section-movimientos');
   const secTarjetasMobile = document.getElementById('sec-tarjetas-mobile');
+  const secMetasMobile = document.getElementById('sec-metas-mobile');
 
   // Reset clases de modo
   document.body.classList.remove('view-analisis');
@@ -198,6 +199,7 @@ function switchTab(tab) {
     root.classList.add('hidden');
     secMov?.classList.remove('hidden');
     secTarjetasMobile?.classList.add('hidden');
+    secMetasMobile?.classList.add('hidden');
     renderMovimientos();
     return;
   }
@@ -206,7 +208,17 @@ function switchTab(tab) {
     root.classList.add('hidden');
     secMov?.classList.add('hidden');
     secTarjetasMobile?.classList.remove('hidden');
+    secMetasMobile?.classList.add('hidden');
     renderTarjetasMobile();
+    return;
+  }
+
+  if (tab === 'metas') {
+    root.classList.add('hidden');
+    secMov?.classList.add('hidden');
+    secTarjetasMobile?.classList.add('hidden');
+    secMetasMobile?.classList.remove('hidden');
+    renderMetasMobile();
     return;
   }
 
@@ -214,6 +226,7 @@ function switchTab(tab) {
   root.classList.remove('hidden');
   secMov?.classList.add('hidden');
   secTarjetasMobile?.classList.add('hidden');
+  secMetasMobile?.classList.add('hidden');
 
   if (tab === 'analisis') {
     // Filtrar visualmente: solo widgets analíticos
@@ -436,6 +449,8 @@ function computarEstadoGlobal() {
   let egresosLiquidos = 0;
   for (const g of state.gastos) {
     if (!g.fecha?.startsWith(mk)) continue;
+    // Habitual SIN cuenta = contador puro: no descuenta de ningún balance
+    if (g.es_habitual && !g.cuenta_id) continue;
     if (g.tipo === 'amortizacion' || g.es_amortizacion_anual) {
       egresosMes += g.monto / 12;
       continue;
@@ -453,6 +468,7 @@ function computarEstadoGlobal() {
   const buckets = new Map();
   for (const g of state.gastos) {
     if (!g.fecha) continue;
+    if (g.es_habitual && !g.cuenta_id) continue; // contador puro
     const k = g.fecha.slice(0,7);
     if (k === mk) continue;
     let m = g.monto;
@@ -859,7 +875,6 @@ function renderTarjetas(el) {
           <div>
             <p class="font-semibold text-white text-base leading-tight">${escapeHtml(t.nombre)}</p>
             ${t.banco ? `<p class="text-white/60 text-xs mt-0.5">${escapeHtml(t.banco)}</p>` : ''}
-            ${esCicloActivo ? `<span class="ciclo-activo-badge mt-1">● Ciclo activo</span>` : ''}
           </div>
           <span class="badge badge-muted text-white/80" style="background:rgba(255,255,255,0.18);border:none;font-size:.6rem">${(() => {
             const [y, m] = r.periodo.split('-');
@@ -1288,7 +1303,7 @@ function renderBalance(el) {
     ingMap.set(k, (ingMap.get(k) || 0) + ((i.sueldo_neto || 0) + (i.bonos || 0)));
   }
   for (const g of state.gastos || []) {
-    if (g.deleted || g.es_pago_tarjeta || !enRango(g.fecha)) continue; // pago de tarjeta no es consumo
+    if (g.deleted || g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id) || !enRango(g.fecha)) continue; // pago de tarjeta / habitual-contador no es consumo
     const k = bucketKey(new Date(g.fecha + 'T12:00:00'));
     gasMap.set(k, (gasMap.get(k) || 0) + gastoEf(g));
   }
@@ -1605,7 +1620,7 @@ function renderCategorias(el) {
 
   const catMap = new Map();
   for (const g of state.gastos) {
-    if (g.es_pago_tarjeta) continue; // el pago de tarjeta no es una categoría de consumo
+    if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id)) continue; // pago tarjeta / habitual-contador no es consumo
     if (!g.fecha?.startsWith(mk)) continue;
     const cat = g.categoria || 'general';
     let m = g.monto;
@@ -4591,6 +4606,68 @@ function renderTarjetasMobile() {
   if (btnNueva) btnNueva.onclick = () => openDialog('dlg-tarjeta');
 }
 
+/** Vista de metas (tab Metas): lista todas las metas con botón agregar. */
+function renderMetasMobile() {
+  const lista = document.getElementById('mm-lista');
+  if (!lista) return;
+  const metas = (state.metas || []).filter(m => !m.deleted)
+    .sort((a,b) => (b.prioridad||3) - (a.prioridad||3));
+
+  const btnNueva = document.getElementById('btn-nueva-meta-m');
+  if (btnNueva) btnNueva.onclick = () => openDialog('dlg-meta');
+
+  if (!metas.length) {
+    lista.innerHTML = `
+      <div class="flex flex-col items-center py-12 gap-3" style="color:var(--ink-muted)">
+        <span class="text-4xl opacity-40">🎯</span>
+        <p class="text-sm text-center">Todavía no tenés metas.<br>Creá una para empezar a ahorrar.</p>
+        <button class="btn-primary text-sm" id="mm-empty-add">+ Crear meta</button>
+      </div>`;
+    lista.querySelector('#mm-empty-add')?.addEventListener('click', () => openDialog('dlg-meta'));
+    return;
+  }
+
+  const margen    = Math.max(0, state.estado?.margen_libre_mes || 0);
+  const pesos     = metas.map(m => (m.prioridad || 3));
+  const sumaPesos = pesos.reduce((a,b)=>a+b,0) || 1;
+
+  lista.innerHTML = metas.map((m, i) => {
+    const pct      = Math.min(100, Math.round((100*(m.monto_actual||0))/(m.monto_objetivo||1)));
+    const sugerido = margen * (pesos[i] / sumaPesos);
+    const icon     = m.es_emergencia ? '🛡️' : '🎯';
+    const completa = pct >= 100;
+    return `
+      <div class="meta-card-m card-glass rounded-2xl p-4" data-meta-id="${m.id}" style="cursor:pointer">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-lg flex-shrink-0">${icon}</span>
+            <p class="font-semibold text-sm truncate">${escapeHtml(m.nombre)}</p>
+          </div>
+          <span class="ff-display font-bold text-sm" style="color:${completa?'var(--success)':'var(--brand-3)'}">${pct}%</span>
+        </div>
+        <div class="bar mb-2"><span style="width:${pct}%;${completa?'background:var(--success)':''}"></span></div>
+        <div class="flex justify-between items-center text-[11px]" style="color:var(--ink-2)">
+          <span>${FMT.format(m.monto_actual||0)} <span style="color:var(--ink-muted)">/ ${FMT.format(m.monto_objetivo||0)}</span></span>
+          ${m.fecha_objetivo ? `<span style="color:var(--ink-muted)">📅 ${m.fecha_objetivo}</span>` : ''}
+          ${!completa ? `<span>Aportar <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes</span>` : `<span style="color:var(--success)">✓ Completada</span>`}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Click en una meta → editarla
+  lista.querySelectorAll('[data-meta-id]').forEach(card => {
+    card.addEventListener('click', async () => {
+      const m = await DB.get('metas', card.dataset.metaId);
+      if (!m) return;
+      openDialog('dlg-meta', {
+        _editing_id: m.id, nombre: m.nombre,
+        monto_objetivo: m.monto_objetivo, monto_actual: m.monto_actual,
+        fecha_objetivo: m.fecha_objetivo || '', prioridad: m.prioridad || 3,
+      });
+    });
+  });
+}
+
 async function cerrarPeriodoUSD(tarjetaId) {
   const tarjeta = state.tarjetas.find(t => t.id === tarjetaId);
   if (!tarjeta) return;
@@ -6096,9 +6173,10 @@ async function init() {
       switchTab('gastos');
     } else if (tab === 'tarjetas') {
       switchTab('tarjetas');
+    } else if (tab === 'metas') {
+      switchTab('metas');
     } else {
       switchTab('home');
-      if (tab === 'metas') openDialog('dlg-meta');
     }
   });
 
