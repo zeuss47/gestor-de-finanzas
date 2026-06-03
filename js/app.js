@@ -6871,6 +6871,9 @@ async function init() {
   // Calculadora emergente en los campos de monto (input[data-calc])
   initCalculadora();
 
+  // Carga de boleta/ticket (PDF o imagen con OCR) + revisión por ítem
+  initRevisionTicket();
+
   // Bloqueo de orientación tipo SCREEN_ORIENTATION_LOCKED: congela la
   // orientación de carga (lock nativo en Android + compensación en iOS).
   bloquearOrientacion();
@@ -6939,6 +6942,17 @@ async function init() {
     openDialog('dlg-ingreso');
   };
   document.getElementById('choice-cancel').onclick = () => document.getElementById('dlg-choice').close();
+
+  // Toggle Gasto/Ingreso dentro del form unificado: cambia de diálogo.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-mov-kind]');
+    if (!btn) return;
+    const targetId = btn.dataset.movKind === 'ingreso' ? 'dlg-ingreso' : 'dlg-gasto';
+    const dlgActual = btn.closest('dialog');
+    if (dlgActual && dlgActual.id === targetId) return;   // ya estás en ese tipo
+    dlgActual?.close();
+    setTimeout(() => openDialog(targetId), 40);
+  });
 
   document.getElementById('btn-sync').onclick = doSync;
   document.getElementById('btn-settings').onclick = abrirSettings;
@@ -8884,4 +8898,121 @@ function iniciarModuloResumenBancario() {
       if (fi) fi.value = '';
     }
   }
+}
+
+/* ============ Revisión de boleta/ticket (PDF o imagen con OCR) ============
+ * Sube una foto/PDF, la IA extrae el/los gasto(s), se revisan y corrigen ítem
+ * por ítem, y al aprobar se crean los gastos. OCR 100% local (Tesseract.js CDN).
+ */
+let _revItems = [];
+
+function _revReset() {
+  const $ = (id) => document.getElementById(id);
+  if ($('rev-paso-0')) $('rev-paso-0').hidden = false;
+  if ($('rev-paso-1')) $('rev-paso-1').hidden = true;
+  if ($('rev-paso-2')) $('rev-paso-2').hidden = true;
+  if ($('rev-guardar')) $('rev-guardar').hidden = true;
+  if ($('rev-items')) $('rev-items').innerHTML = '';
+  if ($('rev-file')) $('rev-file').value = '';
+  _revItems = [];
+}
+
+async function _revProcesar(files) {
+  document.getElementById('rev-paso-0').hidden = true;
+  document.getElementById('rev-paso-1').hidden = false;
+  document.getElementById('rev-paso-2').hidden = true;
+  const prog = document.getElementById('rev-progreso');
+  const bar = document.getElementById('rev-bar');
+  try {
+    const { extraerGastosDeArchivo } = await import('./receipt-extractor.js');
+    for (let i = 0; i < files.length; i++) {
+      if (prog) prog.textContent = files.length > 1 ? `Leyendo archivo ${i + 1} de ${files.length}…` : 'Leyendo el archivo…';
+      const { items } = await extraerGastosDeArchivo(files[i], {
+        sugerirCat: (d) => sugerirCategoria(d, state.gastos),
+        onProgress: (p) => { if (bar) bar.style.width = Math.round(10 + p * 85) + '%'; },
+      });
+      _revItems.push(...items.map(it => ({ ...it, incluir: true })));
+    }
+    if (!_revItems.length) { toast('No se detectó ningún gasto en el archivo', 3500); _revReset(); return; }
+    document.getElementById('rev-paso-1').hidden = true;
+    document.getElementById('rev-paso-2').hidden = false;
+    document.getElementById('rev-guardar').hidden = false;
+    _revRender();
+  } catch (err) {
+    console.error('[revision] error:', err);
+    toast('No se pudo leer el archivo: ' + (err?.message || err), 4500);
+    _revReset();
+  }
+}
+
+function _revRender() {
+  const box = document.getElementById('rev-items');
+  if (!box) return;
+  const cats = (state.ajustes?.catalogos?.categorias_gasto?.length
+    ? state.ajustes.catalogos.categorias_gasto
+    : AJUSTES_DEFAULT.catalogos.categorias_gasto);
+  box.innerHTML = _revItems.map((it, i) => {
+    const opts = cats.map(c => `<option value="${escapeHtml(c.id || c.nombre)}" ${(it.categoria === (c.id || c.nombre)) ? 'selected' : ''}>${escapeHtml(c.icono || '')} ${escapeHtml(c.nombre)}</option>`).join('');
+    return `
+      <div class="rev-item${it.incluir ? '' : ' off'}" data-i="${i}">
+        <input type="checkbox" class="rev-chk" ${it.incluir ? 'checked' : ''} />
+        <div class="rev-fields">
+          <div class="input-with-prefix"><span class="input-prefix">$</span>
+            <input class="input rev-monto" type="text" data-calc inputmode="decimal" value="${it.monto || ''}" /></div>
+          <input class="input rev-desc" value="${escapeHtml(it.descripcion || '')}" placeholder="Descripción" />
+          <div class="grid grid-cols-2 gap-2">
+            <select class="input rev-cat">${opts}</select>
+            <input class="input rev-fecha" type="date" value="${it.fecha || ''}" />
+          </div>
+        </div>
+        <button type="button" class="rev-del" title="Quitar">✕</button>
+      </div>`;
+  }).join('');
+  box.querySelectorAll('.rev-item').forEach(row => {
+    const i = +row.dataset.i;
+    row.querySelector('.rev-chk').onchange = e => { _revItems[i].incluir = e.target.checked; row.classList.toggle('off', !e.target.checked); };
+    row.querySelector('.rev-monto').oninput = e => { _revItems[i].monto = parseFloat(e.target.value) || 0; };
+    row.querySelector('.rev-desc').oninput = e => { _revItems[i].descripcion = e.target.value; };
+    row.querySelector('.rev-cat').onchange = e => { _revItems[i].categoria = e.target.value; };
+    row.querySelector('.rev-fecha').onchange = e => { _revItems[i].fecha = e.target.value; };
+    row.querySelector('.rev-del').onclick = () => { _revItems.splice(i, 1); _revRender(); };
+  });
+}
+
+async function _revGuardar() {
+  const aprobados = _revItems.filter(it => it.incluir && it.monto > 0);
+  if (!aprobados.length) { toast('Marcá al menos un gasto con monto', 2500); return; }
+  for (const it of aprobados) {
+    await DB.put('gastos', {
+      id: uuid(), updated_at: nowTs(), deleted: false,
+      fecha: it.fecha || new Date().toISOString().slice(0, 10),
+      monto: it.monto, moneda: 'ARS', cotizacion_referencia: null, cotizacion_al_pagar: null,
+      descripcion: it.descripcion || 'Ticket', categoria: it.categoria || 'general', subcategoria: null,
+      metodo_pago: 'efectivo', tipo: 'unico', tarjeta_id: null, cuenta_id: null,
+      cuotas_total: 1, cuota_numero: 1, compartido: null, es_amortizacion_anual: false,
+      es_habitual: false, adjunto_ref: null,
+    });
+  }
+  notificarCambioLocal();
+  toast(`✓ ${aprobados.length} gasto${aprobados.length > 1 ? 's' : ''} cargado${aprobados.length > 1 ? 's' : ''}`);
+  document.getElementById('dlg-revision')?.close();
+  await reloadAll();
+}
+
+function initRevisionTicket() {
+  document.getElementById('docs-ticket')?.addEventListener('click', () => {
+    document.getElementById('dlg-documentos')?.close();
+    _revReset();
+    document.getElementById('dlg-revision')?.showModal();
+  });
+  const dz = document.getElementById('rev-dropzone');
+  const fi = document.getElementById('rev-file');
+  dz?.addEventListener('click', () => fi?.click());
+  dz?.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi?.click(); } });
+  fi?.addEventListener('change', () => { const f = [...fi.files]; if (f.length) _revProcesar(f); });
+  dz?.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz?.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz?.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); const f = [...(e.dataTransfer?.files || [])]; if (f.length) _revProcesar(f); });
+  document.getElementById('rev-otro')?.addEventListener('click', () => _revReset());
+  document.getElementById('rev-guardar')?.addEventListener('click', _revGuardar);
 }

@@ -1064,9 +1064,9 @@
 
 <!-- Gasto -->
 <dialog id="dlg-gasto">
-  <form method="dialog" class="gasto-wizard" style="min-width:min(96vw,440px);max-width:460px">
+  <form method="dialog" class="gasto-wizard flat" style="min-width:min(96vw,440px);max-width:460px">
     <input type="hidden" name="_editing_id" />
-    <!-- Campos ocultos necesarios para handleSubmitGasto -->
+    <!-- Campos ocultos necesarios para handleSubmitGasto (tarjeta/cuotas en 1) -->
     <input type="hidden" name="metodo_pago"      id="hid-metodo-pago"   value="efectivo" />
     <input type="hidden" name="tipo"              id="hid-tipo-gasto"    value="unico" />
     <input type="hidden" name="cuotas_total"      id="hid-cuotas-total"  value="1" />
@@ -1076,8 +1076,12 @@
     <input type="hidden" name="comp_persona"      value="" />
     <input type="hidden" name="comp_porc"         value="" />
 
-    <!-- ── Header con stepper ── -->
-    <div class="gasto-wizard-header">
+    <!-- ── Header: toggle Gasto/Ingreso ── -->
+    <div class="gasto-wizard-header" style="justify-content:space-between">
+      <div class="mov-toggle" id="mov-toggle-gasto">
+        <button type="button" class="on on-gasto" data-mov-kind="gasto">Gasto</button>
+        <button type="button" data-mov-kind="ingreso">Ingreso</button>
+      </div>
       <button type="button" id="gasto-btn-back" class="gasto-back-btn" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
@@ -1165,55 +1169,16 @@
           </button>
         </div>
 
-        <!-- PASO 3: Pago + Cuotas + Ciclo -->
+        <!-- PASO 3: ¿De qué cuenta? (la tarjeta de crédito se gestiona solo por
+             resúmenes del banco, no se carga manualmente acá) -->
         <div class="gasto-slide" data-slide="3">
           <div class="gasto-slide-badge" id="gasto-badge-monto">$ 0</div>
-          <div class="gasto-slide-title">¿Cómo pagás?</div>
-          <div class="gasto-pago-tabs">
-            <button type="button" class="gasto-pago-tab active" data-pago="cuenta">💳 Cuenta / Efectivo</button>
-            <button type="button" class="gasto-pago-tab" data-pago="credito">🃏 Tarjeta crédito</button>
-          </div>
-
-          <!-- Cuenta -->
-          <div id="pago-cuenta-wrap" style="margin-top:.6rem">
+          <div class="gasto-slide-title">¿De qué cuenta?</div>
+          <div id="pago-cuenta-wrap">
             <div id="chips-cuenta-gasto" class="pago-chips"></div>
             <select name="cuenta_id" class="input" id="sel-cuenta-gasto" hidden>
               <option value="">Sin cuenta específica</option>
             </select>
-          </div>
-
-          <!-- Tarjeta crédito -->
-          <div id="pago-credito-wrap" hidden style="margin-top:.6rem">
-            <div id="chips-tarjeta-gasto" class="pago-chips" style="margin-bottom:.65rem"></div>
-            <select name="tarjeta_id_simple" class="input" id="sel-tarjeta-simple" hidden>
-              <option value="">Elegir tarjeta…</option>
-            </select>
-            <!-- Cuotas -->
-            <div id="wrap-cuotas-gasto" style="margin-top:.65rem">
-              <label class="form-label">¿En cuántas cuotas?</label>
-              <div class="chip-row chip-row-cuotas" id="chips-cuotas-gasto">
-                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="1" checked/><span>1 pago</span></label>
-                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="3"/><span>3</span></label>
-                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="6"/><span>6</span></label>
-                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="9"/><span>9</span></label>
-                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="12"/><span>12</span></label>
-                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="18"/><span>18</span></label>
-                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="24"/><span>24</span></label>
-              </div>
-              <input id="inp-cuotas-manual" type="number" min="1" max="48" placeholder="Otro número de cuotas…"
-                     class="input mt-2" style="font-size:.85rem"
-                     oninput="document.getElementById('hid-cuotas-total').value=this.value||1" />
-            </div>
-            <!-- Ciclo de facturación de la tarjeta seleccionada -->
-            <div id="ciclo-info" class="ciclo-info-banner" hidden style="margin-top:.65rem">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-5 h-5 flex-shrink-0">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-              <div class="flex-1 min-w-0">
-                <p class="ciclo-info-title" id="ciclo-info-title">—</p>
-                <p class="ciclo-info-sub"   id="ciclo-info-sub">—</p>
-              </div>
-            </div>
           </div>
 
           <!-- Guardar -->
@@ -1230,13 +1195,17 @@
   </form>
 </dialog>
 
-<!-- Ingreso (wizard de 3 pasos, igual que el de gastos) -->
+<!-- Ingreso (una sola pantalla, con toggle a Gasto) -->
 <dialog id="dlg-ingreso">
-  <form method="dialog" class="gasto-wizard" style="min-width:min(96vw,440px);max-width:460px">
+  <form method="dialog" class="gasto-wizard flat" style="min-width:min(96vw,440px);max-width:460px">
     <input type="hidden" name="_editing_id" />
 
-    <!-- ── Header con stepper ── -->
-    <div class="gasto-wizard-header">
+    <!-- ── Header: toggle Gasto/Ingreso ── -->
+    <div class="gasto-wizard-header" style="justify-content:space-between">
+      <div class="mov-toggle" id="mov-toggle-ingreso">
+        <button type="button" data-mov-kind="gasto">Gasto</button>
+        <button type="button" class="on on-ingreso" data-mov-kind="ingreso">Ingreso</button>
+      </div>
       <button type="button" id="ingreso-btn-back" class="gasto-back-btn" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
@@ -2158,12 +2127,60 @@
         <span class="docs-card-arrow">›</span>
       </button>
 
+      <button type="button" id="docs-ticket" class="docs-card">
+        <span class="docs-card-icon" style="background:linear-gradient(135deg,var(--success),var(--brand))">🧾</span>
+        <div class="docs-card-text">
+          <span class="docs-card-title">Boleta / Ticket (foto o PDF)</span>
+          <span class="docs-card-desc">Subí una foto de un ticket o un PDF; la IA detecta el gasto y lo revisás antes de cargarlo</span>
+        </div>
+        <span class="docs-card-arrow">›</span>
+      </button>
+
       <p class="text-[10px] mt-1" style="color:var(--ink-muted);text-align:center">
-        Todo el procesamiento es 100% local en tu dispositivo. Los PDF no salen de tu navegador.
+        Todo el procesamiento es 100% local en tu dispositivo. Los PDF y fotos no salen de tu navegador.
       </p>
 
       <!-- File input para recibo (se dispara desde la tarjeta de arriba) -->
       <input type="file" id="rec-import-file" accept="application/pdf,.pdf" hidden />
+    </div>
+  </div>
+</dialog>
+
+<!-- Revisión de boleta/ticket (PDF o imagen con OCR) -->
+<dialog id="dlg-revision">
+  <div class="form-modern" style="min-width:min(96vw,560px);max-width:600px">
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--success),var(--brand))">🧾</div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Boleta / Ticket</h3>
+        <p class="text-xs" style="color:var(--ink-muted)">Subí foto o PDF; revisá y aprobá cada gasto</p>
+      </div>
+    </div>
+    <div class="form-modern-body">
+      <!-- Paso 0: dropzone -->
+      <div id="rev-paso-0">
+        <div id="rev-dropzone" class="rsb-dropzone" role="button" tabindex="0" title="Tocá o arrastrá">
+          <span class="rsb-dropzone-icon" aria-hidden="true">🧾</span>
+          <p class="rsb-dropzone-label">Arrastrá una foto o PDF, o <span class="rsb-dropzone-link">tocá para elegir</span></p>
+          <p class="rsb-dropzone-hint">Fotos de tickets/boletas o PDF · la IA lo lee 100% local en tu dispositivo</p>
+        </div>
+        <input type="file" id="rev-file" accept="image/*,application/pdf,.pdf" multiple hidden />
+      </div>
+      <!-- Paso 1: progreso -->
+      <div id="rev-paso-1" hidden style="text-align:center;padding:1.4rem .5rem">
+        <p id="rev-progreso" class="text-sm" style="color:var(--ink-muted)">Leyendo el archivo…</p>
+        <div class="bar mt-3"><span id="rev-bar" style="width:10%"></span></div>
+      </div>
+      <!-- Paso 2: revisión editable -->
+      <div id="rev-paso-2" hidden>
+        <p class="text-xs mb-2" style="color:var(--ink-muted)">Revisá y corregí cada gasto. Destildá los que no quieras cargar.</p>
+        <div id="rev-items"></div>
+        <button type="button" id="rev-otro" class="btn-secondary w-full text-xs mt-2">+ Subir otro archivo</button>
+      </div>
+    </div>
+    <div class="form-modern-footer">
+      <button value="cancel" formnovalidate class="btn-secondary flex-1" onclick="this.closest('dialog').close()">Cerrar</button>
+      <button type="button" id="rev-guardar" class="btn-primary flex-1" hidden>✓ Cargar aprobados</button>
     </div>
   </div>
 </dialog>
@@ -2433,6 +2450,11 @@
 
     <!-- Filtros del drawer -->
     <div class="widget-drawer-filters">
+     <!-- Dos casillas en la misma línea: Fecha (calendario) + Categoría/tipo -->
+     <div class="hd-filtros-2col">
+      <details class="hd-filtro-box">
+       <summary>📅 <span id="hd-filtro-fecha-lbl">Fecha</span></summary>
+       <div class="hd-filtro-body">
 
       <!-- Fila 1: rangos rápidos + botón calendario -->
       <div class="flex gap-1 flex-wrap" id="hd-quick-filters">
@@ -2482,15 +2504,23 @@
         </div>
       </div>
 
-      <!-- Fila 2: tipo de movimiento -->
-      <div class="flex gap-1 mt-2" id="hd-type-filter">
-        <button type="button" class="hd-type-btn active" data-htype="todos">Todos</button>
-        <button type="button" class="hd-type-btn"        data-htype="ingresos">💰 Ingresos</button>
-        <button type="button" class="hd-type-btn"        data-htype="gastos">💸 Gastos</button>
-      </div>
+       </div>
+      </details>
 
-      <!-- Fila 3: filtro de categorías (chips, generados por JS) -->
-      <div id="hd-cat-filter" class="flex gap-1 flex-wrap mt-2"></div>
+      <details class="hd-filtro-box">
+       <summary>🏷 <span id="hd-filtro-cat-lbl">Categoría</span></summary>
+       <div class="hd-filtro-body">
+        <!-- tipo de movimiento -->
+        <div class="flex gap-1" id="hd-type-filter">
+          <button type="button" class="hd-type-btn active" data-htype="todos">Todos</button>
+          <button type="button" class="hd-type-btn"        data-htype="ingresos">💰 Ingresos</button>
+          <button type="button" class="hd-type-btn"        data-htype="gastos">💸 Gastos</button>
+        </div>
+        <!-- filtro de categorías (chips, generados por JS) -->
+        <div id="hd-cat-filter" class="flex gap-1 flex-wrap mt-2"></div>
+       </div>
+      </details>
+     </div>
 
     </div>
 

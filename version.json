@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.66",
-    "build":  83,
-    "modified":  "2026-06-03T23:31:57Z",
-    "commit":  "M js/ai-predict.js, M js/app.js",
-    "notes":  "Auto-update 2026-06-03 20:31"
+    "version":  "1.67",
+    "build":  84,
+    "modified":  "2026-06-03T23:56:14Z",
+    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js, js/receipt-extractor.js, tests/_...",
+    "notes":  "Auto-update 2026-06-03 20:56"
 }
