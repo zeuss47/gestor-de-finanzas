@@ -4550,7 +4550,17 @@ body.view-analisis #main-widgets::before {
 
 /* Monto big en paso 2 */
 .gasto-monto-big { font-size: 1.5rem !important; font-weight: 800 !important; }
-.gasto-monto-row { gap: 0; }
+/* Selector de moneda arriba, junto al label "Monto", para que el input use todo
+   el ancho de su celda (monto y fecha comparten línea). */
+.monto-label-row { display: flex; align-items: center; justify-content: space-between; gap: .4rem; margin-bottom: .2rem; }
+.currency-selector-top {
+  border-radius: var(--r-sm);
+  border-left: 1px solid var(--border);
+  height: 1.25rem; line-height: 1; padding: 0 .25rem; font-size: .62rem;
+}
+/* Monto y fecha comparten línea: fuente algo menor para que entren montos
+   grandes sin recortarse en la celda. */
+.calc-row .gasto-monto-big { font-size: 1.3rem !important; }
 
 /* ── Tabs de pago en formulario de gasto ──────────────────────── */
 .gasto-pago-tabs { display: flex; gap: .4rem; }

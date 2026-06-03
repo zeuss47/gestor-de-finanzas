@@ -1126,34 +1126,39 @@
             <input name="descripcion" required id="inp-descripcion-gasto"
                    placeholder="Ej: Supermercado, Nafta, Almuerzo…" class="input input-lg" autocomplete="off" />
           </div>
-          <div class="form-section">
-            <label class="form-label">Monto</label>
-            <div class="input-with-prefix gasto-monto-row">
-              <span class="input-prefix" id="gasto-moneda-prefix">$</span>
-              <input name="monto" required type="number" step="0.01" placeholder="0"
-                     class="input input-lg gasto-monto-big" data-bind-gasto="monto" data-calc inputmode="decimal" />
-              <select class="currency-selector" id="gasto-moneda-sel"
-                      onchange="document.getElementById('hid-moneda-gasto').value=this.value;window._gsActualizarCotiz?.()">
-                <option value="ARS">ARS</option><option value="USD">USD</option>
-                <option value="EUR">EUR</option><option value="BRL">BRL</option>
-              </select>
-            </div>
-            <!-- Cotización inline cuando no es ARS -->
-            <div id="row-cotizacion" hidden style="margin-top:.5rem">
+          <!-- Monto + Fecha en la misma línea -->
+          <div class="grid gap-3 calc-row" style="grid-template-columns:1.4fr 1fr;align-items:end">
+            <div class="form-section">
+              <div class="monto-label-row">
+                <label class="form-label" style="margin:0">Monto</label>
+                <select class="currency-selector currency-selector-top" id="gasto-moneda-sel"
+                        onchange="document.getElementById('hid-moneda-gasto').value=this.value;window._gsActualizarCotiz?.()">
+                  <option value="ARS">ARS</option><option value="USD">USD</option>
+                  <option value="EUR">EUR</option><option value="BRL">BRL</option>
+                </select>
+              </div>
               <div class="input-with-prefix">
-                <span class="input-prefix" style="font-size:.75rem" id="cot-currency-label">USD</span>
-                <input id="gasto-cotizacion" type="number" step="0.01" placeholder="Cotización"
-                       class="input" style="font-size:.85rem"
-                       oninput="document.getElementById('hid-cotiz-gasto').value=this.value;window._gsActualizarEquiv?.()"/>
+                <span class="input-prefix" id="gasto-moneda-prefix">$</span>
+                <input name="monto" required type="number" step="0.01" placeholder="0"
+                       class="input input-lg gasto-monto-big" data-bind-gasto="monto" data-calc inputmode="decimal" />
               </div>
-              <div class="cotizacion-equivalente" id="cot-equiv" hidden>
-                ≈ <b style="color:var(--brand)" id="cot-equiv-valor">$0</b> ARS
-              </div>
+            </div>
+            <div class="form-section">
+              <label class="form-label">Fecha</label>
+              <input name="fecha" required type="date" class="input input-lg" id="inp-fecha-gasto" />
             </div>
           </div>
-          <div class="form-section">
-            <label class="form-label">Fecha</label>
-            <input name="fecha" required type="date" class="input input-lg" id="inp-fecha-gasto" />
+          <!-- Cotización a ancho completo cuando no es ARS -->
+          <div id="row-cotizacion" hidden style="margin-top:.5rem">
+            <div class="input-with-prefix">
+              <span class="input-prefix" style="font-size:.75rem" id="cot-currency-label">USD</span>
+              <input id="gasto-cotizacion" type="number" step="0.01" placeholder="Cotización"
+                     class="input" style="font-size:.85rem"
+                     oninput="document.getElementById('hid-cotiz-gasto').value=this.value;window._gsActualizarEquiv?.()"/>
+            </div>
+            <div class="cotizacion-equivalente" id="cot-equiv" hidden>
+              ≈ <b style="color:var(--brand)" id="cot-equiv-valor">$0</b> ARS
+            </div>
           </div>
           <button type="button" id="gasto-next-2" class="btn-primary w-full mt-1">
             Siguiente →
@@ -1264,23 +1269,24 @@
         <div class="gasto-slide" data-slide="2">
           <div class="gasto-slide-badge" id="ingreso-badge-concepto">💼 Sueldo</div>
           <div class="gasto-slide-title">¿Cuánto recibiste?</div>
-          <div class="form-section">
-            <label class="form-label">Monto neto</label>
-            <div class="input-with-prefix gasto-monto-row">
-              <span class="input-prefix">$</span>
-              <input name="sueldo_neto" required type="number" step="0.01" placeholder="0"
-                     class="input input-lg gasto-monto-big" data-calc inputmode="decimal" />
+          <!-- Monto + Fecha en la misma línea -->
+          <div class="grid gap-3 calc-row" style="grid-template-columns:1.4fr 1fr;align-items:end">
+            <div class="form-section">
+              <label class="form-label">Monto neto</label>
+              <div class="input-with-prefix gasto-monto-row">
+                <span class="input-prefix">$</span>
+                <input name="sueldo_neto" required type="number" step="0.01" placeholder="0"
+                       class="input input-lg gasto-monto-big" data-calc inputmode="decimal" />
+              </div>
             </div>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
             <div class="form-section">
               <label class="form-label">Fecha</label>
-              <input name="fecha" required type="date" class="input" id="inp-fecha-ingreso" />
+              <input name="fecha" required type="date" class="input input-lg" id="inp-fecha-ingreso" />
             </div>
-            <div class="form-section">
-              <label class="form-label">Período</label>
-              <input name="periodo_aplicacion" required type="month" class="input" id="inp-periodo-ingreso" />
-            </div>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Período</label>
+            <input name="periodo_aplicacion" required type="month" class="input" id="inp-periodo-ingreso" />
           </div>
           <button type="button" id="ingreso-next-2" class="btn-primary w-full mt-1">Siguiente →</button>
         </div>

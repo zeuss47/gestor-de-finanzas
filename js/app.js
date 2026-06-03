@@ -157,8 +157,10 @@ function _calcRender() {
   const r = _calcEval(_calc.expr);
   _calc.pop.querySelector('#calc-expr').textContent = _calc.expr || '';
   const val = r !== null ? r : (parseFloat(_calc.expr) || 0);
-  _calc.pop.querySelector('#calc-val').textContent =
-    (Math.round(val * 100) / 100).toLocaleString('es-AR', { maximumFractionDigits: 2 });
+  const num = Math.round(val * 100) / 100;
+  _calc.pop.querySelector('#calc-val').textContent = num.toLocaleString('es-AR', { maximumFractionDigits: 2 });
+  // Integrar EN VIVO el número en el campo de monto final (no sólo al Aplicar).
+  if (_calc.input) _calc.input.value = _calc.expr ? num : '';
 }
 
 function _calcCrearPop() {
@@ -228,10 +230,11 @@ function _calcAplicar() { _calcCerrar(true); }
 function _calcAbrir(input) {
   if (_calc.input && _calc.input !== input) _calcCerrar(true); // confirmar el anterior
   _calcCrearPop();
-  // Insertar el teclado INLINE, justo después del bloque del campo (form-section
-  // o la fila del input). Queda en el flujo del formulario: no se superpone,
-  // empuja el contenido → todo es una sola pantalla.
-  const anchor = input.closest('.form-section') || input.closest('.input-with-prefix') || input;
+  // Insertar el teclado INLINE, después de la FILA del campo. Si el monto está
+  // en una grilla (monto + fecha en la misma línea) anclamos a la grilla para
+  // que el teclado quede debajo de toda la línea, no metido en una columna.
+  const anchor = input.closest('.calc-row') || input.closest('.grid')
+              || input.closest('.form-section') || input.closest('.input-with-prefix') || input;
   if (_calc.pop.previousElementSibling !== anchor || !_calc.pop.parentElement) {
     anchor.insertAdjacentElement('afterend', _calc.pop);
   }
