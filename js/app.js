@@ -189,7 +189,7 @@ function _calcCrearPop() {
       <button type="button" class="calc-k calc-zero" data-k="0">0</button>
       <button type="button" class="calc-k calc-apply" data-k="apply">✓ Aplicar</button>
     </div>`;
-  document.body.appendChild(pop);
+  // No se agrega al body: se inserta inline tras el campo en _calcAbrir.
   // Mousedown (no click) para no robar el foco antes de procesar
   pop.addEventListener('mousedown', e => e.preventDefault());
   pop.addEventListener('click', e => {
@@ -236,40 +236,25 @@ function _calcAplicar() {
   _calcCerrar();
 }
 
-function _calcPosicionar() {
-  if (!_calc.pop || !_calc.input) return;
-  const pop = _calc.pop;
-  pop.hidden = false;
-  // Dentro de un diálogo se posiciona por CSS (.in-dialog, anclado al pie).
-  if (pop.classList.contains('in-dialog')) { pop.style.left = pop.style.top = ''; return; }
-  const r = _calc.input.getBoundingClientRect();
-  const pw = pop.offsetWidth, ph = pop.offsetHeight;
-  let left = Math.min(r.left, window.innerWidth - pw - 8);
-  left = Math.max(8, left);
-  // Preferir debajo; si no entra, arriba
-  let top = r.bottom + 6;
-  if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
-  pop.style.left = left + 'px';
-  pop.style.top = top + 'px';
-}
-
 function _calcAbrir(input) {
   _calcCrearPop();
-  // Re-parentar la calculadora DENTRO del diálogo abierto: los <dialog> con
-  // showModal() viven en el top-layer y tapan cualquier elemento de la página,
-  // así que la calc debe ser hija del diálogo para verse por encima (una sola
-  // interfaz). Si no hay diálogo, va al body.
-  const host = input.closest('dialog') || document.body;
-  if (_calc.pop.parentElement !== host) host.appendChild(_calc.pop);
-  _calc.pop.classList.toggle('in-dialog', host.tagName === 'DIALOG');
+  // Insertar el teclado INLINE, justo después del bloque del campo (form-section
+  // o la fila del input). Queda en el flujo del formulario: no se superpone,
+  // empuja el contenido → todo es una sola pantalla.
+  const anchor = input.closest('.form-section') || input.closest('.input-with-prefix') || input;
+  if (_calc.pop.previousElementSibling !== anchor || !_calc.pop.parentElement) {
+    anchor.insertAdjacentElement('afterend', _calc.pop);
+  }
   _calc.input = input;
   _calc.expr = (input.value && parseFloat(input.value)) ? String(input.value) : '';
   _calc.fresh = !!_calc.expr;   // si precargó un valor, el 1er dígito reemplaza
   // Evitar el teclado nativo mientras la calculadora está abierta
   input.setAttribute('readonly', 'readonly');
   input.blur();
+  _calc.pop.hidden = false;
   _calcRender();
-  _calcPosicionar();
+  // Asegurar que el teclado quede a la vista dentro del diálogo
+  setTimeout(() => { try { _calc.pop.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {} }, 60);
 }
 
 function _calcCerrar() {
@@ -314,9 +299,6 @@ function initCalculadora() {
     else if (k === 'Enter' || k === '=') { _calcTecla('apply'); e.preventDefault(); }
     else if (k === 'Escape') { _calcCerrar(); e.preventDefault(); }
   });
-  // Reposicionar al scrollear/resize
-  window.addEventListener('resize', () => { if (_calc.input) _calcPosicionar(); });
-  window.addEventListener('scroll', () => { if (_calc.input) _calcPosicionar(); }, true);
 }
 
 /* ============ Forzar orientación vertical ============

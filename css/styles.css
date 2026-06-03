@@ -836,38 +836,55 @@ html.light .ciclo-activo-highlight {
   box-shadow: 0 0 0 2px rgba(255,45,110,.18), 0 8px 26px rgba(0,0,0,.28) !important;
 }
 
-/* btn-add central — pulso de glow suave (solo box-shadow, sin mover el botón
-   para no revelar contenido detrás). Un único color coherente: el brand. */
-@keyframes btn-add-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--brand-glow), 0 6px 18px rgba(0,0,0,.4); }
-  50%      { box-shadow: 0 0 0 7px transparent, 0 8px 22px rgba(0,0,0,.45); }
+/* btn-add central — estilo gradiente (acentos personalizables brand→brand-2) +
+   animación de halo + barrido de brillo. El botón NO se mueve en idle (vive en
+   el cradle del nav y moverlo revelaría el fondo); el ícono "+" gira al tocar. */
+@keyframes btn-add-halo {
+  0%   { box-shadow: 0 8px 22px rgba(0,0,0,.45), 0 0 0 0 var(--brand-glow); }
+  70%  { box-shadow: 0 8px 22px rgba(0,0,0,.45), 0 0 0 11px transparent; }
+  100% { box-shadow: 0 8px 22px rgba(0,0,0,.45), 0 0 0 0 transparent; }
+}
+@keyframes btn-add-shine {
+  0%, 55% { transform: translateX(-140%) rotate(8deg); }
+  80%     { transform: translateX(140%)  rotate(8deg); }
+  100%    { transform: translateX(140%)  rotate(8deg); }
 }
 #btn-add {
   position: relative;
   z-index: 2;                       /* por encima del cradle ::before */
-  /* Gloss arriba-izquierda + sheen claro→oscuro sobre el color de marca:
-     un solo tono limpio, sin magenta hardcodeado. */
+  overflow: hidden;                 /* recorta el barrido al círculo */
   background:
-    radial-gradient(circle at 32% 26%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 46%),
-    linear-gradient(150deg, rgba(255,255,255,.16) 0%, rgba(0,0,0,.22) 100%),
-    var(--brand);
-  box-shadow: 0 0 0 0 var(--brand-glow), 0 6px 18px rgba(0,0,0,.4);
-  border: 2px solid rgba(255,255,255,.2);
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 48%),
+    linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+  box-shadow: 0 8px 22px rgba(0,0,0,.45), 0 0 0 0 var(--brand-glow);
+  border: 2px solid rgba(255,255,255,.3);
   cursor: pointer;
   color: #fff;
-  animation: btn-add-pulse 2.6s ease-in-out infinite;
-  transition: transform .18s cubic-bezier(.34,1.56,.64,1), filter .18s;
+  animation: btn-add-halo 3s ease-out infinite;
+  transition: transform .2s cubic-bezier(.34,1.56,.64,1), filter .2s, box-shadow .2s;
   will-change: box-shadow;
 }
-#btn-add:hover  {
-  transform: scale(1.08);
-  filter: brightness(1.08);
+/* Barrido de luz que cruza el botón cada ciclo */
+#btn-add::before {
+  content: '';
+  position: absolute;
+  top: -20%; left: 0; width: 60%; height: 140%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+  transform: translateX(-140%) rotate(8deg);
+  animation: btn-add-shine 3.6s ease-in-out infinite;
+  pointer-events: none;
 }
-#btn-add:active {
-  transform: scale(.9);
-  transition: transform .1s ease;
+.btn-add-icon {
+  width: 26px; height: 26px;
+  position: relative; z-index: 1;
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1);
 }
-@media (prefers-reduced-motion: reduce) { #btn-add { animation: none; } }
+#btn-add:hover  { transform: scale(1.12); filter: brightness(1.07); }
+#btn-add:hover .btn-add-icon { transform: rotate(90deg); }
+#btn-add:active { transform: scale(.9); transition: transform .1s ease; }
+@media (prefers-reduced-motion: reduce) {
+  #btn-add, #btn-add::before { animation: none; }
+}
 
 /* ── Quick actions ────────────────────────────────────────────── */
 .quick-btn {
@@ -4718,26 +4735,18 @@ body.view-analisis #main-widgets::before {
 /* ── Calculadora emergente en campos de monto ──────────────────────
    Aparece al enfocar un input con [data-calc]. Teclado propio para no
    depender del teclado nativo y permitir operaciones (+ − × ÷). */
+/* Teclado INLINE: vive en el flujo del formulario, justo debajo del campo de
+   monto. No se superpone — empuja el contenido y forma parte de la misma
+   pantalla de carga (una sola interfaz). */
 .calc-pop {
-  position: fixed; z-index: 4000;
-  width: min(290px, 92vw);
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  padding: .65rem;
-  box-shadow: 0 24px 70px rgba(0,0,0,.6), 0 0 0 1px var(--brand-soft);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  width: 100%;
+  margin: .55rem 0 .2rem;
+  background: var(--surface-2);
+  border: 1px solid var(--brand-soft);
+  border-radius: .9rem;
+  padding: .55rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
   animation: calc-in .16s cubic-bezier(.16,1,.3,1);
-}
-/* Dentro de un <dialog> (top-layer): un position:fixed se iría a la capa de la
-   página (detrás del diálogo), así que usamos absolute anclado al pie del
-   diálogo. Queda como un teclado integrado en la misma interfaz, por encima. */
-.calc-pop.in-dialog {
-  position: absolute;
-  left: .6rem; right: .6rem; bottom: .6rem;
-  top: auto;
-  width: auto;
 }
 @keyframes calc-in { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
 .calc-display {

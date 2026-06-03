@@ -505,9 +505,13 @@
       <span>Historial</span>
     </button>
 
-    <button id="btn-add"
-            class="-mt-6 mx-auto w-14 h-14 rounded-full flex items-center justify-center text-3xl font-light"
-            style="font-size:1.75rem;line-height:1">+</button>
+    <button id="btn-add" aria-label="Agregar movimiento"
+            class="-mt-6 mx-auto w-14 h-14 rounded-full flex items-center justify-center">
+      <svg class="btn-add-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.6" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </button>
 
     <button data-tab="tarjetas" class="nav-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
