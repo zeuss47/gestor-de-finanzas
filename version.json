@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.59",
-    "build":  76,
-    "modified":  "2026-06-03T15:19:36Z",
-    "commit":  "M js/app.js",
-    "notes":  "Auto-update 2026-06-03 12:19"
+    "version":  "1.60",
+    "build":  77,
+    "modified":  "2026-06-03T15:32:57Z",
+    "commit":  "M js/app.js, tests/_shots/cdp_90.png",
+    "notes":  "Auto-update 2026-06-03 12:32"
 }

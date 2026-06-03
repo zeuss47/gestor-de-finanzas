@@ -332,7 +332,10 @@ let _orientLockType  = null;   // tipo (portrait-primary / landscape-primary…)
 
 function _orientAngulo() {
   if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
-  if (typeof window.orientation === 'number') return ((window.orientation % 360) + 360) % 360;
+  // Fallback WebKit viejo: window.orientation usa convención INVERTIDA respecto
+  // a screen.orientation.angle (el device-angle es el negativo del screen-angle),
+  // así que negamos para que delta 90/270 no queden intercambiados.
+  if (typeof window.orientation === 'number') return (((-window.orientation) % 360) + 360) % 360;
   return 0;
 }
 
