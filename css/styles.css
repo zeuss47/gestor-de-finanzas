@@ -1638,6 +1638,7 @@ html.light select.input { color-scheme: light; }
   border-bottom: 1px solid var(--border);
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;   /* no comprimir: si no, los KPIs se recortan y los filtros los tapan */
 }
 .widget-drawer-header::before {
   content: '';
@@ -1692,6 +1693,7 @@ html.light select.input { color-scheme: light; }
   padding: .75rem 1.25rem;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;   /* tampoco comprimir los filtros */
 }
 .hd-quick-btn {
   padding: .35rem .8rem;
