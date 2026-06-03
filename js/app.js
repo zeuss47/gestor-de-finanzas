@@ -3556,7 +3556,9 @@ async function registrarGastoHabitual(habitualId) {
   };
   await DB.put('gastos', g);
   notificarCambioLocal();
-  toast(`${h.icono || '✓'} ${h.nombre} +1 · ${FMT.format(g.monto)}`, 1600);
+  const cuenta = cuentaId ? (state.cuentas || []).find(c => c.id === cuentaId) : null;
+  const sufijo = cuenta ? ` · de ${cuenta.nombre}` : '';
+  toast(`${h.icono || '✓'} ${h.nombre} +1 · ${FMT.format(g.monto)}${sufijo}`, 1800);
   await reloadAll();
 }
 
@@ -6592,37 +6594,51 @@ function renderHabitualesSettings() {
     : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.catalogos.categorias_gasto);
 
   cont.innerHTML = lista.length ? '' :
-    `<p class="text-xs text-center py-2" style="color:var(--ink-muted)">Sin gastos habituales</p>`;
+    `<p class="text-xs text-center py-3" style="color:var(--ink-muted)">Sin gastos habituales. Tocá "+ Agregar".</p>`;
 
   lista.forEach((h, idx) => {
     const optsCat = catsGasto.map(c => `<option value="${escapeHtml(c.id||c.nombre)}" ${(h.categoria===(c.id||c.nombre))?'selected':''}>${escapeHtml(c.icono||'')} ${escapeHtml(c.nombre)}</option>`).join('');
     cont.insertAdjacentHTML('beforeend', `
-      <div class="habitual-edit-row" data-idx="${idx}">
-        <span class="habitual-edit-emoji" data-hab-emoji="${idx}" style="background:${h.color}1a;border:1px solid ${h.color}44">${escapeHtml(h.icono||'🔁')}</span>
-        <input class="input habitual-edit-nombre" data-hab-nombre="${idx}" value="${escapeHtml(h.nombre||'')}" placeholder="Nombre" maxlength="24" />
-        <div class="input-with-prefix habitual-edit-valor"><span class="input-prefix">$</span>
-          <input type="number" class="input" data-hab-valor="${idx}" value="${h.valor||0}" min="0" step="100" placeholder="0" /></div>
-        <select class="input habitual-edit-cat" data-hab-cat="${idx}">${optsCat}</select>
-        <span class="habitual-edit-color" data-hab-color="${idx}" style="background:${h.color}" title="Color"></span>
-        <button type="button" class="catalog-item-del" data-hab-del="${idx}" title="Eliminar">✕</button>
+      <div class="hab-edit-card" data-idx="${idx}">
+        <div class="hab-edit-top">
+          <span class="hab-edit-emoji" data-hab-emoji="${idx}" style="background:${h.color}1a;border-color:${h.color}55" title="Cambiar emoji">${escapeHtml(h.icono||'🔁')}</span>
+          <input class="input hab-edit-nombre" data-hab-nombre="${idx}" value="${escapeHtml(h.nombre||'')}" placeholder="Nombre (ej: Vianda)" maxlength="24" />
+          <span class="hab-edit-color" data-hab-color="${idx}" style="background:${h.color}" title="Color"></span>
+          <button type="button" class="hab-edit-del" data-hab-del="${idx}" title="Eliminar">✕</button>
+        </div>
+        <div class="hab-edit-bottom">
+          <label class="hab-edit-field">
+            <span>Valor</span>
+            <div class="input-with-prefix"><span class="input-prefix">$</span>
+              <input type="number" class="input" data-hab-valor="${idx}" value="${h.valor||0}" min="0" step="100" placeholder="0" /></div>
+          </label>
+          <label class="hab-edit-field">
+            <span>Categoría</span>
+            <select class="input" data-hab-cat="${idx}">${optsCat}</select>
+          </label>
+        </div>
       </div>`);
   });
 
   cont.querySelectorAll('[data-hab-nombre]').forEach(inp => inp.oninput = e => { lista[+e.target.dataset.habNombre].nombre = e.target.value; });
   cont.querySelectorAll('[data-hab-valor]').forEach(inp => inp.oninput = e => { lista[+e.target.dataset.habValor].valor = Number(e.target.value)||0; });
   cont.querySelectorAll('[data-hab-cat]').forEach(sel => sel.onchange = e => { lista[+e.target.dataset.habCat].categoria = e.target.value; });
-  cont.querySelectorAll('[data-hab-emoji]').forEach(el => el.onclick = e => mostrarPickerEmojiHabitual(+el.dataset.habEmoji));
-  cont.querySelectorAll('[data-hab-color]').forEach(el => el.onclick = e => mostrarPickerColorHabitual(+el.dataset.habColor));
+  cont.querySelectorAll('[data-hab-emoji]').forEach(el => el.onclick = () => mostrarPickerEmojiHabitual(+el.dataset.habEmoji));
+  cont.querySelectorAll('[data-hab-color]').forEach(el => el.onclick = () => mostrarPickerColorHabitual(+el.dataset.habColor));
   cont.querySelectorAll('[data-hab-del]').forEach(btn => btn.onclick = () => {
     lista.splice(+btn.dataset.habDel, 1); renderHabitualesSettings();
   });
 
-  // Poblar el select de cuenta para descontar
+  // Poblar el select de cuenta para descontar. Preserva lo seleccionado en el
+  // DOM (si el usuario ya eligió pero aún no guardó) para no perder la elección
+  // al re-renderizar tras agregar/eliminar habituales.
   const selCuenta = document.getElementById('sel-habituales-cuenta');
   if (selCuenta) {
+    const seleccionActual = selCuenta.value || state.ajustes?.habituales_cuenta_id || '';
     const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
     selCuenta.innerHTML = `<option value="">No descontar de ninguna</option>` +
-      cuentas.map(c => `<option value="${c.id}" ${state.ajustes?.habituales_cuenta_id===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
+      cuentas.map(c => `<option value="${c.id}" ${seleccionActual===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
+    selCuenta.value = seleccionActual;
   }
 }
 
