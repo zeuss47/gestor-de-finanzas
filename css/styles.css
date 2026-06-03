@@ -1321,10 +1321,10 @@ html.light #app-header { background: rgba(240,244,255,0.8); }
   background: rgba(255,255,255,0.05);
   pointer-events: none;
 }
-/* Stagger del brillo para que no barran todas al mismo tiempo */
-.credit-card:nth-child(2n)::before   { animation-delay: 1.3s; }
-.credit-card:nth-child(3n)::before   { animation-delay: 2.6s; }
-.credit-card:nth-child(4n)::before   { animation-delay: 3.9s; }
+/* Todas las tarjetas animan EN SINCRONÍA (mismo delay 0): el brillo y la
+   flotación coinciden en el dashboard. (Antes había un stagger por nth-child
+   que las desfasaba). */
+.credit-card::before { animation-delay: 0s; }
 
 /* ── Identidad bancaria: gradiente + acento por banco ─────────── */
 .card-bank-bbva     { background: linear-gradient(135deg, #04162e 0%, #004481 55%, #1973b8 100%) !important; }
