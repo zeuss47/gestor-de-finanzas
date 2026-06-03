@@ -814,22 +814,6 @@ html.light #bottom-nav::before { background: #eef2ff; }
   100% { opacity:0; }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   DASHBOARD — Ciclo activo resaltado
-══════════════════════════════════════════════════════════════ */
-/* El ciclo activo. En MODO OSCURO no lleva borde luminoso: se ve igual que las
-   demás tarjetas (solo la sombra de profundidad normal). En modo claro sí
-   mantiene un contorno con glow para distinguirlo del fondo claro. */
-.ciclo-activo-highlight {
-  box-shadow: 0 8px 26px rgba(0,0,0,.28) !important;
-}
-html.light .ciclo-activo-highlight {
-  border: 1.5px solid var(--brand) !important;
-  box-shadow: 0 0 0 2px var(--brand-soft),
-              0 0 18px 2px var(--brand-glow),
-              0 8px 26px rgba(0,0,0,.28) !important;
-  background: rgba(0,240,255,.04) !important;
-}
 /* Tarjeta con cierre/venc inminente: borde rojo ESTÁTICO (sin pulso). */
 .credit-card.card-urgente {
   border: 1.5px solid var(--danger) !important;
@@ -926,6 +910,15 @@ html.light .ciclo-activo-highlight {
 .habitual-nombre { font-size: .85rem; font-weight: 600; color: var(--ink); }
 .habitual-sub { font-size: .66rem; color: var(--ink-muted); }
 .habitual-subtotal { font-size: .8rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.habitual-right { display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; }
+.habitual-aprobar {
+  font-size: .62rem; font-weight: 700; padding: .15rem .45rem; border-radius: .5rem;
+  border: 1px solid var(--brand); color: var(--brand); background: transparent;
+  cursor: pointer; white-space: nowrap; transition: all .15s;
+}
+.habitual-aprobar:active { transform: scale(.94); }
+.habitual-aprobar.on { background: var(--success); border-color: var(--success); color: #04210f; }
+.habitual-row.aprobado { box-shadow: inset 2px 0 0 var(--success); }
 .habitual-counter { display: flex; align-items: center; gap: .3rem; flex-shrink: 0; }
 .habitual-btn {
   width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
@@ -1131,6 +1124,44 @@ fieldset legend {
 .widget-in:nth-child(6), .widget:nth-child(6) { animation-delay: .30s; }
 .widget-in:nth-child(7), .widget:nth-child(7) { animation-delay: .36s; }
 .widget-in:nth-child(8), .widget:nth-child(8) { animation-delay: .42s; }
+
+/* ── Ítem 2: scroll fluido (objetivo 120fps) + transición suave de página ──
+   El scroll compone en GPU (transform:translateZ) con momentum y sin rebote
+   que propague; el contenido se mueve por el compositor, no por layout. */
+html { scroll-behavior: smooth; }
+body, #main-area, #main-widgets,
+#section-movimientos, #sec-tarjetas-mobile, #sec-metas-mobile {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+#main-area, #main-widgets,
+#section-movimientos, #sec-tarjetas-mobile, #sec-metas-mobile {
+  transform: translateZ(0);          /* capa propia → scroll en GPU */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.widget { will-change: transform, opacity; }
+/* Easing más suave en la entrada/deslizamiento de widgets */
+.widget-in, .widget { animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+
+/* Deslizamiento suave entre páginas/pestañas: al mostrarse una sección
+   (se le quita .hidden) entra con un slide + fade corto. */
+@keyframes pagina-in {
+  from { opacity: 0; transform: translate3d(10px, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+#section-movimientos:not(.hidden),
+#sec-tarjetas-mobile:not(.hidden),
+#sec-metas-mobile:not(.hidden) {
+  animation: pagina-in .34s cubic-bezier(.16, 1, .3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .widget, .widget-in,
+  #section-movimientos:not(.hidden),
+  #sec-tarjetas-mobile:not(.hidden),
+  #sec-metas-mobile:not(.hidden) { animation: none !important; }
+}
 
 /* sidebar-item-in */
 @keyframes sidebar-item-in {

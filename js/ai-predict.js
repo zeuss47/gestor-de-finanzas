@@ -397,6 +397,39 @@ export function predecirSaturacionTarjetas({ gastos = [], tarjetas = [], resumen
  *     IDF aproximado (1/log(1+freq_global)).
  *   - Sumar score por categoria. Devolver la mejor.
  */
+/**
+ * Estima, para cada meta activa, en cuántos MESES se completa según el flujo
+ * real (margen libre repartido por prioridad). Determinista.
+ * @param {Array}  metas       state.metas
+ * @param {number} margenLibre margen mensual ya neto de cuotas (ver app.js)
+ * @returns {Map} meta.id -> { aporteMensual, mesesRestantes, fechaEstimada, alcanzable }
+ *
+ * Fórmula: aporte = margenLibre · (prioridad / Σprioridades);
+ *          meses  = ⌈(objetivo − actual) / aporte⌉.
+ * Recalcular es automático: al agregar una meta o generarse una cuota nueva
+ * (que baja el margen), reloadAll() vuelve a llamar a esta función.
+ */
+export function estimarMesesMeta(metas = [], margenLibre = 0) {
+  const activas = (metas || []).filter(m => !m.deleted && (m.monto_objetivo || 0) > (m.monto_actual || 0));
+  const pesos = activas.map(m => m.prioridad || 3);
+  const suma = pesos.reduce((a, b) => a + b, 0) || 1;
+  const margen = Math.max(0, margenLibre || 0);
+  const mesActual = hoyISO().slice(0, 7);
+  const out = new Map();
+  activas.forEach((m, i) => {
+    const aporte = margen * (pesos[i] / suma);
+    const falta = (m.monto_objetivo || 0) - (m.monto_actual || 0);
+    const meses = aporte > 0 ? Math.ceil(falta / aporte) : Infinity;
+    out.set(m.id, {
+      aporteMensual: aporte,
+      mesesRestantes: meses,
+      fechaEstimada: aporte > 0 ? shiftMonth(mesActual, meses) : null,
+      alcanzable: aporte > 0 && isFinite(meses),
+    });
+  });
+  return out;
+}
+
 export function sugerirCategoria(descripcion, gastos = []) {
   const tokensIn = tokenizar(descripcion);
   if (tokensIn.length === 0) return null;

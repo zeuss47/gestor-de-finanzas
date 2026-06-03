@@ -18,7 +18,7 @@ import { DB, uuid, nowTs } from './db.js';
 import { resumenTarjeta, fechasCiclo, rangoCicloActual, cicloDelGasto, cuotaEnPeriodo, estadoCiclo } from './cards.js';
 import { calcularCapacidad, simularCompra, cuotasPendientes } from './credito.js';
 import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
-import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria } from './ai-predict.js';
+import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria, estimarMesesMeta } from './ai-predict.js';
 import { analizarSaludFinanciera, simularEscenario } from './ai-advisor.js';
 import { fetchCotizaciones, timestampUltimoFetch } from './cotizaciones.js';
 import { Notif, chequeoDiarioTarjetas, chequeoMargenDisponible } from './notifications.js';
@@ -811,7 +811,7 @@ function computarEstadoGlobal() {
   for (const g of state.gastos) {
     if (!g.fecha?.startsWith(mk)) continue;
     // Habitual SIN cuenta = contador puro: no descuenta de ningún balance
-    if (g.es_habitual && !g.cuenta_id) continue;
+    if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;
     if (g.tipo === 'amortizacion' || g.es_amortizacion_anual) {
       egresosMes += g.monto / 12;
       continue;
@@ -829,7 +829,7 @@ function computarEstadoGlobal() {
   const buckets = new Map();
   for (const g of state.gastos) {
     if (!g.fecha) continue;
-    if (g.es_habitual && !g.cuenta_id) continue; // contador puro
+    if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue; // contador puro
     const k = g.fecha.slice(0,7);
     if (k === mk) continue;
     let m = g.monto;
@@ -1234,15 +1234,10 @@ function renderTarjetas(el) {
         <p class="text-sm">Sin tarjetas. Tocá "+ Nueva".</p>
       </div>`;
   }
-  // Determinar qué tarjeta tiene el ciclo MÁS próximo a cerrar → highlight
-  const cicloMasProximo = state.resumenes.reduce((prev, r) =>
-    (!prev || r.dias_para_cierre < prev.dias_para_cierre) ? r : prev, null);
-
   for (const r of state.resumenes) {
     const t   = state.tarjetas.find(x => x.id === r.tarjeta_id);
     const pct = Math.min(100, r.porcentaje_limite_usado);
     const urgente = r.dias_para_cierre <= 2 || r.dias_para_vencimiento <= 2;
-    const esCicloActivo = cicloMasProximo && r.tarjeta_id === cicloMasProximo.tarjeta_id;
     // Sin pulso: la urgencia ya se indica con el color de los badges de fecha
     const claseUrgente = urgente ? 'card-urgente' : '';
     // Gradiente generado desde el color elegido por el usuario (todas las tarjetas)
@@ -1254,7 +1249,7 @@ function renderTarjetas(el) {
     const badgeVenc   = diasV <= 1 ? 'badge-danger' : diasV <= 5 ? 'badge-warning' : 'badge-muted';
 
     box.insertAdjacentHTML('beforeend', `
-      <div class="credit-card ${claseUrgente}${esCicloActivo ? ' ciclo-activo-highlight' : ''}"
+      <div class="credit-card ${claseUrgente}"
            data-tarjeta-id="${t.id}"
            style="${bgStyle}cursor:pointer">
         <!-- fila superior -->
@@ -1777,7 +1772,7 @@ function renderBalance(el) {
     ingMap.set(k, (ingMap.get(k) || 0) + ((i.sueldo_neto || 0) + (i.bonos || 0)));
   }
   for (const g of state.gastos || []) {
-    if (g.deleted || g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id) || !enRango(g.fecha)) continue; // pago de tarjeta / habitual-contador no es consumo
+    if (g.deleted || g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado) || !enRango(g.fecha)) continue; // pago de tarjeta / habitual-contador no es consumo
     const k = bucketKey(new Date(g.fecha + 'T12:00:00'));
     gasMap.set(k, (gasMap.get(k) || 0) + gastoEf(g));
   }
@@ -1879,15 +1874,23 @@ function renderMetas(el) {
       </div>`;
   }
 
-  const margen    = Math.max(0, state.estado.margen_libre_mes);
-  // Nueva convención: prioridad alta = más estrellas. Peso ∝ prioridad.
+  // Margen NETO de compromisos: las cuotas vigentes/futuras reducen lo aportable
+  // a metas. Al crear una cuota nueva, esto baja y recalcula los meses (reloadAll).
+  const margen    = Math.max(0, (state.estado.margen_libre_mes || 0) - (state.capacidad?.cuotas_mensuales_proyectadas || 0));
   const pesos     = state.metas.map(m => (m.prioridad || 3));
   const sumaPesos = pesos.reduce((a,b)=>a+b,0) || 1;
+  const estMeses  = estimarMesesMeta(state.metas, margen);   // IA: meses por meta
 
   state.metas.sort((a,b)=>(b.prioridad||3)-(a.prioridad||3)).forEach((m, i) => {
     const pct      = Math.min(100, Math.round((100*m.monto_actual)/(m.monto_objetivo||1)));
     const sugerido = margen * (pesos[i] / sumaPesos);
     const icon     = m.es_emergencia ? '🛡️' : '🎯';
+    const est      = estMeses.get(m.id);
+    const mesesTxt = est
+      ? (est.alcanzable
+          ? ` · <b style="color:var(--brand)">~${est.mesesRestantes} ${est.mesesRestantes === 1 ? 'mes' : 'meses'}</b>`
+          : ` · <b style="color:var(--warning)">sin margen</b>`)
+      : (m.monto_actual >= m.monto_objetivo ? ` · <b style="color:var(--success)">✓ completa</b>` : '');
     const fechaLabel = m.fecha_objetivo
       ? `<span class="badge badge-muted text-[10px]">${m.fecha_objetivo}</span>` : '';
 
@@ -1906,7 +1909,7 @@ function renderMetas(el) {
         </div>
         <div class="flex justify-between text-[11px]" style="color:var(--ink-2)">
           <span>${FMT.format(m.monto_actual)} <span style="color:var(--ink-muted)">/ ${FMT.format(m.monto_objetivo)}</span></span>
-          <span>Aportar <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes</span>
+          <span>Aportar <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes${mesesTxt}</span>
         </div>
       </div>`);
   });
@@ -2099,7 +2102,7 @@ function renderCategorias(el) {
 
   const catMap = new Map();
   for (const g of state.gastos) {
-    if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id)) continue; // pago tarjeta / habitual-contador no es consumo
+    if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // pago tarjeta / habitual-contador no es consumo
     if (!g.fecha?.startsWith(mk)) continue;
     const cat = g.categoria || 'general';
     let m = g.monto;
@@ -4199,6 +4202,34 @@ function _conteoHabitualMes(habitualId, mes = new Date().toISOString().slice(0,7
   return state.gastos.filter(g => !g.deleted && g.habitual_id === habitualId && (g.fecha||'').startsWith(mes)).length;
 }
 
+/** Gastos de un habitual en el mes (no borrados). */
+function _gastosHabitualMes(habitualId, mes = new Date().toISOString().slice(0,7)) {
+  return state.gastos.filter(g => !g.deleted && g.habitual_id === habitualId && (g.fecha||'').startsWith(mes));
+}
+
+/** ¿El total del mes de este habitual ya fue APROBADO? (todos sus gastos del
+ *  mes con aprobado=true). Sólo aplica a habituales "solo contar" (sin cuenta). */
+function _habitualAprobadoMes(habitualId, mes = new Date().toISOString().slice(0,7)) {
+  const gs = _gastosHabitualMes(habitualId, mes);
+  return gs.length > 0 && gs.every(g => g.aprobado);
+}
+
+/** Aprueba (o desaprueba) el gasto total del mes de un habitual. Al aprobar, sus
+ *  gastos "solo contar" pasan a DESCONTAR del saldo general (flag aprobado). */
+async function _aprobarHabitualMes(habitualId, aprobar = true) {
+  const mes = new Date().toISOString().slice(0,7);
+  const gs = _gastosHabitualMes(habitualId, mes);
+  if (!gs.length) { toast('No hay registros este mes para aprobar', 2000); return; }
+  for (const g of gs) {
+    await DB.put('gastos', { ...g, aprobado: !!aprobar, updated_at: nowTs() });
+  }
+  notificarCambioLocal();
+  const h = getHabituales().find(x => x.id === habitualId);
+  const total = gs.reduce((a, g) => a + (g.monto || 0), 0);
+  toast(aprobar ? `✓ ${h?.nombre || 'Habitual'} aprobado · ${FMT.format(total)} al saldo` : 'Aprobación quitada', 2200);
+  await reloadAll();
+}
+
 /** Registra un gasto a partir de un habitual (un "tic" del contador). */
 async function registrarGastoHabitual(habitualId) {
   const h = getHabituales().find(x => x.id === habitualId);
@@ -4284,14 +4315,25 @@ function renderWidgetHabituales(el) {
     const n = _conteoHabitualMes(h.id, mes);
     const subtotal = n * (Number(h.valor)||0);
     totalMes += subtotal;
+    // "Solo contar" (sin cuenta): puede aprobarse para descontar del saldo.
+    const soloContar = !h.cuenta_id;
+    const aprobado = soloContar && _habitualAprobadoMes(h.id, mes);
+    const aprobarBtn = (soloContar && n > 0)
+      ? `<button class="habitual-aprobar${aprobado ? ' on' : ''}" data-hab-aprobar="${escapeHtml(h.id)}"
+           title="${aprobado ? 'Descontado del saldo — tocá para revertir' : 'Aprobar y descontar el total del saldo general'}">
+           ${aprobado ? '✓ Aprobado' : 'Aprobar'}</button>`
+      : '';
     return `
-      <div class="habitual-row">
+      <div class="habitual-row${aprobado ? ' aprobado' : ''}">
         <span class="habitual-icon" style="background:${h.color}1a;border:1px solid ${h.color}44">${escapeHtml(h.icono||'🔁')}</span>
         <div class="habitual-info">
           <span class="habitual-nombre">${escapeHtml(h.nombre)}</span>
-          <span class="habitual-sub">${FMT.format(h.valor||0)} c/u · ${n} este mes</span>
+          <span class="habitual-sub">${FMT.format(h.valor||0)} c/u · ${n} este mes${aprobado ? ' · <b style="color:var(--success)">descontado</b>' : ''}</span>
         </div>
-        <span class="habitual-subtotal">${FMT.format(subtotal)}</span>
+        <div class="habitual-right">
+          <span class="habitual-subtotal">${FMT.format(subtotal)}</span>
+          ${aprobarBtn}
+        </div>
         <div class="habitual-counter">
           <button class="habitual-btn" data-hab-menos="${escapeHtml(h.id)}" title="Quitar uno">−</button>
           <span class="habitual-count">${n}</span>
@@ -4305,6 +4347,11 @@ function renderWidgetHabituales(el) {
 
   box.querySelectorAll('[data-hab-mas]').forEach(b => b.onclick = (e) => { e.stopPropagation(); registrarGastoHabitual(b.dataset.habMas); });
   box.querySelectorAll('[data-hab-menos]').forEach(b => b.onclick = (e) => { e.stopPropagation(); quitarGastoHabitual(b.dataset.habMenos); });
+  box.querySelectorAll('[data-hab-aprobar]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const id = b.dataset.habAprobar;
+    _aprobarHabitualMes(id, !_habitualAprobadoMes(id, mes));
+  });
 }
 
 /* ============ Helpers ============ */
@@ -5283,15 +5330,20 @@ function renderMetasMobile() {
     return;
   }
 
-  const margen    = Math.max(0, state.estado?.margen_libre_mes || 0);
+  const margen    = Math.max(0, (state.estado?.margen_libre_mes || 0) - (state.capacidad?.cuotas_mensuales_proyectadas || 0));
   const pesos     = metas.map(m => (m.prioridad || 3));
   const sumaPesos = pesos.reduce((a,b)=>a+b,0) || 1;
+  const estMeses  = estimarMesesMeta(metas, margen);
 
   lista.innerHTML = metas.map((m, i) => {
     const pct      = Math.min(100, Math.round((100*(m.monto_actual||0))/(m.monto_objetivo||1)));
     const sugerido = margen * (pesos[i] / sumaPesos);
     const icon     = m.es_emergencia ? '🛡️' : '🎯';
     const completa = pct >= 100;
+    const est      = estMeses.get(m.id);
+    const mesesTxt = (!completa && est)
+      ? (est.alcanzable ? ` · <b style="color:var(--brand)">~${est.mesesRestantes} ${est.mesesRestantes === 1 ? 'mes' : 'meses'}</b>` : ` · <b style="color:var(--warning)">sin margen</b>`)
+      : '';
     return `
       <div class="meta-card-m card-glass rounded-2xl p-4" data-meta-id="${m.id}" style="cursor:pointer">
         <div class="flex items-center justify-between mb-2">
@@ -5305,7 +5357,7 @@ function renderMetasMobile() {
         <div class="flex justify-between items-center text-[11px]" style="color:var(--ink-2)">
           <span>${FMT.format(m.monto_actual||0)} <span style="color:var(--ink-muted)">/ ${FMT.format(m.monto_objetivo||0)}</span></span>
           ${m.fecha_objetivo ? `<span style="color:var(--ink-muted)">📅 ${m.fecha_objetivo}</span>` : ''}
-          ${!completa ? `<span>Aportar <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes</span>` : `<span style="color:var(--success)">✓ Completada</span>`}
+          ${!completa ? `<span>Aportar <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes${mesesTxt}</span>` : `<span style="color:var(--success)">✓ Completada</span>`}
         </div>
       </div>`;
   }).join('');
