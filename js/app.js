@@ -319,56 +319,50 @@ function initCalculadora() {
   });
 }
 
-/* ============ Bloqueo de orientación (tipo SCREEN_ORIENTATION_LOCKED) ============
- * Congela la orientación con la que se ABRIÓ la app y apaga el sensor de giro.
- *  - Android/Chromium: screen.orientation.lock(tipo_inicial) → lock real.
- *  - iOS (sin lock): se calcula el DELTA de ángulo respecto al inicial y se
- *    marca html[data-orient-lock] para que el CSS contra-rote y conserve la
- *    vista inicial (sea vertical u horizontal).
+/* ============ Forzar VERTICAL en el móvil (nunca rotar) ============
+ * El objetivo es SIEMPRE portrait en teléfonos (no congelar la de carga).
+ *  - Android/Chromium: screen.orientation.lock('portrait') → lock real del SO.
+ *  - iOS (sin lock): si el teléfono está apaisado, se marca html[data-orient-lock]
+ *    con el ángulo y el CSS contra-rota para que el contenido quede vertical.
+ *  - Sólo aplica en teléfonos (táctil + pantalla chica): tablets/desktop quedan
+ *    libres.
  */
-let _orientLockAngle = null;   // ángulo con el que arrancó la app
-let _orientLockType  = null;   // tipo (portrait-primary / landscape-primary…)
-
 function _orientAngulo() {
   if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
   // Fallback WebKit viejo: window.orientation usa convención INVERTIDA respecto
-  // a screen.orientation.angle (el device-angle es el negativo del screen-angle),
-  // así que negamos para que delta 90/270 no queden intercambiados.
+  // a screen.orientation.angle, así que negamos para no intercambiar 90/270.
   if (typeof window.orientation === 'number') return (((-window.orientation) % 360) + 360) % 360;
   return 0;
 }
 
-// Congelar la orientación en el "preciso milisegundo" de carga: se captura
-// apenas se ejecuta el módulo (antes de cualquier giro), no recién en el init.
-try {
-  _orientLockAngle = _orientAngulo();
-  _orientLockType  = (typeof screen !== 'undefined' && screen.orientation && screen.orientation.type) || null;
-} catch {}
+/** ¿Es un teléfono (donde forzamos vertical)? Táctil + lado corto chico. */
+function _esTelefono() {
+  try {
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const corto = Math.min(screen.width || 9999, screen.height || 9999);
+    return coarse && corto <= 500;
+  } catch { return false; }
+}
 
 function bloquearOrientacion() {
-  // Por si el módulo no pudo capturar antes, asegurar la orientación inicial.
-  if (_orientLockAngle === null) _orientLockAngle = _orientAngulo();
-  if (_orientLockType === null)  _orientLockType  = (screen.orientation && screen.orientation.type) || null;
-
   const intentarLock = () => {
+    if (!_esTelefono()) return;
     try {
-      if (screen.orientation && typeof screen.orientation.lock === 'function' && _orientLockType) {
-        screen.orientation.lock(_orientLockType).catch(() => {});
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('portrait').catch(() => {});   // SIEMPRE vertical
       }
     } catch {}
   };
   const recalcular = () => { intentarLock(); _compensarOrientacion(); };
 
-  intentarLock();
-  _compensarOrientacion();
+  recalcular();
   document.addEventListener('fullscreenchange', recalcular);
   window.addEventListener('orientationchange', recalcular);
   window.addEventListener('resize', _compensarOrientacion);
   if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
     screen.orientation.addEventListener('change', recalcular);
   }
-  // Re-asegurar el lock al volver a la app (varios navegadores Android lo
-  // sueltan al cambiar de app o apagar/encender la pantalla).
+  // Re-asegurar el lock al volver a la app (Android a veces lo suelta).
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') recalcular();
   });
@@ -376,13 +370,13 @@ function bloquearOrientacion() {
   window.addEventListener('pageshow', recalcular);
 }
 
-/** Contra-rota (vía html[data-orient-lock]) según cuánto giró el dispositivo
- *  respecto a la orientación inicial. Si el lock nativo funcionó, el viewport
- *  no gira → delta 0 → no hace nada. */
+/** En teléfono: si está apaisado (o cabeza abajo) marca html[data-orient-lock]
+ *  con el ángulo para que el CSS contra-rote a vertical. Objetivo = portrait
+ *  (angle 0), así que el delta es directamente el ángulo actual. */
 function _compensarOrientacion() {
-  if (_orientLockAngle === null) return;
-  const delta = (((_orientAngulo() - _orientLockAngle) % 360) + 360) % 360;
   const el = document.documentElement;
+  if (!_esTelefono()) { delete el.dataset.orientLock; return; }
+  const delta = ((_orientAngulo() % 360) + 360) % 360;
   if (delta === 90 || delta === 180 || delta === 270) el.dataset.orientLock = String(delta);
   else delete el.dataset.orientLock;
 }
