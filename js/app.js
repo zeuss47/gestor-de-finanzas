@@ -110,47 +110,6 @@ function mostrarBannerActualizacion(v) {
   banner.querySelector('#update-banner-x').onclick = () => banner.remove();
 }
 
-/**
- * Bloquea la orientación a vertical. La Screen Orientation API solo permite
- * lock cuando la app corre instalada (standalone) o en pantalla completa; en el
- * navegador normal el manifest "orientation":"portrait" es lo que aplica al
- * instalarla. Hacemos el intento de forma segura (ignora si no está permitido).
- */
-function bloquearOrientacionVertical() {
-  const intentar = () => {
-    try {
-      if (screen.orientation && typeof screen.orientation.lock === 'function') {
-        screen.orientation.lock('portrait').catch(() => {});
-      }
-    } catch {}
-  };
-  intentar();
-  // Re-intentar al entrar en pantalla completa (ahí sí está permitido) y cuando
-  // el dispositivo cambia de orientación (en Android vuelve a forzar vertical).
-  document.addEventListener('fullscreenchange', intentar);
-  if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
-    screen.orientation.addEventListener('change', () => { intentar(); _marcarSentidoGiro(); });
-  } else {
-    window.addEventListener('orientationchange', () => { intentar(); _marcarSentidoGiro(); });
-  }
-  _marcarSentidoGiro();
-}
-
-/**
- * Marca en <html data-orient> el sentido del giro para que el CSS contra-rote
- * el contenido hacia el lado correcto. En iOS (donde el lock no funciona) esto
- * mantiene la app en vertical girando el layout 90°. Sin JS, el CSS usa el
- * sentido por defecto y igual queda vertical.
- */
-function _marcarSentidoGiro() {
-  const ang = (screen.orientation && typeof screen.orientation.angle === 'number')
-    ? screen.orientation.angle
-    : (typeof window.orientation === 'number' ? window.orientation : null);
-  // angle 270 (o -90) = landscape "secundario": el CSS lo rota al revés.
-  const inverso = ang === 270 || ang === -90;
-  document.documentElement.dataset.orient = inverso ? 'l270' : 'l90';
-}
-
 function iniciarChequeoActualizaciones() {
   if (_chequeoActIniciado) return;
   _chequeoActIniciado = true;
@@ -6498,8 +6457,9 @@ async function init() {
   // Chequeo periódico de actualizaciones (cada 10 min si la app está visible)
   iniciarChequeoActualizaciones();
 
-  // Bloquear orientación a vertical (solo aplica en PWA instalada / fullscreen)
-  bloquearOrientacionVertical();
+  // Nota: la app funciona en cualquier orientación (vertical y horizontal). No
+  // forzamos rotación — eso rompía el táctil al girar. La orientación la decide
+  // el SO / el bloqueo de rotación del teléfono.
 
   // Si venimos de un reset, NO hacer pull inicial: evita que el merge LWW
   // restaure datos del repo antes de que el usuario lo decida.

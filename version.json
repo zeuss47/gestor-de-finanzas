@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.52",
-    "build":  69,
-    "modified":  "2026-06-03T13:05:18Z",
-    "commit":  "M css/styles.css, tests/_shots/rot_drawer.png, tests/_shots/rot_gasto.png",
-    "notes":  "Auto-update 2026-06-03 10:05"
+    "version":  "1.53",
+    "build":  70,
+    "modified":  "2026-06-03T13:18:20Z",
+    "commit":  "M css/styles.css, M js/app.js, M manifest.json, tests/_shots/land_dashboard.png, tests/_shots/lan...",
+    "notes":  "Auto-update 2026-06-03 10:18"
 }

@@ -4663,59 +4663,14 @@ body.view-analisis #main-widgets::before {
   .rsb-mov-monto { font-size: .8rem; }
 }
 
-/* ── Forzar layout vertical en teléfonos apaisados ─────────────────
-   iOS ignora el manifest "orientation":"portrait" y screen.orientation.lock,
-   así que cuando el teléfono se gira a horizontal CONTRA-ROTAMOS el contenido
-   90° para que la app siga viéndose y funcionando en vertical.
-   Condiciones para NO afectar a desktop/tablet:
-     - orientation: landscape  → el teléfono está girado
-     - max-height: 600px       → alto chico = teléfono (tablets/desktop fuera)
-     - pointer: coarse         → táctil (excluye desktop con mouse)
-   El sentido del giro lo afina el JS con html[data-orient]; sin JS usa el
-   sentido por defecto (rotate 90°), igual queda vertical. */
+/* ── Teléfono apaisado: la app funciona en horizontal igual que en vertical ──
+   No forzamos ninguna orientación (eso rompía el táctil al girar). El layout
+   ya es responsive; acá solo afinamos para que en el alto chico del apaisado
+   los diálogos no queden cortados y el contenido siga siendo usable.
+   Gate: landscape + alto chico (teléfono) + táctil → no afecta desktop/tablet. */
 @media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
-  html { overflow: hidden; width: 100%; height: 100%; }
-
-  /* body y diálogos (estos viven en el top-layer, se rotan aparte con la
-     misma fórmula) ocupan el viewport girado y se contra-rotan.
-     Usamos max-width/max-height con !important para CAPAR los anchos que
-     algunos diálogos fijan por ID (#dlg-...{width:...!important}) — no se
-     puede vencer un id+!important con `width`, pero sí acotarlo con max-*. */
-  body,
-  dialog[open] {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vh;                       /* ancho visual = alto físico  */
-    height: 100vw;                      /* alto visual  = ancho físico */
-    min-width: 0 !important;
-    max-width: 100vh !important;        /* capa el width:...!important por id */
-    min-height: 0 !important;
-    max-height: 100vw !important;       /* capa el max-height:90dvh base      */
-    margin: 0;
-    transform-origin: top left;
-    transform: translateX(100vw) rotate(90deg);
-    box-sizing: border-box;
-  }
-  body { overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  dialog[open] { overflow-x: hidden; overflow-y: auto; }
-
-  /* Sentido inverso para la otra orientación landscape (angle 270 / -90). */
-  html[data-orient="l270"] body,
-  html[data-orient="l270"] dialog[open] {
-    transform: translateY(100vh) rotate(-90deg);
-  }
-
-  /* Wrappers internos (.form-modern, .widget-drawer): usan min-width:min(NNvw,…)
-     y max-height:90dvh referidos al viewport FÍSICO (apaisado) y desbordan el
-     área visual (vertical, angosta). Los atamos al diálogo. */
-  dialog[open] > * {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    max-height: none !important;
-    height: auto !important;
-  }
-
-  /* El backdrop nativo cubre el viewport físico; lo dejamos opaco al tema. */
-  dialog::backdrop { background: rgba(0, 0, 0, .55); }
+  /* Diálogos y drawers: usar casi todo el alto disponible y scrollear adentro. */
+  dialog { max-height: 96dvh; }
+  .widget-drawer { max-height: 96dvh; }
+  .form-modern   { max-height: 96dvh; }
 }
