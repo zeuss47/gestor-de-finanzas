@@ -336,10 +336,17 @@ function _orientAngulo() {
   return 0;
 }
 
-function bloquearOrientacion() {
-  // Capturar la orientación inicial (la que queda congelada).
+// Congelar la orientación en el "preciso milisegundo" de carga: se captura
+// apenas se ejecuta el módulo (antes de cualquier giro), no recién en el init.
+try {
   _orientLockAngle = _orientAngulo();
-  _orientLockType  = (screen.orientation && screen.orientation.type) || null;
+  _orientLockType  = (typeof screen !== 'undefined' && screen.orientation && screen.orientation.type) || null;
+} catch {}
+
+function bloquearOrientacion() {
+  // Por si el módulo no pudo capturar antes, asegurar la orientación inicial.
+  if (_orientLockAngle === null) _orientLockAngle = _orientAngulo();
+  if (_orientLockType === null)  _orientLockType  = (screen.orientation && screen.orientation.type) || null;
 
   const intentarLock = () => {
     try {
@@ -358,6 +365,13 @@ function bloquearOrientacion() {
   if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
     screen.orientation.addEventListener('change', recalcular);
   }
+  // Re-asegurar el lock al volver a la app (varios navegadores Android lo
+  // sueltan al cambiar de app o apagar/encender la pantalla).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') recalcular();
+  });
+  window.addEventListener('focus', recalcular);
+  window.addEventListener('pageshow', recalcular);
 }
 
 /** Contra-rota (vía html[data-orient-lock]) según cuánto giró el dispositivo
