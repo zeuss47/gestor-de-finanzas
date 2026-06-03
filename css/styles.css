@@ -705,6 +705,21 @@ html.light #bottom-nav::before { background: rgba(240,244,255,0.85); }
 .mov-filtro-todos:hover { color: var(--ink); border-color: var(--ink-2); }
 .mov-filtro-todos.active { color: var(--brand); border-color: var(--brand); }
 
+/* Header de período (agrupación por día) */
+.mov-period-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: .5rem; margin: .9rem .15rem .4rem;
+  padding-bottom: .35rem; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 2;
+  background: linear-gradient(var(--bg, #050614) 70%, transparent);
+}
+.mov-period-header:first-child { margin-top: .2rem; }
+.mov-period-fecha {
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: .82rem;
+  color: var(--ink); text-transform: capitalize; letter-spacing: -.01em;
+}
+.mov-period-total { font-size: .68rem; color: var(--ink-muted); white-space: nowrap; }
+
 /* Filas de historial detalladas */
 .mov-row-gasto {
   display: flex; align-items: flex-start; gap: .65rem;
@@ -1178,30 +1193,74 @@ html.light #app-header { background: rgba(240,244,255,0.8); }
 .section-transition.hidden { display: none; }
 
 /* ── Tarjeta visual (crédito) ────────────────────────────────── */
+/* ── Animación premium de tarjeta (todas) ──────────────────────
+   Brillo holográfico que barre en diagonal + flotación sutil.    */
+@keyframes card-shine {
+  0%   { transform: translateX(-160%) skewX(-22deg); opacity: 0; }
+  12%  { opacity: .55; }
+  30%  { opacity: 0; }
+  100% { transform: translateX(260%) skewX(-22deg); opacity: 0; }
+}
+@keyframes card-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
 .credit-card {
   border-radius: var(--r);
   padding: 1rem;
   position: relative;
   overflow: hidden;
   min-height: 100px;
+  animation: card-float 5.5s ease-in-out infinite;
+  will-change: transform;
+  box-shadow: 0 8px 26px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.18);
+  transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;
 }
+.credit-card:hover {
+  transform: translateY(-5px) scale(1.015);
+  box-shadow: 0 16px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.25);
+}
+/* Brillo que barre */
 .credit-card::before {
   content: '';
   position: absolute;
-  top: -40%; right: -20%;
-  width: 220px; height: 220px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.07);
+  top: 0; left: 0;
+  width: 55%; height: 100%;
+  background: linear-gradient(105deg, transparent 0%, rgba(255,255,255,.38) 50%, transparent 100%);
+  animation: card-shine 6.5s ease-in-out infinite;
   pointer-events: none;
+  z-index: 1;
 }
+/* Círculo decorativo de profundidad */
 .credit-card::after {
   content: '';
   position: absolute;
   bottom: -30%; left: -10%;
   width: 160px; height: 160px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.05);
   pointer-events: none;
+}
+/* Stagger del brillo para que no barran todas al mismo tiempo */
+.credit-card:nth-child(2n)::before   { animation-delay: 1.3s; }
+.credit-card:nth-child(3n)::before   { animation-delay: 2.6s; }
+.credit-card:nth-child(4n)::before   { animation-delay: 3.9s; }
+
+/* ── Identidad bancaria: gradiente + acento por banco ─────────── */
+.card-bank-bbva     { background: linear-gradient(135deg, #04162e 0%, #004481 55%, #1973b8 100%) !important; }
+.card-bank-santander{ background: linear-gradient(135deg, #6b0000 0%, #ec0000 55%, #ff4d4d 100%) !important; }
+.card-bank-galicia  { background: linear-gradient(135deg, #8a3500 0%, #ff6b35 50%, #f7931e 100%) !important; }
+.card-bank-macro    { background: linear-gradient(135deg, #001f40 0%, #003874 50%, #0a7bd0 100%) !important; }
+.card-bank-icbc     { background: linear-gradient(135deg, #5a0714 0%, #c8102e 55%, #e8334d 100%) !important; }
+.card-bank-hsbc     { background: linear-gradient(135deg, #3a0006 0%, #db0011 55%, #ff3a4a 100%) !important; }
+.card-bank-nacion   { background: linear-gradient(135deg, #0a2d52 0%, #1a5490 55%, #2a7bc2 100%) !important; }
+.card-bank-brubank  { background: linear-gradient(135deg, #2a0a52 0%, #6d28d9 55%, #a855f7 100%) !important; }
+.card-bank-uala     { background: linear-gradient(135deg, #1a0a4d 0%, #4f46e5 55%, #818cf8 100%) !important; }
+.card-bank-naranja  { background: linear-gradient(135deg, #7a2e00 0%, #ff6a00 55%, #ffa033 100%) !important; }
+.card-bank-mercado  { background: linear-gradient(135deg, #0a4d8a 0%, #2d8fef 55%, #ffe600 130%) !important; }
+/* Cinta/acento sutil distintivo por banco (esquina superior) */
+.credit-card[class*="card-bank-"]::after {
+  background: radial-gradient(circle, rgba(255,255,255,.12) 0%, transparent 70%);
 }
 
 /* ── Badge ───────────────────────────────────────────────────── */

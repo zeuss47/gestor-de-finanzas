@@ -708,6 +708,23 @@ function calcularSaldoCuenta(cuenta) {
   return saldo;
 }
 
+/** Mapea el nombre del banco a su clase de identidad visual (gradiente). */
+function _bancoCardClass(banco) {
+  const b = (banco || '').toLowerCase();
+  if (b.includes('bbva'))                       return 'card-bank-bbva';
+  if (b.includes('santander'))                  return 'card-bank-santander';
+  if (b.includes('galicia'))                    return 'card-bank-galicia';
+  if (b.includes('macro'))                      return 'card-bank-macro';
+  if (b.includes('icbc'))                       return 'card-bank-icbc';
+  if (b.includes('hsbc'))                       return 'card-bank-hsbc';
+  if (b.includes('nacion') || b.includes('nación')) return 'card-bank-nacion';
+  if (b.includes('brubank'))                    return 'card-bank-brubank';
+  if (b.includes('uala') || b.includes('ualá')) return 'card-bank-uala';
+  if (b.includes('naranja'))                    return 'card-bank-naranja';
+  if (b.includes('mercado'))                    return 'card-bank-mercado';
+  return '';
+}
+
 function renderTarjetas(el) {
   const box = el.querySelector('[data-bind="cards"]');
   box.innerHTML = '';
@@ -730,17 +747,19 @@ function renderTarjetas(el) {
     const urgente = r.dias_para_cierre <= 2 || r.dias_para_vencimiento <= 2;
     const esCicloActivo = cicloMasProximo && r.tarjeta_id === cicloMasProximo.tarjeta_id;
     const claseUrgente = urgente ? 'pulse-warn' : '';
-    // Colores derivados del color de la tarjeta
+    // Identidad bancaria: si reconocemos el banco, usamos su gradiente; si no, el color custom
+    const bankClass = _bancoCardClass(t.banco);
     const colorBase = t.color || '#6366f1';
+    const bgStyle = bankClass ? '' : `background:linear-gradient(135deg,${colorBase}dd 0%,${colorBase}88 100%);`;
     const diasC = r.dias_para_cierre;
     const diasV = r.dias_para_vencimiento;
     const badgeCierre = diasC <= 1 ? 'badge-danger' : diasC <= 5 ? 'badge-warning' : 'badge-muted';
     const badgeVenc   = diasV <= 1 ? 'badge-danger' : diasV <= 5 ? 'badge-warning' : 'badge-muted';
 
     box.insertAdjacentHTML('beforeend', `
-      <div class="credit-card ${claseUrgente}${esCicloActivo ? ' ciclo-activo-highlight' : ''}"
+      <div class="credit-card ${bankClass} ${claseUrgente}${esCicloActivo ? ' ciclo-activo-highlight' : ''}"
            data-tarjeta-id="${t.id}"
-           style="background:linear-gradient(135deg,${colorBase}dd 0%,${colorBase}88 100%);cursor:pointer">
+           style="${bgStyle}cursor:pointer">
         <!-- fila superior -->
         <div class="flex items-start justify-between mb-3 relative z-10">
           <div>
@@ -2452,18 +2471,24 @@ function renderMovimientos() {
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
-  // ── Ingresos ────────────────────────────────────────────────
-  for (const i of ingresosMes) {
+  const allCats = state.ajustes?.catalogos?.categorias_gasto?.length
+    ? state.ajustes.catalogos.categorias_gasto
+    : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.categorias_gasto);
+
+  // ── Helpers de fila ─────────────────────────────────────────
+  const ingresoHTML = (i) => {
     const total = (i.sueldo_neto || 0) + (i.bonos || 0);
-    list.insertAdjacentHTML('beforeend', `
+    return `
       <div class="mov-row-gasto" data-id="${i.id}" data-tipo="ingreso">
         <div class="mov-row-icon" style="background:rgba(0,255,159,.1)">💰</div>
         <div class="mov-row-body">
           <div class="mov-row-desc">${escapeHtml(i.descripcion || 'Ingreso')}</div>
           <div class="mov-row-meta">
-            <span>${i.fecha}</span>
             <span>período ${i.periodo_aplicacion || '—'}</span>
             ${i.sueldo_bruto ? `<span>bruto ${FMT.format(i.sueldo_bruto)}</span>` : ''}
+          </div>
+          <div class="mov-row-meta" style="margin-top:.2rem">
+            <span class="mov-cat-badge" style="background:rgba(0,255,159,.1);color:var(--success);border-color:rgba(0,255,159,.25)">💰 Ingreso</span>
           </div>
         </div>
         <div class="mov-row-right">
@@ -2473,16 +2498,9 @@ function renderMovimientos() {
             <button class="mov-row-btn del"  data-del-ing="${i.id}" title="Eliminar">${SVG_TRASH}</button>
           </div>
         </div>
-      </div>`);
-  }
-
-  // ── Gastos ──────────────────────────────────────────────────
-  const allCats = state.ajustes?.catalogos?.categorias_gasto?.length
-    ? state.ajustes.catalogos.categorias_gasto
-    : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.categorias_gasto);
-
-  for (const g of gastosMes) {
-    if (g.es_pago_tarjeta) continue; // ocultar pagos de tarjeta en historial
+      </div>`;
+  };
+  const gastoHTML = (g) => {
     const catObj  = allCats.find(c => c.id === g.categoria || c.nombre?.toLowerCase() === (g.categoria||'').toLowerCase());
     const icon    = catObj?.icono || CAT_ICON[g.categoria] || '📌';
     const catColor= catObj?.color || '#94a3b8';
@@ -2493,14 +2511,12 @@ function renderMovimientos() {
     const monedaFmt = (g.moneda && g.moneda !== 'ARS')
       ? `${g.moneda} ${(g.monto||0).toLocaleString('es-AR',{minimumFractionDigits:2})}`
       : FMT.format(monto);
-
-    list.insertAdjacentHTML('beforeend', `
+    return `
       <div class="mov-row-gasto" data-id="${g.id}" data-tipo="gasto">
         <div class="mov-row-icon" style="background:${catColor}18;border:1px solid ${catColor}33">${icon}</div>
         <div class="mov-row-body">
           <div class="mov-row-desc">${escapeHtml(g.descripcion || '—')}</div>
           <div class="mov-row-meta">
-            <span>${g.fecha}</span>
             <span>${escapeHtml(metodo)}</span>
             ${cuotas ? `<span>${cuotas}</span>` : ''}
             ${g.compartido ? `<span>👫 ${escapeHtml(g.compartido.persona)}</span>` : ''}
@@ -2520,7 +2536,47 @@ function renderMovimientos() {
             <button class="mov-row-btn del"  data-del-gas="${g.id}"  title="Eliminar">${SVG_TRASH}</button>
           </div>
         </div>
+      </div>`;
+  };
+
+  // ── Unificar items y agrupar por FECHA (período diario) ──────
+  const items = [];
+  for (const i of ingresosMes) items.push({ fecha: i.fecha || '', tipo: 'ingreso', signo: +1, monto: (i.sueldo_neto||0)+(i.bonos||0), html: ingresoHTML(i) });
+  for (const g of gastosMes) {
+    if (g.es_pago_tarjeta) continue;
+    const m = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
+    items.push({ fecha: g.fecha || '', tipo: 'gasto', signo: -1, monto: m, moneda: g.moneda, html: gastoHTML(g) });
+  }
+  items.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+
+  // Agrupar por día
+  const grupos = new Map();
+  for (const it of items) {
+    if (!grupos.has(it.fecha)) grupos.set(it.fecha, []);
+    grupos.get(it.fecha).push(it);
+  }
+
+  const hoyISO = new Date().toISOString().slice(0,10);
+  const ayer = new Date(); ayer.setDate(ayer.getDate()-1);
+  const ayerISO = ayer.toISOString().slice(0,10);
+  const fmtCabecera = (iso) => {
+    if (!iso) return 'Sin fecha';
+    if (iso === hoyISO)  return 'Hoy';
+    if (iso === ayerISO) return 'Ayer';
+    const d = new Date(iso + 'T12:00:00');
+    return d.toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' });
+  };
+
+  for (const [fecha, grupo] of grupos) {
+    // Total neto del día (gastos solo en ARS para el resumen rápido)
+    const totalDiaArs = grupo.filter(x => x.tipo === 'gasto' && (!x.moneda || x.moneda === 'ARS'))
+      .reduce((a, x) => a + x.monto, 0);
+    list.insertAdjacentHTML('beforeend', `
+      <div class="mov-period-header">
+        <span class="mov-period-fecha">${escapeHtml(fmtCabecera(fecha))}</span>
+        <span class="mov-period-total">${grupo.length} ítem${grupo.length===1?'':'s'}${totalDiaArs ? ` · ${FMT.format(totalDiaArs)}` : ''}</span>
       </div>`);
+    for (const it of grupo) list.insertAdjacentHTML('beforeend', it.html);
   }
 
   // ── Handlers ────────────────────────────────────────────────
@@ -4272,29 +4328,33 @@ function renderTarjetasMobile() {
   lista.innerHTML = tarjetas.map(t => {
     const r = resumenTarjeta(t, state.gastos);
     const pct = t.limite_un_pago ? Math.min(100, Math.round((r.total_resumen / t.limite_un_pago) * 100)) : 0;
-    const colorPct = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--warning)' : 'var(--success)';
-    return `<div class="card-glass rounded-2xl p-4" style="border-color:${t.color || 'var(--border)'}22">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-2">
-          <span class="w-3 h-3 rounded-full flex-shrink-0" style="background:${t.color || 'var(--brand)'}"></span>
-          <span class="ff-display font-bold text-sm">${escapeHtml(t.nombre)}</span>
+    const bankClass = _bancoCardClass(t.banco);
+    const colorBase = t.color || '#6366f1';
+    const bgStyle = bankClass ? '' : `background:linear-gradient(135deg,${colorBase}dd 0%,${colorBase}88 100%);`;
+    const fmtCorto = (iso) => {
+      if (!iso) return '—';
+      const d = new Date(iso + 'T12:00:00');
+      const mn = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      return `${d.getDate()}/${mn[d.getMonth()]}`;
+    };
+    return `<div>
+      <div class="credit-card ${bankClass}" style="${bgStyle}cursor:pointer" data-tm-detalle="${t.id}">
+        <div class="flex items-start justify-between mb-2 relative z-10">
+          <div>
+            <p class="font-semibold text-white text-base leading-tight">${escapeHtml(t.nombre)}</p>
+            ${t.banco ? `<p class="text-white/60 text-xs mt-0.5">${escapeHtml(t.banco)}</p>` : ''}
+          </div>
+          <span class="badge text-white/85" style="background:rgba(255,255,255,0.18);border:none;font-size:.6rem">Cierra en ${r.dias_para_cierre}d</span>
         </div>
-        <span class="text-xs" style="color:var(--ink-muted)">Cierra en <b style="color:var(--brand)">${r.dias_para_cierre}d</b></span>
-      </div>
-      <div class="flex justify-between items-end mb-2">
-        <div>
-          <p class="text-[10px] uppercase tracking-wider" style="color:var(--ink-muted)">Acumulado este ciclo</p>
-          <p class="ff-display font-bold text-xl" style="color:${colorPct}">${FMT.format(r.total_resumen)}</p>
-        </div>
-        <div class="text-right">
-          <p class="text-[10px]" style="color:var(--ink-muted)">Vence ${r.fecha_vencimiento || '—'}</p>
-          <p class="text-xs font-semibold" style="color:${colorPct}">${pct}% del límite</p>
+        <p class="ff-display font-bold text-white text-2xl mb-2 relative z-10" style="text-shadow:0 2px 8px rgba(0,0,0,0.3)">${FMT.format(r.total_resumen)}</p>
+        <div class="relative z-10 mb-2">
+          <div class="bar" style="background:rgba(255,255,255,.18)">
+            <span style="width:${pct}%;background:rgba(255,255,255,.85);box-shadow:none"></span>
+          </div>
+          <p class="text-white/60 text-[10px] mt-1">${pct}% del límite · vence ${fmtCorto(r.fecha_vencimiento)}</p>
         </div>
       </div>
-      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:.75rem">
-        <div style="width:${pct}%;height:100%;background:${colorPct};border-radius:2px;transition:width .3s"></div>
-      </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 mt-2">
         <button class="btn-primary flex-1 text-xs" data-tm-add="${t.id}">+ Agregar gasto</button>
         <button class="btn-secondary flex-1 text-xs" data-tm-detalle="${t.id}">Ver detalle</button>
       </div>
