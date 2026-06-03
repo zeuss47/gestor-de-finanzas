@@ -110,6 +110,206 @@ function mostrarBannerActualizacion(v) {
   banner.querySelector('#update-banner-x').onclick = () => banner.remove();
 }
 
+/* ============ Calculadora en campos de monto ============
+ * Aparece al enfocar cualquier input[data-calc]. Tiene teclado propio
+ * (dígitos + operaciones + − × ÷) y escribe el resultado en el campo.
+ * Evaluación segura (sin eval): tokeniza y resuelve con shunting-yard.
+ */
+const _calc = { input: null, expr: '', pop: null };
+
+/** Evalúa una expresión aritmética (+ − × ÷ y decimales) sin usar eval(). */
+function _calcEval(expr) {
+  const s = String(expr).replace(/×/g, '*').replace(/÷/g, '/').replace(/[−–]/g, '-').replace(/\s+/g, '');
+  if (!s) return null;
+  // Tokenizar: números (con decimales) y operadores + - * /
+  const tokens = s.match(/(\d+\.?\d*|\.\d+|[+\-*/])/g);
+  if (!tokens) return null;
+  const prec = { '+': 1, '-': 1, '*': 2, '/': 2 };
+  const out = [], ops = [];
+  let prevTipo = 'op'; // para detectar signo unario
+  for (const t of tokens) {
+    if (/[0-9.]/.test(t[0])) { out.push(parseFloat(t)); prevTipo = 'num'; }
+    else {
+      // signo unario (ej: -5, o tras otro operador): tratar como 0 - n
+      if (t === '-' && prevTipo === 'op') out.push(0);
+      while (ops.length && prec[ops[ops.length - 1]] >= prec[t]) out.push(ops.pop());
+      ops.push(t);
+      prevTipo = 'op';
+    }
+  }
+  while (ops.length) out.push(ops.pop());
+  // Evaluar RPN
+  const st = [];
+  for (const tk of out) {
+    if (typeof tk === 'number') st.push(tk);
+    else {
+      const b = st.pop(), a = st.pop();
+      if (a === undefined || b === undefined) return null;
+      st.push(tk === '+' ? a + b : tk === '-' ? a - b : tk === '*' ? a * b : b === 0 ? NaN : a / b);
+    }
+  }
+  const r = st.pop();
+  return (typeof r === 'number' && isFinite(r)) ? r : null;
+}
+
+function _calcRender() {
+  if (!_calc.pop) return;
+  const r = _calcEval(_calc.expr);
+  _calc.pop.querySelector('#calc-expr').textContent = _calc.expr || '';
+  const val = r !== null ? r : (parseFloat(_calc.expr) || 0);
+  _calc.pop.querySelector('#calc-val').textContent =
+    (Math.round(val * 100) / 100).toLocaleString('es-AR', { maximumFractionDigits: 2 });
+}
+
+function _calcCrearPop() {
+  if (_calc.pop) return _calc.pop;
+  const pop = document.createElement('div');
+  pop.className = 'calc-pop';
+  pop.id = 'calc-pop';
+  pop.hidden = true;
+  pop.innerHTML = `
+    <div class="calc-display"><span class="calc-expr" id="calc-expr"></span><b class="calc-val" id="calc-val">0</b></div>
+    <div class="calc-keys">
+      <button type="button" class="calc-k calc-fn" data-k="C">C</button>
+      <button type="button" class="calc-k calc-fn" data-k="back">⌫</button>
+      <button type="button" class="calc-k calc-op" data-k="÷">÷</button>
+      <button type="button" class="calc-k calc-op" data-k="×">×</button>
+      <button type="button" class="calc-k" data-k="7">7</button>
+      <button type="button" class="calc-k" data-k="8">8</button>
+      <button type="button" class="calc-k" data-k="9">9</button>
+      <button type="button" class="calc-k calc-op" data-k="−">−</button>
+      <button type="button" class="calc-k" data-k="4">4</button>
+      <button type="button" class="calc-k" data-k="5">5</button>
+      <button type="button" class="calc-k" data-k="6">6</button>
+      <button type="button" class="calc-k calc-op" data-k="+">+</button>
+      <button type="button" class="calc-k" data-k="1">1</button>
+      <button type="button" class="calc-k" data-k="2">2</button>
+      <button type="button" class="calc-k" data-k="3">3</button>
+      <button type="button" class="calc-k" data-k=".">.</button>
+      <button type="button" class="calc-k calc-zero" data-k="0">0</button>
+      <button type="button" class="calc-k calc-apply" data-k="apply">✓ Aplicar</button>
+    </div>`;
+  document.body.appendChild(pop);
+  // Mousedown (no click) para no robar el foco antes de procesar
+  pop.addEventListener('mousedown', e => e.preventDefault());
+  pop.addEventListener('click', e => {
+    const b = e.target.closest('[data-k]'); if (!b) return;
+    _calcTecla(b.dataset.k);
+  });
+  _calc.pop = pop;
+  return pop;
+}
+
+function _calcTecla(k) {
+  if (k === 'apply') { _calcAplicar(); return; }
+  if (k === 'C') { _calc.expr = ''; _calc.fresh = false; _calcRender(); return; }
+  if (k === 'back') { _calc.expr = _calc.expr.slice(0, -1); _calc.fresh = false; _calcRender(); return; }
+  const esOp = /[+\-−×÷]/.test(k);
+  // Recién abierto con un valor precargado: el primer dígito/punto arranca de
+  // cero (reemplaza); un operador continúa desde el valor existente.
+  if (_calc.fresh) {
+    _calc.fresh = false;
+    if (!esOp) _calc.expr = '';
+  }
+  // Operadores: reemplazar el último si ya era operador
+  if (esOp && /[+\-−×÷]$/.test(_calc.expr)) _calc.expr = _calc.expr.slice(0, -1);
+  if (k === '.' ) {
+    // evitar dos puntos en el mismo número
+    const ult = _calc.expr.split(/[+\-−×÷]/).pop();
+    if (ult.includes('.')) return;
+    if (!ult) _calc.expr += '0';
+  }
+  _calc.expr += k;
+  _calcRender();
+}
+
+function _calcAplicar() {
+  const r = _calcEval(_calc.expr);
+  if (_calc.input) {
+    const val = r !== null ? r : parseFloat(_calc.expr);
+    if (isFinite(val)) {
+      _calc.input.value = Math.round(val * 100) / 100;
+      _calc.input.dispatchEvent(new Event('input', { bubbles: true }));
+      _calc.input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+  _calcCerrar();
+}
+
+function _calcPosicionar() {
+  if (!_calc.pop || !_calc.input) return;
+  const r = _calc.input.getBoundingClientRect();
+  const pop = _calc.pop;
+  pop.hidden = false;
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = Math.min(r.left, window.innerWidth - pw - 8);
+  left = Math.max(8, left);
+  // Preferir debajo; si no entra, arriba
+  let top = r.bottom + 6;
+  if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+}
+
+function _calcAbrir(input) {
+  _calcCrearPop();
+  _calc.input = input;
+  _calc.expr = (input.value && parseFloat(input.value)) ? String(input.value) : '';
+  _calc.fresh = !!_calc.expr;   // si precargó un valor, el 1er dígito reemplaza
+  // Evitar el teclado nativo mientras la calculadora está abierta
+  input.setAttribute('readonly', 'readonly');
+  input.blur();
+  _calcRender();
+  _calcPosicionar();
+}
+
+function _calcCerrar() {
+  if (_calc.pop) _calc.pop.hidden = true;
+  if (_calc.input) _calc.input.removeAttribute('readonly');
+  _calc.input = null; _calc.expr = '';
+}
+
+function initCalculadora() {
+  // Delegación: al tocar/enfocar un input[data-calc] abrimos la calculadora.
+  const abrirDesde = (e) => {
+    const t = e.target;
+    if (t && t.matches && t.matches('input[data-calc]') && (!_calc.input || _calc.input !== t)) {
+      _calcAbrir(t);
+    }
+  };
+  document.addEventListener('focusin', abrirDesde);
+  document.addEventListener('pointerdown', (e) => {
+    const t = e.target;
+    if (t && t.matches && t.matches('input[data-calc][readonly]')) {
+      // re-tap sobre el mismo input (ya readonly): reabrir
+      e.preventDefault(); _calcAbrir(t);
+    }
+  });
+  // Cerrar al tocar fuera
+  document.addEventListener('pointerdown', (e) => {
+    if (!_calc.input) return;
+    if (_calc.pop && _calc.pop.contains(e.target)) return;
+    if (e.target === _calc.input) return;
+    _calcCerrar();
+  }, true);
+  // Teclado físico maneja la calc cuando está abierta (desktop)
+  document.addEventListener('keydown', (e) => {
+    if (!_calc.input) return;
+    const k = e.key;
+    if (/[0-9.]/.test(k)) { _calcTecla(k); e.preventDefault(); }
+    else if (k === '+' ) { _calcTecla('+'); e.preventDefault(); }
+    else if (k === '-' ) { _calcTecla('−'); e.preventDefault(); }
+    else if (k === '*' ) { _calcTecla('×'); e.preventDefault(); }
+    else if (k === '/' ) { _calcTecla('÷'); e.preventDefault(); }
+    else if (k === 'Backspace') { _calcTecla('back'); e.preventDefault(); }
+    else if (k === 'Enter' || k === '=') { _calcTecla('apply'); e.preventDefault(); }
+    else if (k === 'Escape') { _calcCerrar(); e.preventDefault(); }
+  });
+  // Reposicionar al scrollear/resize
+  window.addEventListener('resize', () => { if (_calc.input) _calcPosicionar(); });
+  window.addEventListener('scroll', () => { if (_calc.input) _calcPosicionar(); }, true);
+}
+
 function iniciarChequeoActualizaciones() {
   if (_chequeoActIniciado) return;
   _chequeoActIniciado = true;
@@ -3049,16 +3249,93 @@ function openDialog(id, prefill = {}) {
   dlg.showModal();
 }
 
+/**
+ * Inicializa el wizard multi-paso del formulario de ingresos (espeja el de
+ * gastos). Paso 1: Concepto · Paso 2: Monto + fecha/período · Paso 3: Cuenta.
+ */
 function prepararDialogoIngreso(form) {
+  // ── Resetear el wizard al paso 1 ─────────────────────────────
+  const slides = form.querySelector('#ingreso-slides');
+  if (slides) { slides.dataset.current = '1'; slides.style.transition = 'none'; }
+  setTimeout(() => { if (slides) slides.style.transition = ''; }, 50);
+
+  // ── Defaults de fecha y período ──────────────────────────────
   const hoy = new Date().toISOString().slice(0, 10);
-  if (!form.elements.fecha?.value)               form.elements.fecha.value = hoy;
-  if (!form.elements.periodo_aplicacion?.value)  form.elements.periodo_aplicacion.value = hoy.slice(0, 7);
-  // Poblar select de cuentas
+  if (form.elements.fecha && !form.elements.fecha.value)              form.elements.fecha.value = hoy;
+  if (form.elements.periodo_aplicacion && !form.elements.periodo_aplicacion.value) form.elements.periodo_aplicacion.value = hoy.slice(0, 7);
+
+  // ── Poblar conceptos (categorías de ingreso) como chips ──────
+  const cats = state.ajustes?.catalogos?.categorias_ingreso?.length
+    ? state.ajustes.catalogos.categorias_ingreso
+    : (AJUSTES_DEFAULT.catalogos.categorias_ingreso);
+  const chipsWrap = form.querySelector('#chips-concepto-ingreso');
+  if (chipsWrap) {
+    chipsWrap.innerHTML = cats.map(c => `
+      <label class="cat-chip">
+        <input type="radio" name="concepto_quick" value="${escapeHtml(c.nombre)}">
+        <span>${escapeHtml(c.icono||'💰')}<br>${escapeHtml(c.nombre)}</span>
+      </label>`).join('');
+  }
+
+  // ── Poblar select de cuentas ─────────────────────────────────
   const cuentasI = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
   for (const sel of form.querySelectorAll('select[name="cuenta_id"]')) {
     sel.innerHTML = `<option value="">Sin cuenta</option>` +
       cuentasI.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
   }
+
+  // ── Navegación del wizard ────────────────────────────────────
+  let pasoActual = 1;
+  const backBtn = form.querySelector('#ingreso-btn-back');
+  const irAPaso = (paso) => {
+    pasoActual = paso;
+    if (slides) slides.dataset.current = String(paso);
+    form.querySelectorAll('.gasto-step-dot').forEach(d => {
+      const n = parseInt(d.dataset.step);
+      d.classList.toggle('active', n === paso);
+      d.classList.toggle('done', n < paso);
+    });
+    form.querySelectorAll('.gasto-step-line').forEach((l, i) => l.classList.toggle('done', i < paso - 1));
+    if (backBtn) backBtn.hidden = paso === 1;
+    setTimeout(() => {
+      const slide = form.querySelector(`.gasto-slide[data-slide="${paso}"]`);
+      slide?.querySelector('input:not([type=hidden]):not([data-calc])')?.focus?.();
+    }, 380);
+  };
+  if (backBtn) backBtn.onclick = () => irAPaso(Math.max(1, pasoActual - 1));
+  irAPaso(1);
+
+  // ── PASO 1: elegir concepto y avanzar ────────────────────────
+  const conceptoInput = form.querySelector('#inp-concepto-ingreso');
+  const setConcepto = (nombre, icono) => {
+    if (conceptoInput) conceptoInput.value = nombre;
+    const badge = form.querySelector('#ingreso-badge-concepto');
+    if (badge) badge.textContent = `${icono || '💰'} ${nombre}`.trim();
+  };
+  form.querySelectorAll('input[name="concepto_quick"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const cat = cats.find(c => c.nombre === r.value);
+      setConcepto(r.value, cat?.icono || '💰');
+      setTimeout(() => irAPaso(2), 260);
+    });
+  });
+  if (conceptoInput) conceptoInput.oninput = e => setConcepto(e.target.value, '💰');
+
+  const next1 = form.querySelector('#ingreso-next-1');
+  if (next1) next1.onclick = () => {
+    if (!conceptoInput?.value?.trim()) { toast('Elegí o escribí un concepto', 2000); return; }
+    irAPaso(2);
+  };
+
+  // ── PASO 2: validar monto → paso 3 ───────────────────────────
+  const next2 = form.querySelector('#ingreso-next-2');
+  if (next2) next2.onclick = () => {
+    const monto = parseFloat(form.querySelector('[name="sueldo_neto"]')?.value || '0');
+    if (!monto) { toast('Ingresá el monto recibido', 2000); return; }
+    const badge = form.querySelector('#ingreso-badge-monto');
+    if (badge) badge.textContent = new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:0 }).format(monto);
+    irAPaso(3);
+  };
 }
 
 /**
@@ -6456,6 +6733,9 @@ async function init() {
 
   // Chequeo periódico de actualizaciones (cada 10 min si la app está visible)
   iniciarChequeoActualizaciones();
+
+  // Calculadora emergente en los campos de monto (input[data-calc])
+  initCalculadora();
 
   // Nota: la app funciona en cualquier orientación (vertical y horizontal). No
   // forzamos rotación — eso rompía el táctil al girar. La orientación la decide

@@ -1127,7 +1127,7 @@
             <div class="input-with-prefix gasto-monto-row">
               <span class="input-prefix" id="gasto-moneda-prefix">$</span>
               <input name="monto" required type="number" step="0.01" placeholder="0"
-                     class="input input-lg gasto-monto-big" data-bind-gasto="monto" />
+                     class="input input-lg gasto-monto-big" data-bind-gasto="monto" data-calc inputmode="decimal" />
               <select class="currency-selector" id="gasto-moneda-sel"
                       onchange="document.getElementById('hid-moneda-gasto').value=this.value;window._gsActualizarCotiz?.()">
                 <option value="ARS">ARS</option><option value="USD">USD</option>
@@ -1219,82 +1219,108 @@
   </form>
 </dialog>
 
-<!-- Ingreso -->
+<!-- Ingreso (wizard de 3 pasos, igual que el de gastos) -->
 <dialog id="dlg-ingreso">
-  <form method="dialog" class="form-modern" style="min-width:min(94vw,420px);max-width:460px">
+  <form method="dialog" class="gasto-wizard" style="min-width:min(96vw,440px);max-width:460px">
     <input type="hidden" name="_editing_id" />
-    <div class="form-modern-header">
-      <div class="form-modern-icon" style="background:linear-gradient(135deg,#10b981,#00f0ff)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
-        </svg>
+
+    <!-- ── Header con stepper ── -->
+    <div class="gasto-wizard-header">
+      <button type="button" id="ingreso-btn-back" class="gasto-back-btn" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="gasto-stepper">
+        <div class="gasto-step-dot active" data-step="1"></div>
+        <div class="gasto-step-line"></div>
+        <div class="gasto-step-dot"       data-step="2"></div>
+        <div class="gasto-step-line"></div>
+        <div class="gasto-step-dot"       data-step="3"></div>
       </div>
-      <div>
-        <h3 class="ff-display text-xl font-bold tracking-tight">Nuevo ingreso</h3>
-        <p class="text-xs" style="color:var(--ink-muted)">Registrá lo que recibiste</p>
-      </div>
+      <button type="button" value="cancel" formnovalidate
+        style="background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:.75rem;padding:.25rem .4rem"
+        onclick="this.closest('dialog').close()">✕</button>
     </div>
-    <div class="form-modern-body ingreso-form-simple">
 
-      <!-- Qué fue -->
-      <div class="form-section">
-        <label class="form-label">Concepto</label>
-        <input name="descripcion" placeholder="Ej: Sueldo, Freelance, Venta…" class="input input-lg" value="" autocomplete="off" />
-      </div>
+    <!-- ── Ventana deslizante ── -->
+    <div class="gasto-slides-wrap">
+      <div class="gasto-slides" id="ingreso-slides">
 
-      <!-- Monto neto grande + fecha -->
-      <div class="form-section" style="text-align:center">
-        <label class="form-label" style="text-align:left">Monto recibido (neto)</label>
-        <div class="input-with-prefix" style="margin-top:.25rem">
-          <span class="input-prefix">$</span>
-          <input name="sueldo_neto" required type="number" step="0.01" placeholder="0" class="input input-lg" style="font-size:1.4rem;font-weight:700" />
-        </div>
-      </div>
-
-      <!-- Fecha y período -->
-      <div class="grid grid-cols-2 gap-3">
-        <div class="form-section">
-          <label class="form-label">Fecha</label>
-          <input name="fecha" required type="date" class="input" />
-        </div>
-        <div class="form-section">
-          <label class="form-label">Período</label>
-          <input name="periodo_aplicacion" required type="month" class="input" />
-        </div>
-      </div>
-
-      <!-- Cuenta -->
-      <div class="form-section">
-        <label class="form-label">Cuenta acreditada</label>
-        <select name="cuenta_id" class="input">
-          <option value="">Sin cuenta</option>
-        </select>
-      </div>
-
-      <!-- Opciones avanzadas colapsadas -->
-      <details class="form-collapse">
-        <summary>Desglose (bruto / descuentos / bonos)</summary>
-        <div class="grid grid-cols-3 gap-2 mt-3">
-          <div>
-            <label class="form-label">Bruto</label>
-            <input name="sueldo_bruto" type="number" step="0.01" placeholder="0" class="input" />
+        <!-- PASO 1: Concepto -->
+        <div class="gasto-slide" data-slide="1">
+          <div class="gasto-slide-title">¿De dónde viene?</div>
+          <div class="chip-row chip-row-big" id="chips-concepto-ingreso">
+            <!-- Se renderiza desde las categorías de ingreso del usuario -->
           </div>
-          <div>
-            <label class="form-label">Descuentos</label>
-            <input name="descuentos" type="number" step="0.01" placeholder="0" class="input" />
-          </div>
-          <div>
-            <label class="form-label">Bonos</label>
-            <input name="bonos" type="number" step="0.01" placeholder="0" class="input" />
-          </div>
+          <input name="descripcion" id="inp-concepto-ingreso" placeholder="Otro concepto…" class="input mt-3"
+                 autocomplete="off" style="font-size:.9rem" />
+          <button type="button" id="ingreso-next-1" class="btn-primary w-full mt-4">Siguiente →</button>
         </div>
-      </details>
 
-    </div>
-    <div class="form-modern-footer">
-      <button value="cancel" formnovalidate class="btn-secondary flex-1">Cancelar</button>
-      <button value="save" class="btn-primary flex-1">✓ Guardar</button>
-    </div>
+        <!-- PASO 2: Monto + fecha + período -->
+        <div class="gasto-slide" data-slide="2">
+          <div class="gasto-slide-badge" id="ingreso-badge-concepto">💼 Sueldo</div>
+          <div class="gasto-slide-title">¿Cuánto recibiste?</div>
+          <div class="form-section">
+            <label class="form-label">Monto neto</label>
+            <div class="input-with-prefix gasto-monto-row">
+              <span class="input-prefix">$</span>
+              <input name="sueldo_neto" required type="number" step="0.01" placeholder="0"
+                     class="input input-lg gasto-monto-big" data-calc inputmode="decimal" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-section">
+              <label class="form-label">Fecha</label>
+              <input name="fecha" required type="date" class="input" id="inp-fecha-ingreso" />
+            </div>
+            <div class="form-section">
+              <label class="form-label">Período</label>
+              <input name="periodo_aplicacion" required type="month" class="input" id="inp-periodo-ingreso" />
+            </div>
+          </div>
+          <button type="button" id="ingreso-next-2" class="btn-primary w-full mt-1">Siguiente →</button>
+        </div>
+
+        <!-- PASO 3: Cuenta + desglose + guardar -->
+        <div class="gasto-slide" data-slide="3">
+          <div class="gasto-slide-badge" id="ingreso-badge-monto">$ 0</div>
+          <div class="gasto-slide-title">¿Dónde se acreditó?</div>
+          <div class="form-section">
+            <label class="form-label">Cuenta acreditada</label>
+            <select name="cuenta_id" class="input" id="sel-cuenta-ingreso">
+              <option value="">Sin cuenta</option>
+            </select>
+          </div>
+
+          <details class="form-collapse">
+            <summary>Desglose (bruto / descuentos / bonos)</summary>
+            <div class="grid grid-cols-3 gap-2 mt-3">
+              <div>
+                <label class="form-label">Bruto</label>
+                <input name="sueldo_bruto" type="number" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
+              </div>
+              <div>
+                <label class="form-label">Descuentos</label>
+                <input name="descuentos" type="number" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
+              </div>
+              <div>
+                <label class="form-label">Bonos</label>
+                <input name="bonos" type="number" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
+              </div>
+            </div>
+          </details>
+
+          <!-- Guardar -->
+          <button value="save" class="btn-primary w-full mt-4" style="font-size:1rem;padding:.8rem">
+            ✓ Guardar ingreso
+          </button>
+          <button value="cancel" type="button" formnovalidate
+                  style="display:block;width:100%;margin-top:.5rem;background:none;border:none;color:var(--ink-muted);font-size:.8rem;cursor:pointer;padding:.3rem"
+                  onclick="this.closest('dialog').close()">Cancelar</button>
+        </div>
+
+      </div><!-- /.gasto-slides -->
+    </div><!-- /.gasto-slides-wrap -->
   </form>
 </dialog>
 
@@ -1395,14 +1421,14 @@
           <label class="form-label">Límite 1 pago</label>
           <div class="input-with-prefix">
             <span class="input-prefix">$</span>
-            <input name="limite_un_pago" type="number" step="0.01" placeholder="0" class="input input-lg" />
+            <input name="limite_un_pago" type="number" step="0.01" placeholder="0" class="input input-lg" / data-calc inputmode="decimal">
           </div>
         </div>
         <div class="form-section">
           <label class="form-label">Límite en cuotas</label>
           <div class="input-with-prefix">
             <span class="input-prefix">$</span>
-            <input name="limite_cuotas" type="number" step="0.01" placeholder="0" class="input input-lg" />
+            <input name="limite_cuotas" type="number" step="0.01" placeholder="0" class="input input-lg" / data-calc inputmode="decimal">
           </div>
         </div>
       </div>
@@ -1597,7 +1623,7 @@
         <label class="form-label">Saldo inicial</label>
         <div class="input-with-prefix">
           <span class="input-prefix">$</span>
-          <input name="saldo_inicial" type="number" step="0.01" placeholder="0" class="input input-lg" value="0" />
+          <input name="saldo_inicial" type="number" step="0.01" placeholder="0" class="input input-lg" value="0" / data-calc inputmode="decimal">
         </div>
         <p class="text-[10px] mt-1" style="color:var(--ink-muted)">
           Monto actual en la cuenta. Se ajusta automáticamente con cada movimiento.
@@ -1808,14 +1834,14 @@
           <label class="form-label">Objetivo total</label>
           <div class="input-with-prefix">
             <span class="input-prefix">$</span>
-            <input name="monto_objetivo" required type="number" step="0.01" placeholder="0" class="input input-lg" id="meta-obj" />
+            <input name="monto_objetivo" required type="number" step="0.01" placeholder="0" class="input input-lg" id="meta-obj" / data-calc inputmode="decimal">
           </div>
         </div>
         <div class="form-section">
           <label class="form-label">Ya ahorrado</label>
           <div class="input-with-prefix">
             <span class="input-prefix">$</span>
-            <input name="monto_actual" type="number" step="0.01" placeholder="0" class="input input-lg" value="0" id="meta-act" />
+            <input name="monto_actual" type="number" step="0.01" placeholder="0" class="input input-lg" value="0" id="meta-act" / data-calc inputmode="decimal">
           </div>
         </div>
       </div>
