@@ -319,66 +319,34 @@ function initCalculadora() {
   });
 }
 
-/* ============ Forzar VERTICAL en el móvil (nunca rotar) ============
- * El objetivo es SIEMPRE portrait en teléfonos (no congelar la de carga).
- *  - Android/Chromium: screen.orientation.lock('portrait') → lock real del SO.
- *  - iOS (sin lock): si el teléfono está apaisado, se marca html[data-orient-lock]
- *    con el ángulo y el CSS contra-rota para que el contenido quede vertical.
- *  - Sólo aplica en teléfonos (táctil + pantalla chica): tablets/desktop quedan
- *    libres.
+/* ============ Lock de orientación (solo NATIVO, sin contra-rotar) ============
+ * Pedimos al SO bloquear en vertical con screen.orientation.lock('portrait').
+ *  - Android instalado/fullscreen: lock real, apaga el sensor.
+ *  - iOS / navegador sin permiso de lock: se IGNORA y la app sigue funcionando
+ *    en cualquier orientación (responsive).
+ * NO contra-rotamos por CSS: el transform sobre body/dialog rompía el render y
+ * el táctil en iOS. El lock real solo es posible de forma nativa (ver Capacitor).
  */
-function _orientAngulo() {
-  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
-  // Fallback WebKit viejo: window.orientation usa convención INVERTIDA respecto
-  // a screen.orientation.angle, así que negamos para no intercambiar 90/270.
-  if (typeof window.orientation === 'number') return (((-window.orientation) % 360) + 360) % 360;
-  return 0;
-}
-
-/** ¿Es un teléfono (donde forzamos vertical)? Táctil + lado corto chico. */
-function _esTelefono() {
-  try {
-    const coarse = window.matchMedia('(pointer: coarse)').matches;
-    const corto = Math.min(screen.width || 9999, screen.height || 9999);
-    return coarse && corto <= 500;
-  } catch { return false; }
-}
-
 function bloquearOrientacion() {
+  // Limpieza de versiones previas que contra-rotaban.
+  delete document.documentElement.dataset.orientLock;
   const intentarLock = () => {
-    if (!_esTelefono()) return;
     try {
       if (screen.orientation && typeof screen.orientation.lock === 'function') {
-        screen.orientation.lock('portrait').catch(() => {});   // SIEMPRE vertical
+        screen.orientation.lock('portrait').catch(() => {});
       }
     } catch {}
   };
-  const recalcular = () => { intentarLock(); _compensarOrientacion(); };
-
-  recalcular();
-  document.addEventListener('fullscreenchange', recalcular);
-  window.addEventListener('orientationchange', recalcular);
-  window.addEventListener('resize', _compensarOrientacion);
+  intentarLock();
+  document.addEventListener('fullscreenchange', intentarLock);
+  window.addEventListener('orientationchange', intentarLock);
   if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
-    screen.orientation.addEventListener('change', recalcular);
+    screen.orientation.addEventListener('change', intentarLock);
   }
-  // Re-asegurar el lock al volver a la app (Android a veces lo suelta).
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') recalcular();
+    if (document.visibilityState === 'visible') intentarLock();
   });
-  window.addEventListener('focus', recalcular);
-  window.addEventListener('pageshow', recalcular);
-}
-
-/** En teléfono: si está apaisado (o cabeza abajo) marca html[data-orient-lock]
- *  con el ángulo para que el CSS contra-rote a vertical. Objetivo = portrait
- *  (angle 0), así que el delta es directamente el ángulo actual. */
-function _compensarOrientacion() {
-  const el = document.documentElement;
-  if (!_esTelefono()) { delete el.dataset.orientLock; return; }
-  const delta = ((_orientAngulo() % 360) + 360) % 360;
-  if (delta === 90 || delta === 180 || delta === 270) el.dataset.orientLock = String(delta);
-  else delete el.dataset.orientLock;
+  window.addEventListener('focus', intentarLock);
 }
 
 function iniciarChequeoActualizaciones() {
