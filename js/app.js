@@ -223,20 +223,10 @@ function _calcTecla(k) {
   _calcRender();
 }
 
-function _calcAplicar() {
-  const r = _calcEval(_calc.expr);
-  if (_calc.input) {
-    const val = r !== null ? r : parseFloat(_calc.expr);
-    if (isFinite(val)) {
-      _calc.input.value = Math.round(val * 100) / 100;
-      _calc.input.dispatchEvent(new Event('input', { bubbles: true }));
-      _calc.input.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }
-  _calcCerrar();
-}
+function _calcAplicar() { _calcCerrar(true); }
 
 function _calcAbrir(input) {
+  if (_calc.input && _calc.input !== input) _calcCerrar(true); // confirmar el anterior
   _calcCrearPop();
   // Insertar el teclado INLINE, justo después del bloque del campo (form-section
   // o la fila del input). Queda en el flujo del formulario: no se superpone,
@@ -257,10 +247,38 @@ function _calcAbrir(input) {
   setTimeout(() => { try { _calc.pop.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {} }, 60);
 }
 
-function _calcCerrar() {
+/** Vuelca el valor calculado al campo, sin cerrar la calculadora. */
+function _calcCommit() {
+  if (!_calc.input) return;
+  const r = _calcEval(_calc.expr);
+  const val = r !== null ? r : parseFloat(_calc.expr);
+  if (isFinite(val)) {
+    _calc.input.value = Math.round(val * 100) / 100;
+    _calc.input.dispatchEvent(new Event('input', { bubbles: true }));
+    _calc.input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+/** Cierra la calculadora. commit=true confirma el valor (Aplicar / cambio de
+ *  paso / cambio de campo); commit=false descarta (Escape). */
+function _calcCerrar(commit = false) {
+  if (commit) _calcCommit();
   if (_calc.pop) _calc.pop.hidden = true;
   if (_calc.input) _calc.input.removeAttribute('readonly');
   _calc.input = null; _calc.expr = '';
+}
+
+/**
+ * Enfoca el primer campo de un slide del wizard. Si ese primer campo es de
+ * monto (input[data-calc]), abre la calculadora automáticamente — así al pasar
+ * a la sección del monto el teclado ya aparece abierto, sin tocar nada.
+ */
+function _autoFocusSlide(slide) {
+  if (!slide) return;
+  const first = slide.querySelector('input:not([type=hidden]), select, textarea');
+  if (!first) return;
+  if (first.matches && first.matches('input[data-calc]')) _calcAbrir(first);
+  else first.focus?.();
 }
 
 function initCalculadora() {
@@ -279,12 +297,13 @@ function initCalculadora() {
       e.preventDefault(); _calcAbrir(t);
     }
   });
-  // Cerrar al tocar fuera
+  // Tocar fuera CONFIRMA el valor sin cerrar (no se pierde lo escrito ni se
+  // mueve el layout antes del tap; la calc se cierra al cambiar de paso/campo).
   document.addEventListener('pointerdown', (e) => {
     if (!_calc.input) return;
     if (_calc.pop && _calc.pop.contains(e.target)) return;
     if (e.target === _calc.input) return;
-    _calcCerrar();
+    _calcCommit();
   }, true);
   // Teclado físico maneja la calc cuando está abierta (desktop)
   document.addEventListener('keydown', (e) => {
@@ -3315,6 +3334,7 @@ function prepararDialogoIngreso(form) {
   let pasoActual = 1;
   const backBtn = form.querySelector('#ingreso-btn-back');
   const irAPaso = (paso) => {
+    if (_calc.input) _calcCerrar(true);   // cerrar la calc al cambiar de sección
     pasoActual = paso;
     if (slides) slides.dataset.current = String(paso);
     form.querySelectorAll('.gasto-step-dot').forEach(d => {
@@ -3324,10 +3344,7 @@ function prepararDialogoIngreso(form) {
     });
     form.querySelectorAll('.gasto-step-line').forEach((l, i) => l.classList.toggle('done', i < paso - 1));
     if (backBtn) backBtn.hidden = paso === 1;
-    setTimeout(() => {
-      const slide = form.querySelector(`.gasto-slide[data-slide="${paso}"]`);
-      slide?.querySelector('input:not([type=hidden]):not([data-calc])')?.focus?.();
-    }, 380);
+    setTimeout(() => _autoFocusSlide(form.querySelector(`.gasto-slide[data-slide="${paso}"]`)), 380);
   };
   if (backBtn) backBtn.onclick = () => irAPaso(Math.max(1, pasoActual - 1));
   irAPaso(1);
@@ -3408,6 +3425,7 @@ function prepararDialogoGasto(form) {
   const backBtn = form.querySelector('#gasto-btn-back');
 
   const irAPaso = (paso, dir = 1) => {
+    if (_calc.input) _calcCerrar(true);   // cerrar la calc al cambiar de sección
     pasoActual = paso;
     if (slides) slides.dataset.current = String(paso);
     // Stepper dots

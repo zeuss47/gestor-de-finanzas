@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.56",
-    "build":  73,
-    "modified":  "2026-06-03T14:11:54Z",
-    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js, tests/_shots/calc_inline.png, te...",
-    "notes":  "Auto-update 2026-06-03 11:11"
+    "version":  "1.57",
+    "build":  74,
+    "modified":  "2026-06-03T14:50:50Z",
+    "commit":  "M js/app.js, tests/_shots/calc_auto.png",
+    "notes":  "Auto-update 2026-06-03 11:50"
 }
