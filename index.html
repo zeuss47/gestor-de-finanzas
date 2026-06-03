@@ -1139,7 +1139,7 @@
               </div>
               <div class="input-with-prefix">
                 <span class="input-prefix" id="gasto-moneda-prefix">$</span>
-                <input name="monto" required type="number" step="0.01" placeholder="0"
+                <input name="monto" required type="text" step="0.01" placeholder="0"
                        class="input input-lg gasto-monto-big" data-bind-gasto="monto" data-calc inputmode="decimal" />
               </div>
             </div>
@@ -1176,14 +1176,16 @@
 
           <!-- Cuenta -->
           <div id="pago-cuenta-wrap" style="margin-top:.6rem">
-            <select name="cuenta_id" class="input" id="sel-cuenta-gasto">
+            <div id="chips-cuenta-gasto" class="pago-chips"></div>
+            <select name="cuenta_id" class="input" id="sel-cuenta-gasto" hidden>
               <option value="">Sin cuenta específica</option>
             </select>
           </div>
 
           <!-- Tarjeta crédito -->
           <div id="pago-credito-wrap" hidden style="margin-top:.6rem">
-            <select name="tarjeta_id_simple" class="input" id="sel-tarjeta-simple">
+            <div id="chips-tarjeta-gasto" class="pago-chips" style="margin-bottom:.65rem"></div>
+            <select name="tarjeta_id_simple" class="input" id="sel-tarjeta-simple" hidden>
               <option value="">Elegir tarjeta…</option>
             </select>
             <!-- Cuotas -->
@@ -1275,7 +1277,7 @@
               <label class="form-label">Monto neto</label>
               <div class="input-with-prefix gasto-monto-row">
                 <span class="input-prefix">$</span>
-                <input name="sueldo_neto" required type="number" step="0.01" placeholder="0"
+                <input name="sueldo_neto" required type="text" step="0.01" placeholder="0"
                        class="input input-lg gasto-monto-big" data-calc inputmode="decimal" />
               </div>
             </div>
@@ -1297,7 +1299,8 @@
           <div class="gasto-slide-title">¿Dónde se acreditó?</div>
           <div class="form-section">
             <label class="form-label">Cuenta acreditada</label>
-            <select name="cuenta_id" class="input" id="sel-cuenta-ingreso">
+            <div id="chips-cuenta-ingreso" class="pago-chips"></div>
+            <select name="cuenta_id" class="input" id="sel-cuenta-ingreso" hidden>
               <option value="">Sin cuenta</option>
             </select>
           </div>
@@ -1307,15 +1310,15 @@
             <div class="grid grid-cols-3 gap-2 mt-3">
               <div>
                 <label class="form-label">Bruto</label>
-                <input name="sueldo_bruto" type="number" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
+                <input name="sueldo_bruto" type="text" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
               </div>
               <div>
                 <label class="form-label">Descuentos</label>
-                <input name="descuentos" type="number" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
+                <input name="descuentos" type="text" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
               </div>
               <div>
                 <label class="form-label">Bonos</label>
-                <input name="bonos" type="number" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
+                <input name="bonos" type="text" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
               </div>
             </div>
           </details>
@@ -1431,14 +1434,14 @@
           <label class="form-label">Límite 1 pago</label>
           <div class="input-with-prefix">
             <span class="input-prefix">$</span>
-            <input name="limite_un_pago" type="number" step="0.01" placeholder="0" class="input input-lg" / data-calc inputmode="decimal">
+            <input name="limite_un_pago" type="text" step="0.01" placeholder="0" class="input input-lg" data-calc inputmode="decimal">
           </div>
         </div>
         <div class="form-section">
           <label class="form-label">Límite en cuotas</label>
           <div class="input-with-prefix">
             <span class="input-prefix">$</span>
-            <input name="limite_cuotas" type="number" step="0.01" placeholder="0" class="input input-lg" / data-calc inputmode="decimal">
+            <input name="limite_cuotas" type="text" step="0.01" placeholder="0" class="input input-lg" data-calc inputmode="decimal">
           </div>
         </div>
       </div>
@@ -1633,7 +1636,7 @@
         <label class="form-label">Saldo inicial</label>
         <div class="input-with-prefix">
           <span class="input-prefix">$</span>
-          <input name="saldo_inicial" type="number" step="0.01" placeholder="0" class="input input-lg" value="0" / data-calc inputmode="decimal">
+          <input name="saldo_inicial" type="text" step="0.01" placeholder="0" class="input input-lg" value="0" data-calc inputmode="decimal">
         </div>
         <p class="text-[10px] mt-1" style="color:var(--ink-muted)">
           Monto actual en la cuenta. Se ajusta automáticamente con cada movimiento.
@@ -1844,14 +1847,14 @@
           <label class="form-label">Objetivo total</label>
           <div class="input-with-prefix">
             <span class="input-prefix">$</span>
-            <input name="monto_objetivo" required type="number" step="0.01" placeholder="0" class="input input-lg" id="meta-obj" / data-calc inputmode="decimal">
+            <input name="monto_objetivo" required type="text" step="0.01" placeholder="0" class="input input-lg" id="meta-obj" data-calc inputmode="decimal">
           </div>
         </div>
         <div class="form-section">
           <label class="form-label">Ya ahorrado</label>
           <div class="input-with-prefix">
             <span class="input-prefix">$</span>
-            <input name="monto_actual" type="number" step="0.01" placeholder="0" class="input input-lg" value="0" id="meta-act" / data-calc inputmode="decimal">
+            <input name="monto_actual" type="text" step="0.01" placeholder="0" class="input input-lg" value="0" id="meta-act" data-calc inputmode="decimal">
           </div>
         </div>
       </div>

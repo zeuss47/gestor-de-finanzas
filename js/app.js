@@ -153,14 +153,10 @@ function _calcEval(expr) {
 }
 
 function _calcRender() {
-  if (!_calc.pop) return;
-  const r = _calcEval(_calc.expr);
-  _calc.pop.querySelector('#calc-expr').textContent = _calc.expr || '';
-  const val = r !== null ? r : (parseFloat(_calc.expr) || 0);
-  const num = Math.round(val * 100) / 100;
-  _calc.pop.querySelector('#calc-val').textContent = num.toLocaleString('es-AR', { maximumFractionDigits: 2 });
-  // Integrar EN VIVO el número en el campo de monto final (no sólo al Aplicar).
-  if (_calc.input) _calc.input.value = _calc.expr ? num : '';
+  // La CAJA DE MONTO es el display de la calculadora: muestra el cálculo en
+  // vivo (ej. "12000+350"). No hay display separado → no se duplica el número.
+  // Al confirmar (_calcCommit) la caja pasa a mostrar el resultado numérico.
+  if (_calc.input) _calc.input.value = _calc.expr;
 }
 
 function _calcCrearPop() {
@@ -170,7 +166,6 @@ function _calcCrearPop() {
   pop.id = 'calc-pop';
   pop.hidden = true;
   pop.innerHTML = `
-    <div class="calc-display"><span class="calc-expr" id="calc-expr"></span><b class="calc-val" id="calc-val">0</b></div>
     <div class="calc-keys">
       <button type="button" class="calc-k calc-fn" data-k="C">C</button>
       <button type="button" class="calc-k calc-fn" data-k="back">⌫</button>
@@ -278,10 +273,11 @@ function _calcCerrar(commit = false) {
  */
 function _autoFocusSlide(slide) {
   if (!slide) return;
-  const first = slide.querySelector('input:not([type=hidden]), select, textarea');
-  if (!first) return;
-  if (first.matches && first.matches('input[data-calc]')) _calcAbrir(first);
-  else first.focus?.();
+  // Si el slide tiene un campo de monto, abrir la calculadora por defecto
+  // (queda visible apenas se entra a la sección, sin tocar el cuadro).
+  const calcInput = slide.querySelector('input[data-calc]');
+  if (calcInput) { _calcAbrir(calcInput); return; }
+  slide.querySelector('input:not([type=hidden]), select, textarea')?.focus?.();
 }
 
 function initCalculadora() {
@@ -3358,12 +3354,16 @@ function prepararDialogoIngreso(form) {
       </label>`).join('');
   }
 
-  // ── Poblar select de cuentas ─────────────────────────────────
+  // ── Poblar select de cuentas + chips (aparecen solas) ────────
   const cuentasI = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
   for (const sel of form.querySelectorAll('select[name="cuenta_id"]')) {
     sel.innerHTML = `<option value="">Sin cuenta</option>` +
       cuentasI.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
   }
+  const selCuentaIng = form.querySelector('#sel-cuenta-ingreso');
+  _renderPagoChips(form.querySelector('#chips-cuenta-ingreso'),
+    cuentasI.map(c => ({ id:c.id, nombre:c.nombre, icono:'🏦', color:c.color })),
+    selCuentaIng, { id:'', nombre:'Sin cuenta', icono:'∅' });
 
   // ── Navegación del wizard ────────────────────────────────────
   let pasoActual = 1;
@@ -3415,6 +3415,35 @@ function prepararDialogoIngreso(form) {
     if (badge) badge.textContent = new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:0 }).format(monto);
     irAPaso(3);
   };
+}
+
+/**
+ * Renderiza una lista (cuentas/tarjetas) como chips tappables que setean un
+ * <select> oculto y disparan su 'change' (para que se mantengan ciclo/cuotas).
+ * Así al entrar al tab de pago las opciones aparecen solas (sin abrir dropdown).
+ * @param none  {id,nombre,icono} opcional para una opción "ninguna" (ej. Efectivo).
+ */
+function _renderPagoChips(container, items, sel, none) {
+  if (!container || !sel) return;
+  const cur = sel.value || '';
+  const chip = (val, label, icon, color) =>
+    `<button type="button" class="pago-chip${cur === val ? ' active' : ''}" data-val="${escapeHtml(val)}"
+        ${color ? `style="--chip:${color}"` : ''}>
+        ${icon ? `<span class="pago-chip-ic">${icon}</span>` : ''}${escapeHtml(label)}
+     </button>`;
+  let html = none ? chip(none.id, none.nombre, none.icono || '', '') : '';
+  html += items.map(i => chip(i.id, i.nombre, i.icono || '', i.color || '')).join('');
+  if (!items.length && !none) {
+    html = `<p class="text-xs" style="color:var(--ink-muted)">No hay opciones. Creá una en Ajustes.</p>`;
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('.pago-chip').forEach(b => {
+    b.onclick = () => {
+      sel.value = b.dataset.val;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      container.querySelectorAll('.pago-chip').forEach(x => x.classList.toggle('active', x === b));
+    };
+  });
 }
 
 /**
@@ -3539,6 +3568,9 @@ function prepararDialogoGasto(form) {
   const wrapCredito= form.querySelector('#pago-credito-wrap');
   const hidMetodo  = form.querySelector('#hid-metodo-pago');
 
+  const chipsCuenta = form.querySelector('#chips-cuenta-gasto');
+  const chipsTarj   = form.querySelector('#chips-tarjeta-gasto');
+
   const activarTab = (tab) => {
     tabCuenta?.classList.toggle('active',  tab === 'cuenta');
     tabCredito?.classList.toggle('active', tab === 'credito');
@@ -3547,9 +3579,13 @@ function prepararDialogoGasto(form) {
     if (hidMetodo) hidMetodo.value = tab === 'credito' ? 'credito' : 'efectivo';
     if (tab === 'credito') {
       form.querySelector('#hid-tipo-gasto').value = 'unico';
+      // Mostrar las TARJETAS automáticamente como chips al entrar al tab
+      _renderPagoChips(chipsTarj, tarjetas.map(t => ({ id:t.id, nombre:t.nombre, icono:'💳', color:t.color })), selTarj, null);
       _gsActualizarCicloTarjeta(form);
     } else {
       form.querySelector('#hid-tipo-gasto').value = 'unico';
+      // Mostrar las CUENTAS automáticamente como chips al entrar al tab
+      _renderPagoChips(chipsCuenta, cuentas.map(c => ({ id:c.id, nombre:c.nombre, icono:'🏦', color:c.color })), selCuenta, { id:'', nombre:'Efectivo', icono:'💵' });
       const ci = form.querySelector('#ciclo-info'); if (ci) ci.hidden = true;
     }
   };

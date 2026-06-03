@@ -4792,3 +4792,21 @@ html[data-orient-lock] dialog::backdrop { background: rgba(0, 0, 0, .55); }
   text-transform: uppercase; letter-spacing: .05em; font-size: .9rem;
 }
 .calc-k.calc-zero { grid-column: span 2; }
+
+/* Chips de cuenta/tarjeta en el paso "¿Cómo pagás?" (aparecen automáticamente) */
+.pago-chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+.pago-chip {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .55rem .75rem; border-radius: .65rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--ink); font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: transform .1s, border-color .15s, background .15s;
+}
+.pago-chip .pago-chip-ic { font-size: .95rem; line-height: 1; }
+.pago-chip.active {
+  border-color: var(--chip, var(--brand));
+  background: color-mix(in srgb, var(--chip, var(--brand)) 16%, transparent);
+  color: var(--chip, var(--brand));
+  box-shadow: 0 0 0 1px var(--chip, var(--brand)) inset;
+}
+.pago-chip:active { transform: scale(.95); }
