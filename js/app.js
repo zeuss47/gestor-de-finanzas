@@ -320,40 +320,55 @@ function initCalculadora() {
   });
 }
 
-/* ============ Forzar orientación vertical ============
- * En Android: screen.orientation.lock('portrait') bloquea de verdad.
- * En iOS (no soporta lock): la contra-rotación CSS endereza el contenido. El
- * sentido lo marca _marcarSentidoGiro en <html data-orient> según el ángulo,
- * recalculado en cada cambio para que SIEMPRE quede derecho (sin el 180° viejo).
+/* ============ Bloqueo de orientación (tipo SCREEN_ORIENTATION_LOCKED) ============
+ * Congela la orientación con la que se ABRIÓ la app y apaga el sensor de giro.
+ *  - Android/Chromium: screen.orientation.lock(tipo_inicial) → lock real.
+ *  - iOS (sin lock): se calcula el DELTA de ángulo respecto al inicial y se
+ *    marca html[data-orient-lock] para que el CSS contra-rote y conserve la
+ *    vista inicial (sea vertical u horizontal).
  */
-function bloquearOrientacionVertical() {
+let _orientLockAngle = null;   // ángulo con el que arrancó la app
+let _orientLockType  = null;   // tipo (portrait-primary / landscape-primary…)
+
+function _orientAngulo() {
+  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+  if (typeof window.orientation === 'number') return ((window.orientation % 360) + 360) % 360;
+  return 0;
+}
+
+function bloquearOrientacion() {
+  // Capturar la orientación inicial (la que queda congelada).
+  _orientLockAngle = _orientAngulo();
+  _orientLockType  = (screen.orientation && screen.orientation.type) || null;
+
   const intentarLock = () => {
     try {
-      if (screen.orientation && typeof screen.orientation.lock === 'function') {
-        screen.orientation.lock('portrait').catch(() => {});
+      if (screen.orientation && typeof screen.orientation.lock === 'function' && _orientLockType) {
+        screen.orientation.lock(_orientLockType).catch(() => {});
       }
     } catch {}
   };
-  const recalcular = () => { intentarLock(); _marcarSentidoGiro(); };
+  const recalcular = () => { intentarLock(); _compensarOrientacion(); };
+
   intentarLock();
-  _marcarSentidoGiro();
+  _compensarOrientacion();
   document.addEventListener('fullscreenchange', recalcular);
   window.addEventListener('orientationchange', recalcular);
-  window.addEventListener('resize', _marcarSentidoGiro);
+  window.addEventListener('resize', _compensarOrientacion);
   if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
     screen.orientation.addEventListener('change', recalcular);
   }
 }
 
-/** Marca el sentido del giro en <html data-orient> para que el CSS contra-rote
- *  hacia el lado correcto (contenido siempre derecho). */
-function _marcarSentidoGiro() {
-  let ang = null;
-  if (screen.orientation && typeof screen.orientation.angle === 'number') ang = screen.orientation.angle;
-  else if (typeof window.orientation === 'number') ang = window.orientation;
-  // angle 270 (o -90) = landscape secundario → giro inverso. El resto usa l90.
-  const inverso = (ang === 270 || ang === -90);
-  document.documentElement.dataset.orient = inverso ? 'l270' : 'l90';
+/** Contra-rota (vía html[data-orient-lock]) según cuánto giró el dispositivo
+ *  respecto a la orientación inicial. Si el lock nativo funcionó, el viewport
+ *  no gira → delta 0 → no hace nada. */
+function _compensarOrientacion() {
+  if (_orientLockAngle === null) return;
+  const delta = (((_orientAngulo() - _orientLockAngle) % 360) + 360) % 360;
+  const el = document.documentElement;
+  if (delta === 90 || delta === 180 || delta === 270) el.dataset.orientLock = String(delta);
+  else delete el.dataset.orientLock;
 }
 
 function iniciarChequeoActualizaciones() {
@@ -6782,8 +6797,9 @@ async function init() {
   // Calculadora emergente en los campos de monto (input[data-calc])
   initCalculadora();
 
-  // Forzar orientación vertical (lock en Android + contra-rotación en iOS)
-  bloquearOrientacionVertical();
+  // Bloqueo de orientación tipo SCREEN_ORIENTATION_LOCKED: congela la
+  // orientación de carga (lock nativo en Android + compensación en iOS).
+  bloquearOrientacion();
 
   // Si venimos de un reset, NO hacer pull inicial: evita que el merge LWW
   // restaure datos del repo antes de que el usuario lo decida.

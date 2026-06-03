@@ -4682,55 +4682,60 @@ body.view-analisis #main-widgets::before {
   .rsb-mov-monto { font-size: .8rem; }
 }
 
-/* ── Forzar VERTICAL en teléfonos apaisados (contra-rotación) ───────
-   iOS no permite bloquear la orientación por software, así que cuando el
-   teléfono se gira a horizontal contra-rotamos el contenido 90° para que la
-   app SIEMPRE se vea y funcione en vertical, sin importar la posición.
-   El sentido del giro lo fija el JS con html[data-orient] (l90 / l270) según
-   screen.orientation.angle, de modo que el contenido quede SIEMPRE derecho
-   (el bug viejo de "rota 180° y no anda el táctil" era por detectar mal el
-   sentido; ahora se recalcula en cada cambio de orientación).
-   Gate: landscape + alto chico (teléfono) + táctil → no afecta desktop/tablet. */
-@media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
-  html { overflow: hidden; width: 100%; height: 100%; }
+/* ── Bloqueo de orientación tipo Android SCREEN_ORIENTATION_LOCKED ──────
+   La orientación con la que se ABRIÓ la app queda congelada. En Android el JS
+   usa screen.orientation.lock (apaga el sensor de verdad). En iOS (sin lock) el
+   JS marca html[data-orient-lock="90|180|270"] con el DELTA de giro respecto a
+   la orientación inicial, y acá lo contra-rotamos para conservar esa vista.
+   Sólo se activa cuando el dispositivo realmente gira respecto al lock. */
+html[data-orient-lock] { overflow: hidden; width: 100%; height: 100%; }
 
-  body,
-  dialog[open] {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vh;                 /* ancho visual = alto físico  */
-    height: 100vw;                /* alto visual  = ancho físico */
-    min-width: 0 !important;
-    max-width: 100vh !important;  /* capa anchos fijados por id !important */
-    min-height: 0 !important;
-    max-height: 100vw !important;
-    margin: 0;
-    box-sizing: border-box;
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    transform-origin: top left;
-    /* Por defecto (l90): gira para enderezar el landscape primario. */
-    transform: rotate(90deg) translateY(-100%);
-  }
-  /* Otra orientación landscape (angle 270 / -90). */
-  html[data-orient="l270"] body,
-  html[data-orient="l270"] dialog[open] {
-    transform: rotate(-90deg) translateX(-100%);
-  }
-
-  /* Wrappers internos de los diálogos: anular min-width:vw / max-height:dvh
-     (referidos al viewport físico apaisado) para que no desborden. */
-  dialog[open] > * {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    max-height: none !important;
-    height: auto !important;
-  }
-
-  dialog::backdrop { background: rgba(0, 0, 0, .55); }
+html[data-orient-lock] body,
+html[data-orient-lock] dialog[open] {
+  position: fixed;
+  top: 0; left: 0;
+  margin: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  transform-origin: top left;
+  min-width: 0 !important;
+  min-height: 0 !important;
 }
+
+/* Delta 90 y 270: el viewport quedó apaisado respecto al lock → dimensiones
+   intercambiadas (ancho=alto físico). Contra-rotamos ∓90. */
+html[data-orient-lock="90"] body,
+html[data-orient-lock="90"] dialog[open] {
+  width: 100vh; height: 100vw;
+  max-width: 100vh !important; max-height: 100vw !important;
+  transform: translateY(100vh) rotate(-90deg);
+}
+html[data-orient-lock="270"] body,
+html[data-orient-lock="270"] dialog[open] {
+  width: 100vh; height: 100vw;
+  max-width: 100vh !important; max-height: 100vw !important;
+  transform: translateX(100vw) rotate(90deg);
+}
+/* Delta 180: misma forma de viewport, contenido cabeza abajo → rotar 180. */
+html[data-orient-lock="180"] body,
+html[data-orient-lock="180"] dialog[open] {
+  width: 100vw; height: 100vh;
+  max-width: 100vw !important; max-height: 100vh !important;
+  transform: translate(100vw, 100vh) rotate(180deg);
+}
+
+/* Wrappers internos de los diálogos: anular min-width:vw / max-height:dvh
+   (referidos al viewport físico) para que no desborden al contra-rotar. */
+html[data-orient-lock] dialog[open] > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  max-height: none !important;
+  height: auto !important;
+}
+html[data-orient-lock] dialog::backdrop { background: rgba(0, 0, 0, .55); }
 
 /* ── Calculadora emergente en campos de monto ──────────────────────
    Aparece al enfocar un input con [data-calc]. Teclado propio para no
