@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.50",
-    "build":  67,
-    "modified":  "2026-06-03T08:33:28Z",
-    "commit":  "M css/styles.css, M index.html, M js/app.js, tests/_shots/orientacion_landscape.png",
-    "notes":  "Auto-update 2026-06-03 05:33"
+    "version":  "1.51",
+    "build":  68,
+    "modified":  "2026-06-03T08:43:08Z",
+    "commit":  "M css/styles.css, M index.html, M js/app.js, tests/_shots/rot_dashboard.png, tests/_shots/rot_set...",
+    "notes":  "Auto-update 2026-06-03 05:43"
 }

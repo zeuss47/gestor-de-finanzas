@@ -129,10 +129,26 @@ function bloquearOrientacionVertical() {
   // el dispositivo cambia de orientación (en Android vuelve a forzar vertical).
   document.addEventListener('fullscreenchange', intentar);
   if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
-    screen.orientation.addEventListener('change', intentar);
+    screen.orientation.addEventListener('change', () => { intentar(); _marcarSentidoGiro(); });
   } else {
-    window.addEventListener('orientationchange', intentar);
+    window.addEventListener('orientationchange', () => { intentar(); _marcarSentidoGiro(); });
   }
+  _marcarSentidoGiro();
+}
+
+/**
+ * Marca en <html data-orient> el sentido del giro para que el CSS contra-rote
+ * el contenido hacia el lado correcto. En iOS (donde el lock no funciona) esto
+ * mantiene la app en vertical girando el layout 90°. Sin JS, el CSS usa el
+ * sentido por defecto y igual queda vertical.
+ */
+function _marcarSentidoGiro() {
+  const ang = (screen.orientation && typeof screen.orientation.angle === 'number')
+    ? screen.orientation.angle
+    : (typeof window.orientation === 'number' ? window.orientation : null);
+  // angle 270 (o -90) = landscape "secundario": el CSS lo rota al revés.
+  const inverso = ang === 270 || ang === -90;
+  document.documentElement.dataset.orient = inverso ? 'l270' : 'l90';
 }
 
 function iniciarChequeoActualizaciones() {

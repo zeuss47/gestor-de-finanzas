@@ -4663,42 +4663,43 @@ body.view-analisis #main-widgets::before {
   .rsb-mov-monto { font-size: .8rem; }
 }
 
-/* ── Bloqueo de orientación: forzar vertical en teléfonos ──────────
-   En iOS el manifest "orientation":"portrait" y screen.orientation.lock
-   se ignoran, así que mostramos un overlay a pantalla completa cuando el
-   teléfono se gira a apaisado. Condiciones para NO molestar a desktop/tablet:
-     - orientation: landscape  → girado
-     - max-height: 600px       → alto chico = teléfono (tablets/desktop quedan fuera)
-     - pointer: coarse         → dispositivo táctil (excluye desktop con mouse) */
-#rotate-lock { display: none; }
-
+/* ── Forzar layout vertical en teléfonos apaisados ─────────────────
+   iOS ignora el manifest "orientation":"portrait" y screen.orientation.lock,
+   así que cuando el teléfono se gira a horizontal CONTRA-ROTAMOS el contenido
+   90° para que la app siga viéndose y funcionando en vertical.
+   Condiciones para NO afectar a desktop/tablet:
+     - orientation: landscape  → el teléfono está girado
+     - max-height: 600px       → alto chico = teléfono (tablets/desktop fuera)
+     - pointer: coarse         → táctil (excluye desktop con mouse)
+   El sentido del giro lo afina el JS con html[data-orient]; sin JS usa el
+   sentido por defecto (rotate 90°), igual queda vertical. */
 @media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
-  #rotate-lock {
-    display: flex;
-    position: fixed; inset: 0; z-index: 2147483647;
-    align-items: center; justify-content: center;
-    text-align: center; padding: 1.5rem;
-    background: var(--bg);
-  }
-  .rotate-lock-inner {
-    max-width: 360px;
-    display: flex; flex-direction: column; align-items: center; gap: .65rem;
-  }
-  .rotate-lock-icon {
-    font-size: 3.2rem; line-height: 1;
-    animation: rotate-lock-wiggle 2s ease-in-out infinite;
-  }
-  .rotate-lock-title { font-size: 1.15rem; font-weight: 700; color: var(--ink); margin: 0; }
-  .rotate-lock-msg   { font-size: .85rem; color: var(--ink-2); line-height: 1.45; margin: 0; }
+  html { overflow: hidden; width: 100%; height: 100%; }
 
-  /* Evitar scroll del fondo y la barra inferior asomando bajo el overlay */
-  body { overflow: hidden; }
-  /* Si hay un diálogo abierto al girar, ocultarlo para no mostrar layout roto.
-     El overlay queda visible (atenuado por el backdrop) y reaparece al volver. */
-  dialog[open] { visibility: hidden; }
-}
+  /* body y diálogos (estos viven en el top-layer, se rotan aparte con la
+     misma fórmula) ocupan el viewport girado y se contra-rotan. */
+  body,
+  dialog[open] {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vh;            /* ancho visual = alto físico  */
+    height: 100vw;           /* alto visual  = ancho físico */
+    margin: 0;
+    max-width: none;
+    max-height: none;
+    transform-origin: top left;
+    transform: translateX(100vw) rotate(90deg);
+    box-sizing: border-box;
+  }
+  body { overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  dialog[open] { overflow-x: hidden; overflow-y: auto; }
 
-@keyframes rotate-lock-wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  50%      { transform: rotate(-90deg); }
+  /* Sentido inverso para la otra orientación landscape (angle 270 / -90). */
+  html[data-orient="l270"] body,
+  html[data-orient="l270"] dialog[open] {
+    transform: translateY(100vh) rotate(-90deg);
+  }
+
+  /* El backdrop nativo cubre el viewport físico; lo dejamos opaco al tema. */
+  dialog::backdrop { background: rgba(0, 0, 0, .55); }
 }
