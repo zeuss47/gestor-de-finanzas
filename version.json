@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.47",
-    "build":  64,
-    "modified":  "2026-06-03T07:15:52Z",
-    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js, tests/visual-harness.mjs",
-    "notes":  "Auto-update 2026-06-03 04:15"
+    "version":  "1.48",
+    "build":  65,
+    "modified":  "2026-06-03T08:01:11Z",
+    "commit":  "M js/app.js, tests/_shots/, tests/test-chart-colors.mjs",
+    "notes":  "Auto-update 2026-06-03 05:01"
 }

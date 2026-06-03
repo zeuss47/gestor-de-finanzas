@@ -431,6 +431,19 @@ function aplicarColoresPersonalizados(esClaro) {
   root.setProperty('--bg-grid',   brandVal  + (esClaro ? '08' : '06'));
 }
 
+/** Lee una variable CSS del :root (ya resuelta por tema + colores custom). */
+function _cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
+/** hex (#rrggbb) + alpha (0..1) → #rrggbbaa, para gradientes de canvas. */
+function _hexAlpha(hex, alpha) {
+  let h = String(hex || '#000000').replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  if (h.length !== 6) return hex; // si ya es rgba u otro formato, lo dejamos
+  const a = Math.round(Math.min(1, Math.max(0, alpha)) * 255).toString(16).padStart(2, '0');
+  return '#' + h + a;
+}
 /** Color efectivo actual de un id de la paleta (custom o default del tema). */
 function _colorActual(id, esClaro) {
   const c = PALETA_SISTEMA.find(x => x.id === id);
@@ -1383,9 +1396,9 @@ const _balanceState = {
   chart: null,
 };
 const _BAL_SERIES = {
-  ingresos: { label: 'Ingresos', color: '#00ff9f' },
-  gastos:   { label: 'Gastos',   color: '#ff2d6e' },
-  balance:  { label: 'Balance acumulado', color: '#00f0ff' },
+  ingresos: { label: 'Ingresos', color: '#00ff9f', ckey: 'success' },
+  gastos:   { label: 'Gastos',   color: '#ff2d6e', ckey: 'danger' },
+  balance:  { label: 'Balance acumulado', color: '#00f0ff', ckey: 'brand' },
 };
 
 function _balanceRango() {
@@ -1477,9 +1490,10 @@ function renderBalance(el) {
   // ── Chips de series (toggle) ──
   const chipsBox = el.querySelector('[data-bind="balance-series"]');
   if (chipsBox) {
+    const cChip = _resolverColoresChart();
     chipsBox.innerHTML = Object.entries(_BAL_SERIES).map(([id, s]) => `
       <button type="button" class="balance-chip ${_balanceState.series[id] ? 'on' : ''}" data-serie="${id}">
-        <span class="balance-chip-dot" style="background:${s.color}"></span>${s.label}
+        <span class="balance-chip-dot" style="background:${cChip[s.ckey] || s.color}"></span>${s.label}
       </button>`).join('');
     chipsBox.querySelectorAll('.balance-chip').forEach(b => {
       b.onclick = () => { _balanceState.series[b.dataset.serie] = !_balanceState.series[b.dataset.serie]; renderBalance(el); };
@@ -1504,10 +1518,12 @@ function renderBalance(el) {
   const ctx = canvas.getContext('2d');
 
   const datasets = [];
-  const mkGrad = (hex) => { const g = ctx.createLinearGradient(0,0,0,180); g.addColorStop(0, hex+'40'); g.addColorStop(1, hex+'05'); return g; };
-  if (_balanceState.series.ingresos) datasets.push({ label:'Ingresos', data:datIng, borderColor:_BAL_SERIES.ingresos.color, backgroundColor:mkGrad(_BAL_SERIES.ingresos.color), tension:.3, fill:true, pointRadius:0, borderWidth:1.8 });
-  if (_balanceState.series.gastos)   datasets.push({ label:'Gastos',   data:datGas, borderColor:_BAL_SERIES.gastos.color,   backgroundColor:mkGrad(_BAL_SERIES.gastos.color),   tension:.3, fill:true, pointRadius:0, borderWidth:1.8 });
-  if (_balanceState.series.balance)  datasets.push({ label:'Balance acumulado', data:datBal, borderColor:_BAL_SERIES.balance.color, backgroundColor:mkGrad(_BAL_SERIES.balance.color), tension:.25, fill:false, pointRadius:0, borderWidth:2.2 });
+  // Colores resueltos del tema/acento actual (no los defaults estáticos de _BAL_SERIES)
+  const colIng = c.success, colGas = c.danger, colBal = c.brand;
+  const mkGrad = (hex) => { const g = ctx.createLinearGradient(0,0,0,180); g.addColorStop(0, _hexAlpha(hex,0.25)); g.addColorStop(1, _hexAlpha(hex,0.02)); return g; };
+  if (_balanceState.series.ingresos) datasets.push({ label:'Ingresos', data:datIng, borderColor:colIng, backgroundColor:mkGrad(colIng), tension:.3, fill:true, pointRadius:0, borderWidth:1.8 });
+  if (_balanceState.series.gastos)   datasets.push({ label:'Gastos',   data:datGas, borderColor:colGas,   backgroundColor:mkGrad(colGas),   tension:.3, fill:true, pointRadius:0, borderWidth:1.8 });
+  if (_balanceState.series.balance)  datasets.push({ label:'Balance acumulado', data:datBal, borderColor:colBal, backgroundColor:mkGrad(colBal), tension:.25, fill:false, pointRadius:0, borderWidth:2.2 });
 
   _balanceState.chart = new Chart(ctx, {
     type: 'line',
@@ -1596,21 +1612,22 @@ function renderGrafico(el) {
 
   // Gradientes
   const ctx   = canvas.getContext('2d');
+  const c     = _resolverColoresChart();
   const gradR = ctx.createLinearGradient(0,0,0,160);
-  gradR.addColorStop(0,'rgba(244,63,94,0.3)'); gradR.addColorStop(1,'rgba(244,63,94,0.02)');
+  gradR.addColorStop(0,_hexAlpha(c.danger,0.3)); gradR.addColorStop(1,_hexAlpha(c.danger,0.02));
   const gradG = ctx.createLinearGradient(0,0,0,160);
-  gradG.addColorStop(0,'rgba(16,185,129,0.3)'); gradG.addColorStop(1,'rgba(16,185,129,0.02)');
+  gradG.addColorStop(0,_hexAlpha(c.success,0.3)); gradG.addColorStop(1,_hexAlpha(c.success,0.02));
 
   chartEvol = new Chart(canvas, {
     type: 'line',
     data: {
       labels,
       datasets: [
-        { label:'Egresos',  data:datEg, tension:.4, borderColor:'#f43f5e', backgroundColor:gradR,
-          fill:true, borderWidth:2, pointRadius:4, pointBackgroundColor:'#f43f5e',
+        { label:'Egresos',  data:datEg, tension:.4, borderColor:c.danger, backgroundColor:gradR,
+          fill:true, borderWidth:2, pointRadius:4, pointBackgroundColor:c.danger,
           pointBorderColor:'var(--bg)', pointBorderWidth:2 },
-        { label:'Ingresos', data:datIn, tension:.4, borderColor:'#10b981', backgroundColor:gradG,
-          fill:true, borderWidth:2, pointRadius:4, pointBackgroundColor:'#10b981',
+        { label:'Ingresos', data:datIn, tension:.4, borderColor:c.success, backgroundColor:gradG,
+          fill:true, borderWidth:2, pointRadius:4, pointBackgroundColor:c.success,
           pointBorderColor:'var(--bg)', pointBorderWidth:2 },
       ],
     },
@@ -1620,24 +1637,24 @@ function renderGrafico(el) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(13,16,33,0.95)',
-          borderColor: 'rgba(255,255,255,0.12)',
+          backgroundColor: c.tooltipBg,
+          borderColor: c.grid,
           borderWidth: 1,
-          titleColor: '#94a3b8',
-          bodyColor: '#e2e8f0',
+          titleColor: c.inkMuted,
+          bodyColor: c.ink,
           padding: 10,
           callbacks: { label: ctx => ' ' + FMT.format(ctx.raw) },
         },
       },
       scales: {
         x: {
-          grid: { color:'rgba(255,255,255,0.04)' },
-          ticks: { color:'#475569', font:{ size:11 } },
+          grid: { color:c.grid },
+          ticks: { color:c.inkMuted, font:{ size:11 } },
           border: { display:false },
         },
         y: {
-          grid: { color:'rgba(255,255,255,0.04)' },
-          ticks: { color:'#475569', font:{ size:11 }, callback: v => '$'+v },
+          grid: { color:c.grid },
+          ticks: { color:c.inkMuted, font:{ size:11 }, callback: v => '$'+v },
           border: { display:false },
         },
       },
@@ -1716,13 +1733,14 @@ function renderFlujoMensual(el) {
   const datIn = labels.map(l=>Math.round(ingrMap.get(l)||0));
 
   if (chartFlujo) chartFlujo.destroy();
+  const c = _resolverColoresChart();
   chartFlujo = new Chart(canvas, {
     type: 'bar',
     data: {
       labels,
       datasets: [
-        { label:'Ingresos', data:datIn, backgroundColor:'rgba(16,185,129,0.7)', borderRadius:6, borderSkipped:false },
-        { label:'Egresos',  data:datEg, backgroundColor:'rgba(244,63,94,0.7)',  borderRadius:6, borderSkipped:false },
+        { label:'Ingresos', data:datIn, backgroundColor:_hexAlpha(c.success,0.7), borderRadius:6, borderSkipped:false },
+        { label:'Egresos',  data:datEg, backgroundColor:_hexAlpha(c.danger,0.7),  borderRadius:6, borderSkipped:false },
       ],
     },
     options: {
@@ -1730,14 +1748,14 @@ function renderFlujoMensual(el) {
       plugins: {
         legend:{display:false},
         tooltip:{
-          backgroundColor:'rgba(13,16,33,0.95)', borderColor:'rgba(255,255,255,0.12)', borderWidth:1,
-          titleColor:'#94a3b8', bodyColor:'#e2e8f0', padding:10,
+          backgroundColor:c.tooltipBg, borderColor:c.grid, borderWidth:1,
+          titleColor:c.inkMuted, bodyColor:c.ink, padding:10,
           callbacks:{ label: ctx => ' '+FMT.format(ctx.raw) },
         },
       },
       scales: {
-        x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#475569',font:{size:11}}, border:{display:false} },
-        y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#475569',font:{size:11},callback:v=>'$'+v}, border:{display:false} },
+        x:{ grid:{color:c.grid}, ticks:{color:c.inkMuted,font:{size:11}}, border:{display:false} },
+        y:{ grid:{color:c.grid}, ticks:{color:c.inkMuted,font:{size:11},callback:v=>'$'+v}, border:{display:false} },
       },
     },
   });
@@ -1763,7 +1781,9 @@ function renderCategorias(el) {
   }
 
   const sorted = [...catMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6);
-  const PALETTE = ['#6366f1','#10b981','#f43f5e','#f59e0b','#38bdf8','#8b5cf6'];
+  const cc = _resolverColoresChart();
+  // Paleta categórica derivada del acento/tema (con un par de tonos extra fijos para distinguir)
+  const PALETTE = [cc.brand, cc.success, cc.danger, cc.warning, cc.brand2, '#8b5cf6'];
   const labels = sorted.map(([k])=>k);
   const data   = sorted.map(([,v])=>Math.round(v));
   const total  = data.reduce((a,b)=>a+b,0) || 1;
@@ -1797,7 +1817,7 @@ function renderCategorias(el) {
       cutout:'72%', responsive:true, maintainAspectRatio:true,
       plugins: {
         legend:{display:false},
-        tooltip:{ backgroundColor:'rgba(13,16,33,0.95)', titleColor:'#94a3b8', bodyColor:'#e2e8f0', padding:8,
+        tooltip:{ backgroundColor:cc.tooltipBg, titleColor:cc.inkMuted, bodyColor:cc.ink, padding:8,
           callbacks:{ label: ctx => ' '+FMT.format(ctx.raw)+' ('+Math.round((ctx.raw/total)*100)+'%)' } },
       },
     },
@@ -2181,17 +2201,18 @@ function renderPrediccion(el) {
     const upper  = proy.puntos.map(p => p.intervalo_sup);
     const lower  = proy.puntos.map(p => p.intervalo_inf);
     const ctx    = canvas.getContext('2d');
+    const c      = _resolverColoresChart();
     const grad   = ctx.createLinearGradient(0, 0, 0, 120);
-    grad.addColorStop(0, 'rgba(0,240,255,0.4)');
-    grad.addColorStop(1, 'rgba(0,240,255,0.02)');
+    grad.addColorStop(0, _hexAlpha(c.brand, 0.4));
+    grad.addColorStop(1, _hexAlpha(c.brand, 0.02));
     chartPrediccion = new Chart(canvas, {
       type: 'line',
       data: {
         labels,
         datasets: [
-          { label: 'Sup',  data: upper, borderColor: 'rgba(0,240,255,0.15)', backgroundColor: 'rgba(0,240,255,0.06)', fill: '+1', pointRadius: 0, borderWidth: 0, tension: .3 },
-          { label: 'Inf',  data: lower, borderColor: 'rgba(0,240,255,0.15)', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 0, tension: .3 },
-          { label: 'Saldo proyectado', data, borderColor: '#00f0ff', backgroundColor: grad, fill: false, pointRadius: 0, borderWidth: 2, tension: .25 },
+          { label: 'Sup',  data: upper, borderColor: _hexAlpha(c.brand,0.15), backgroundColor: _hexAlpha(c.brand,0.06), fill: '+1', pointRadius: 0, borderWidth: 0, tension: .3 },
+          { label: 'Inf',  data: lower, borderColor: _hexAlpha(c.brand,0.15), backgroundColor: 'transparent', pointRadius: 0, borderWidth: 0, tension: .3 },
+          { label: 'Saldo proyectado', data, borderColor: c.brand, backgroundColor: grad, fill: false, pointRadius: 0, borderWidth: 2, tension: .25 },
         ],
       },
       options: {
@@ -2199,8 +2220,8 @@ function renderPrediccion(el) {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(5,6,20,0.95)', borderColor: '#00f0ff', borderWidth: 1,
-            titleColor: '#7a9bc2', bodyColor: '#e8f5ff',
+            backgroundColor: c.tooltipBg, borderColor: c.brand, borderWidth: 1,
+            titleColor: c.inkMuted, bodyColor: c.ink,
             callbacks: { label: (ctx) => ' ' + FMT.format(ctx.raw) },
           },
         },
@@ -5443,14 +5464,15 @@ function _hdRenderChart() {
 
   if (_hdState.chart) _hdState.chart.destroy();
   const ctx = canvas.getContext('2d');
+  const c = _resolverColoresChart();
 
   const gradG = ctx.createLinearGradient(0, 0, 0, 160);
-  gradG.addColorStop(0, 'rgba(255, 45, 110, 0.35)');
-  gradG.addColorStop(1, 'rgba(255, 45, 110, 0.02)');
+  gradG.addColorStop(0, _hexAlpha(c.danger, 0.35));
+  gradG.addColorStop(1, _hexAlpha(c.danger, 0.02));
 
   const gradI = ctx.createLinearGradient(0, 0, 0, 160);
-  gradI.addColorStop(0, 'rgba(0, 255, 159, 0.35)');
-  gradI.addColorStop(1, 'rgba(0, 255, 159, 0.02)');
+  gradI.addColorStop(0, _hexAlpha(c.success, 0.35));
+  gradI.addColorStop(1, _hexAlpha(c.success, 0.02));
 
   // Decidir tipo de chart según selector
   const modo = _hdState.chartMode || 'lineas';
@@ -5463,38 +5485,38 @@ function _hdRenderChart() {
   let datasets = [];
   if (modo === 'lineas') {
     if (showGastos) {
-      datasets.push({ label: 'Gastos', data: datG, borderColor: '#ff2d6e', backgroundColor: gradG, fill: true, tension: .3, pointRadius: 0, borderWidth: 1.5, order: 2 });
+      datasets.push({ label: 'Gastos', data: datG, borderColor: c.danger, backgroundColor: gradG, fill: true, tension: .3, pointRadius: 0, borderWidth: 1.5, order: 2 });
     }
     if (showIngresos) {
-      datasets.push({ label: 'Ingresos', data: datI, borderColor: '#00ff9f', backgroundColor: gradI, fill: true, tension: .3, pointRadius: 0, borderWidth: 1.5, order: 1 });
+      datasets.push({ label: 'Ingresos', data: datI, borderColor: c.success, backgroundColor: gradI, fill: true, tension: .3, pointRadius: 0, borderWidth: 1.5, order: 1 });
     }
     // Media móvil solo si mostramos gastos
     if (showGastos) {
-      datasets.push({ label: 'Media móvil (7d)', data: datMA, borderColor: 'rgba(0, 240, 255, 0.6)', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, order: 0 });
+      datasets.push({ label: 'Media móvil (7d)', data: datMA, borderColor: _hexAlpha(c.brand, 0.6), borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .3, order: 0 });
     }
   } else if (modo === 'acumulado') {
     const gradA = ctx.createLinearGradient(0, 0, 0, 160);
-    gradA.addColorStop(0, 'rgba(0, 240, 255, 0.4)');
-    gradA.addColorStop(1, 'rgba(0, 240, 255, 0.02)');
+    gradA.addColorStop(0, _hexAlpha(c.brand, 0.4));
+    gradA.addColorStop(1, _hexAlpha(c.brand, 0.02));
     // Si filtro = solo gastos → acumulado de gastos. Si solo ingresos → acumulado de ingresos. Sino → saldo neto.
     let datSerie, color, gradient, label;
     if (showGastos && !showIngresos) {
       let acum = 0;
       datSerie = datG.map(v => { acum += v; return acum; });
-      color = '#ff2d6e';
+      color = c.danger;
       gradient = ctx.createLinearGradient(0,0,0,160);
-      gradient.addColorStop(0,'rgba(255,45,110,0.4)'); gradient.addColorStop(1,'rgba(255,45,110,0.02)');
+      gradient.addColorStop(0,_hexAlpha(c.danger,0.4)); gradient.addColorStop(1,_hexAlpha(c.danger,0.02));
       label = 'Gastos acumulados';
     } else if (showIngresos && !showGastos) {
       let acum = 0;
       datSerie = datI.map(v => { acum += v; return acum; });
-      color = '#00ff9f';
+      color = c.success;
       gradient = ctx.createLinearGradient(0,0,0,160);
-      gradient.addColorStop(0,'rgba(0,255,159,0.4)'); gradient.addColorStop(1,'rgba(0,255,159,0.02)');
+      gradient.addColorStop(0,_hexAlpha(c.success,0.4)); gradient.addColorStop(1,_hexAlpha(c.success,0.02));
       label = 'Ingresos acumulados';
     } else {
       datSerie = datAcum;
-      color = '#00f0ff';
+      color = c.brand;
       gradient = gradA;
       label = 'Saldo acumulado';
     }
@@ -5502,8 +5524,8 @@ function _hdRenderChart() {
       { label, data: datSerie, borderColor: color, backgroundColor: gradient, fill: true, tension: .25, pointRadius: 0, borderWidth: 2 },
     ];
   } else { // barras
-    if (showGastos)   datasets.push({ label: 'Gastos',   data: datG, backgroundColor: 'rgba(255, 45, 110, 0.6)', borderRadius: 4, borderSkipped: false });
-    if (showIngresos) datasets.push({ label: 'Ingresos', data: datI, backgroundColor: 'rgba(0, 255, 159, 0.6)',  borderRadius: 4, borderSkipped: false });
+    if (showGastos)   datasets.push({ label: 'Gastos',   data: datG, backgroundColor: _hexAlpha(c.danger, 0.6), borderRadius: 4, borderSkipped: false });
+    if (showIngresos) datasets.push({ label: 'Ingresos', data: datI, backgroundColor: _hexAlpha(c.success, 0.6),  borderRadius: 4, borderSkipped: false });
   }
 
   _hdState.chart = new Chart(canvas, {
@@ -5519,15 +5541,15 @@ function _hdRenderChart() {
           position: 'top',
           align: 'end',
           labels: {
-            color: '#94a3b8', boxWidth: 10, boxHeight: 10, padding: 8,
+            color: c.inkMuted, boxWidth: 10, boxHeight: 10, padding: 8,
             font: { size: 10, family: "'Inter', sans-serif" },
           },
         },
         tooltip: {
-          backgroundColor: 'rgba(5, 6, 20, 0.95)',
-          borderColor: 'rgba(0, 240, 255, 0.5)',
+          backgroundColor: c.tooltipBg,
+          borderColor: _hexAlpha(c.brand, 0.5),
           borderWidth: 1,
-          titleColor: '#7a9bc2', bodyColor: '#e8f5ff',
+          titleColor: c.inkMuted, bodyColor: c.ink,
           padding: 10,
           callbacks: {
             title: (items) => {
@@ -5545,7 +5567,7 @@ function _hdRenderChart() {
           display: true,
           grid: { display: false },
           ticks: {
-            color: '#475569',
+            color: c.inkMuted,
             font: { size: 9 },
             maxTicksLimit: 6,
             callback: function(val, idx) {
@@ -5559,9 +5581,9 @@ function _hdRenderChart() {
         },
         y: {
           display: true,
-          grid: { color: 'rgba(255, 255, 255, 0.04)' },
+          grid: { color: c.grid },
           ticks: {
-            color: '#475569', font: { size: 9 },
+            color: c.inkMuted, font: { size: 9 },
             callback: (v) => {
               if (Math.abs(v) >= 1_000_000) return (v/1_000_000).toFixed(1) + 'M';
               if (Math.abs(v) >= 1000)      return (v/1000).toFixed(0) + 'k';
@@ -5607,11 +5629,70 @@ function _hdSetKPIs(items) {
 function _resolverColoresChart() {
   const root = getComputedStyle(document.documentElement);
   const get = (k, fallback) => (root.getPropertyValue(k) || '').trim() || fallback;
+  const esClaro = document.documentElement.classList.contains('light');
   return {
-    ink:        get('--ink',        '#e8f5ff'),
-    inkMuted:   get('--ink-muted',  '#94a3b8'),
+    ink:        get('--ink',        esClaro ? '#0f172a' : '#e8f5ff'),
+    inkMuted:   get('--ink-muted',  esClaro ? '#64748b' : '#94a3b8'),
     grid:       'rgba(127,127,127,.18)',
+    // Colores semánticos (siguen el acento custom y el tema)
+    success:    get('--success',    esClaro ? '#059669' : '#00ff9f'),
+    danger:     get('--danger',     esClaro ? '#dc2626' : '#ff2d6e'),
+    brand:      get('--brand',      esClaro ? '#4f46e5' : '#00f0ff'),
+    brand2:     get('--brand-2',    esClaro ? '#ec4899' : '#ff00ea'),
+    warning:    get('--warning',    esClaro ? '#d97706' : '#ffb800'),
+    tooltipBg:  esClaro ? 'rgba(255,255,255,0.96)' : 'rgba(13,16,33,0.96)',
   };
+}
+
+// Familias de color semántico que usan los renderers de widget (RGB de los
+// defaults oscuros). Mapean a la clave resuelta de _resolverColoresChart().
+const _HD_COLOR_FAMILIAS = [
+  { rgb: [0, 255, 159],  key: 'success' },
+  { rgb: [255, 45, 110], key: 'danger'  },
+  { rgb: [0, 240, 255],  key: 'brand'   },
+  { rgb: [181, 55, 255], key: 'brand2'  },
+  { rgb: [122, 155, 194], key: 'inkMuted' },
+];
+
+/** Parsea '#rgb', '#rrggbb', 'rgb(...)' o 'rgba(...)' a {r,g,b,a} o null. */
+function _parseColor(str) {
+  if (!str || typeof str !== 'string') return null;
+  const s = str.trim();
+  let m = s.match(/^#([0-9a-f]{3})$/i);
+  if (m) { const h = m[1]; return { r: parseInt(h[0]+h[0],16), g: parseInt(h[1]+h[1],16), b: parseInt(h[2]+h[2],16), a: 1 }; }
+  m = s.match(/^#([0-9a-f]{6})$/i);
+  if (m) { const h = m[1]; return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16), a: 1 }; }
+  m = s.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
+  if (m) return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+  return null;
+}
+
+/** Devuelve la clave semántica si el color coincide con una familia conocida. */
+function _familiaDeColor(str) {
+  const p = _parseColor(str);
+  if (!p) return null;
+  for (const f of _HD_COLOR_FAMILIAS) {
+    if (Math.abs(p.r - f.rgb[0]) <= 6 && Math.abs(p.g - f.rgb[1]) <= 6 && Math.abs(p.b - f.rgb[2]) <= 6) {
+      return { key: f.key, alpha: p.a };
+    }
+  }
+  return null;
+}
+
+/** Reemplaza border/backgroundColor estáticos por el color resuelto del tema. */
+function _hdNormalizarColores(ds, c) {
+  const remap = (val) => {
+    if (typeof val !== 'string') return val;       // gradientes/funciones: dejar
+    const fam = _familiaDeColor(val);
+    if (!fam) return val;
+    const base = c[fam.key];
+    if (!base) return val;
+    return fam.alpha < 1 ? _hexAlpha(base, fam.alpha) : base;
+  };
+  if ('borderColor' in ds)     ds.borderColor     = remap(ds.borderColor);
+  if ('backgroundColor' in ds) ds.backgroundColor = remap(ds.backgroundColor);
+  if ('pointBackgroundColor' in ds) ds.pointBackgroundColor = remap(ds.pointBackgroundColor);
+  return ds;
 }
 
 function _hdRenderChartCustom({ labels, datasets }) {
@@ -5622,9 +5703,12 @@ function _hdRenderChartCustom({ labels, datasets }) {
   if (statsEl) statsEl.innerHTML = '';
   const ctx = canvas.getContext('2d');
   const c = _resolverColoresChart();
+  // Remapear los colores semánticos estáticos que usan los renderers a los
+  // colores resueltos del tema/acento actual (border + relleno con alpha).
+  const datasetsNorm = datasets.map(ds => _hdNormalizarColores({ ...ds }, c));
   _hdState.chart = new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets },
+    data: { labels, datasets: datasetsNorm },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: datasets.length > 1, labels: { color: c.ink, boxWidth: 10 } } },
