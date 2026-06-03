@@ -2497,68 +2497,209 @@ function prepararDialogoIngreso(form) {
   }
 }
 
+/**
+ * Inicializa el wizard multi-paso del formulario de gastos.
+ * Paso 1: Categoría + Subcategoría
+ * Paso 2: Descripción + Monto + Fecha
+ * Paso 3: ¿Con qué pagás? + Cuotas + Ciclo de tarjeta
+ */
 function prepararDialogoGasto(form) {
-  // Resetear moneda a ARS por defecto y ocultar fila de cotización
-  const monedaSel = form.elements.moneda;
-  if (monedaSel) monedaSel.value = 'ARS';
-  const cotInp = form.elements.cotizacion;
-  if (cotInp) cotInp.value = '';
-  setTimeout(actualizarRowCotizacion, 0);
+  // ── Resetear el wizard al paso 1 ─────────────────────────────
+  const slides = form.querySelector('#gasto-slides');
+  if (slides) { slides.dataset.current = '1'; slides.style.transition = 'none'; }
+  setTimeout(() => { if (slides) slides.style.transition = ''; }, 50);
 
-  // Poblar selects de tarjetas (cuotas + tab de crédito)
+  // ── Poblar categorías dinámicamente ─────────────────────────
+  // Pueden estar en catalogos.categorias_gasto (usuario) o en categorias_gasto (default)
+  const cats = state.ajustes?.catalogos?.categorias_gasto?.length
+    ? state.ajustes.catalogos.categorias_gasto
+    : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.categorias_gasto);
+  const chipsWrap = form.querySelector('#chips-categoria-gasto');
+  if (chipsWrap) {
+    chipsWrap.innerHTML = cats.map(c => `
+      <label class="cat-chip">
+        <input type="radio" name="cat_quick" value="${escapeHtml(c.id||c.nombre)}">
+        <span>${escapeHtml(c.icono||'📌')}<br>${escapeHtml(c.nombre)}</span>
+      </label>`).join('');
+  }
+
+  // ── Poblar selects de tarjetas y cuentas ─────────────────────
   const tarjetas = state.tarjetas.filter(t => !t.deleted && t.activa !== false);
-  for (const sel of form.querySelectorAll('select[name="tarjeta_id"], select[name="tarjeta_id_simple"]')) {
-    sel.innerHTML = `<option value="">Sin tarjeta</option>` +
-      tarjetas.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
-  }
-  // Poblar select de cuentas (tab de cuenta/efectivo)
-  const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
-  for (const sel of form.querySelectorAll('select[name="cuenta_id"]')) {
-    sel.innerHTML = `<option value="">Sin cuenta</option>` +
-      cuentas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
-  }
-  // Default fecha hoy
-  const fecha = form.elements.fecha;
-  if (!fecha.value) fecha.value = new Date().toISOString().slice(0,10);
+  const cuentas  = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+  const selTarj  = form.querySelector('#sel-tarjeta-simple');
+  const selCuenta= form.querySelector('#sel-cuenta-gasto');
+  if (selTarj)  selTarj.innerHTML  = `<option value="">Elegir tarjeta…</option>` + tarjetas.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+  if (selCuenta) selCuenta.innerHTML = `<option value="">Sin cuenta específica</option>` + cuentas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
 
-  // ── Tabs de pago (nuevo form: cuenta vs crédito) ──────────────
+  // ── Default fecha hoy ────────────────────────────────────────
+  const fechaInp = form.querySelector('#inp-fecha-gasto');
+  if (fechaInp && !fechaInp.value) fechaInp.value = new Date().toISOString().slice(0, 10);
+
+  // ── Funciones del wizard ─────────────────────────────────────
+  let pasoActual = 1;
+  const backBtn = form.querySelector('#gasto-btn-back');
+
+  const irAPaso = (paso, dir = 1) => {
+    pasoActual = paso;
+    if (slides) slides.dataset.current = String(paso);
+    // Stepper dots
+    form.querySelectorAll('.gasto-step-dot').forEach(d => {
+      const n = parseInt(d.dataset.step);
+      d.classList.toggle('active', n === paso);
+      d.classList.toggle('done', n < paso);
+    });
+    form.querySelectorAll('.gasto-step-line').forEach((l, i) => {
+      l.classList.toggle('done', i < paso - 1);
+    });
+    if (backBtn) backBtn.hidden = paso === 1;
+    // Foco en el primer campo del nuevo paso
+    setTimeout(() => {
+      const slide = form.querySelector(`.gasto-slide[data-slide="${paso}"]`);
+      slide?.querySelector('input:not([type=hidden])')?.focus?.();
+    }, 380);
+  };
+
+  if (backBtn) backBtn.onclick = () => irAPaso(Math.max(1, pasoActual - 1), -1);
+  irAPaso(1);
+
+  // ── PASO 1: elegir categoría y avanzar ────────────────────────
+  const actualizarCategoria = (catId, nombreMostrar, icono) => {
+    form.querySelector('#inp-categoria-gasto').value = catId;
+    form.querySelector('#hid-tipo-gasto').value = 'unico';
+    // Mostrar badge en paso 2
+    const badge = form.querySelector('#gasto-badge-cat');
+    if (badge) badge.textContent = `${icono || ''} ${nombreMostrar}`.trim();
+    // Subcategorías
+    _actualizarSubcategoriasGasto(form, catId);
+  };
+
+  form.querySelectorAll('input[name="cat_quick"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const cat = cats.find(c => (c.id||c.nombre) === r.value);
+      actualizarCategoria(r.value, cat?.nombre || r.value, cat?.icono || '');
+      const subcats = cat?.subcategorias || [];
+      // Si tiene subcategorías, no autoavanzo: espero que elija subcategoría
+      if (!subcats.length) setTimeout(() => irAPaso(2), 280);
+    });
+  });
+
+  form.querySelector('#inp-categoria-gasto')?.addEventListener('input', e => {
+    actualizarCategoria(e.target.value, e.target.value, '');
+  });
+
+  form.querySelector('#gasto-next-1')?.addEventListener('click', () => {
+    const cat = form.querySelector('#inp-categoria-gasto').value || '';
+    if (!cat) { toast('Elegí o escribí una categoría', 2000); return; }
+    irAPaso(2);
+  });
+
+  // ── PASO 2: monto + validar → paso 3 ─────────────────────────
+  form.querySelector('#gasto-next-2')?.addEventListener('click', () => {
+    const monto = parseFloat(form.querySelector('[name="monto"]')?.value || '0');
+    const desc  = form.querySelector('[name="descripcion"]')?.value?.trim() || '';
+    if (!desc)  { toast('Escribí una descripción', 2000); return; }
+    if (!monto) { toast('Ingresá un monto', 2000); return; }
+    // Actualizar badge monto en paso 3
+    const badge = form.querySelector('#gasto-badge-monto');
+    if (badge) {
+      const moneda = form.querySelector('#gasto-moneda-sel')?.value || 'ARS';
+      const fmt = moneda === 'ARS'
+        ? new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:0 }).format(monto)
+        : `${moneda} ${monto.toLocaleString('es-AR', { minimumFractionDigits:2 })}`;
+      badge.textContent = fmt;
+    }
+    irAPaso(3);
+  });
+
+  // ── PASO 3: Tabs cuenta/tarjeta + cuotas + ciclo ─────────────
   const tabCuenta  = form.querySelector('.gasto-pago-tab[data-pago="cuenta"]');
   const tabCredito = form.querySelector('.gasto-pago-tab[data-pago="credito"]');
   const wrapCuenta = form.querySelector('#pago-cuenta-wrap');
   const wrapCredito= form.querySelector('#pago-credito-wrap');
   const hidMetodo  = form.querySelector('#hid-metodo-pago');
-  if (tabCuenta && tabCredito) {
-    const activarTab = (tab) => {
-      tabCuenta.classList.toggle('active', tab === 'cuenta');
-      tabCredito.classList.toggle('active', tab === 'credito');
-      if (wrapCuenta)  wrapCuenta.hidden  = tab !== 'cuenta';
-      if (wrapCredito) wrapCredito.hidden = tab !== 'credito';
-      if (hidMetodo) hidMetodo.value = tab === 'credito' ? 'credito' : 'efectivo';
-    };
-    tabCuenta.onclick  = () => activarTab('cuenta');
-    tabCredito.onclick = () => activarTab('credito');
-    activarTab('cuenta'); // default
+
+  const activarTab = (tab) => {
+    tabCuenta?.classList.toggle('active',  tab === 'cuenta');
+    tabCredito?.classList.toggle('active', tab === 'credito');
+    if (wrapCuenta)  wrapCuenta.hidden  = tab !== 'cuenta';
+    if (wrapCredito) wrapCredito.hidden = tab !== 'credito';
+    if (hidMetodo) hidMetodo.value = tab === 'credito' ? 'credito' : 'efectivo';
+    if (tab === 'credito') {
+      form.querySelector('#hid-tipo-gasto').value = 'unico';
+      _gsActualizarCicloTarjeta(form);
+    } else {
+      form.querySelector('#hid-tipo-gasto').value = 'unico';
+      const ci = form.querySelector('#ciclo-info'); if (ci) ci.hidden = true;
+    }
+  };
+  if (tabCuenta)  tabCuenta.onclick  = () => activarTab('cuenta');
+  if (tabCredito) tabCredito.onclick = () => activarTab('credito');
+  activarTab('cuenta');
+
+  // Cuotas: radios + input manual
+  form.querySelectorAll('input[name="cuotas_radio"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const v = parseInt(r.value);
+      form.querySelector('#hid-cuotas-total').value = v;
+      form.querySelector('#hid-tarjeta-cuot').value = form.querySelector('#sel-tarjeta-simple')?.value || '';
+      form.querySelector('#hid-tipo-gasto').value = v > 1 ? 'cuotas' : 'unico';
+      form.querySelector('#inp-cuotas-manual').value = '';
+    });
+  });
+
+  // Ciclo al cambiar tarjeta
+  if (selTarj) {
+    selTarj.addEventListener('change', () => {
+      form.querySelector('#hid-tarjeta-cuot').value = selTarj.value;
+      _gsActualizarCicloTarjeta(form);
+    });
   }
 
-  const refrescar = () => {
-    const v = form.elements.tipo?.value || 'unico';
-    const rowCuotas = form.querySelector('#row-cuotas');
-    if (rowCuotas) rowCuotas.hidden = v !== 'cuotas';
+  // ── Cotización para moneda no-ARS ────────────────────────────
+  window._gsActualizarCotiz = () => {
+    const moneda = form.querySelector('#gasto-moneda-sel')?.value || 'ARS';
+    const rowCot = form.querySelector('#row-cotizacion');
+    const lbl    = form.querySelector('#cot-currency-label');
+    if (rowCot) rowCot.hidden = moneda === 'ARS';
+    if (lbl)    lbl.textContent = moneda;
+    window._gsActualizarEquiv?.();
   };
-  form.querySelectorAll('input[name="tipo"]').forEach(r => r.onchange = refrescar);
-  refrescar();
+  window._gsActualizarEquiv = () => {
+    const cotiz = parseFloat(form.querySelector('#gasto-cotizacion')?.value || '0');
+    const monto = parseFloat(form.querySelector('[name="monto"]')?.value || '0');
+    const equiv = form.querySelector('#cot-equiv');
+    const val   = form.querySelector('#cot-equiv-valor');
+    if (!equiv || !val) return;
+    if (cotiz > 0 && monto > 0) {
+      equiv.hidden = false;
+      val.textContent = new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:0 }).format(monto * cotiz);
+    } else { equiv.hidden = true; }
+  };
 
-  // Inicializar label y chip de categoría
-  const catInicial = form.elements.categoria?.value || '';
-  _actualizarLabelGasto(catInicial);
-  form.querySelectorAll('input[name="cat_quick"]').forEach(r => r.checked = (r.value === catInicial));
+  // Restore categoría si venimos de edición
+  const catEdit = form.querySelector('#inp-categoria-gasto')?.value || '';
+  if (catEdit) {
+    const cat = cats.find(c => (c.id||c.nombre) === catEdit);
+    actualizarCategoria(catEdit, cat?.nombre || catEdit, cat?.icono || '');
+    form.querySelectorAll('input[name="cat_quick"]').forEach(r => { r.checked = r.value === catEdit; });
+  }
+}
 
-  // ── Subcategorías: cargar chips cuando se elige una categoría ──
-  _actualizarSubcategoriasGasto(form, catInicial);
-  form.querySelectorAll('input[name="cat_quick"]').forEach(r => {
-    r.addEventListener('change', () => _actualizarSubcategoriasGasto(form, r.value));
-  });
-  form.elements.categoria?.addEventListener('input', (e) => _actualizarSubcategoriasGasto(form, e.target.value));
+/** Muestra el ciclo de facturación de la tarjeta seleccionada en el paso 3. */
+function _gsActualizarCicloTarjeta(form) {
+  const tarjetaId = form.querySelector('#sel-tarjeta-simple')?.value || '';
+  const ci = form.querySelector('#ciclo-info');
+  const ct = form.querySelector('#ciclo-info-title');
+  const cs = form.querySelector('#ciclo-info-sub');
+  if (!ci) return;
+  if (!tarjetaId) { ci.hidden = true; return; }
+  const t = state.tarjetas.find(x => x.id === tarjetaId);
+  if (!t) { ci.hidden = true; return; }
+  const { cierre, vencimiento, periodo } = fechasCiclo(t, new Date());
+  const dd = (d) => d ? `${d.getDate()}/${String(d.getMonth()+1).padStart(2,'0')}` : '—';
+  if (ct) ct.textContent = `Tarjeta: ${t.nombre} — ciclo ${periodo}`;
+  if (cs) cs.textContent = `Cierra ${dd(cierre)} · Se paga el ${dd(vencimiento)}`;
+  ci.hidden = false;
 }
 
 /** Carga los chips de subcategoría cuando se selecciona una categoría en el form de gasto. */
@@ -2567,29 +2708,57 @@ function _actualizarSubcategoriasGasto(form, catId) {
   const chipsWrap = form.querySelector('#chips-subcategoria-gasto');
   const inp = form.querySelector('#inp-subcategoria-gasto');
   if (!row || !chipsWrap) return;
-  const cat = (state.ajustes?.categorias_gasto || []).find(c => c.id === catId || c.nombre?.toLowerCase() === catId?.toLowerCase());
+  const _allCats = state.ajustes?.catalogos?.categorias_gasto?.length ? state.ajustes.catalogos.categorias_gasto : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.categorias_gasto);
+  const cat = _allCats.find(c => c.id === catId || c.nombre?.toLowerCase() === catId?.toLowerCase());
   const subcats = cat?.subcategorias || [];
   if (!subcats.length) { row.hidden = true; if (inp) inp.value = ''; return; }
   row.hidden = false;
   chipsWrap.innerHTML = subcats.map(s => `
-    <label class="cat-chip"><input type="radio" name="subcat_quick" value="${escapeHtml(s)}"><span>${escapeHtml(s)}</span></label>
+    <label class="cat-chip chip-row-sub"><input type="radio" name="subcat_quick" value="${escapeHtml(s)}"><span>${escapeHtml(s)}</span></label>
   `).join('');
   chipsWrap.querySelectorAll('input[name="subcat_quick"]').forEach(r => {
-    r.addEventListener('change', () => { if (inp) inp.value = r.value; });
+    r.addEventListener('change', () => {
+      if (inp) inp.value = r.value;
+      // Tras elegir subcategoría, avanzar al paso 2
+      setTimeout(() => {
+        const slides = form.querySelector('#gasto-slides');
+        if (slides) slides.dataset.current = '2';
+        form.querySelectorAll('.gasto-step-dot').forEach(d => {
+          const n = parseInt(d.dataset.step);
+          d.classList.toggle('active', n === 2);
+          d.classList.toggle('done', n < 2);
+        });
+        form.querySelectorAll('.gasto-step-line').forEach((l, i) => l.classList.toggle('done', i < 1));
+        const btn = form.querySelector('#gasto-btn-back'); if (btn) btn.hidden = false;
+      }, 280);
+    });
   });
 }
 
 async function handleSubmitGasto(form) {
   const fd = new FormData(form);
-  const tipo = fd.get('tipo');
   const editingId = fd.get('_editing_id');
+
+  // El wizard usa campos hidden para tipo/cuotas/tarjeta/moneda/cotizacion
+  const tipo     = form.querySelector('#hid-tipo-gasto')?.value || fd.get('tipo') || 'unico';
+  const metodo   = fd.get('metodo_pago') || 'efectivo';
+  const moneda   = form.querySelector('#hid-moneda-gasto')?.value || fd.get('moneda') || 'ARS';
+  const cotizStr = form.querySelector('#hid-cotiz-gasto')?.value || fd.get('cotizacion') || '';
+  const cotizacionRef = moneda !== 'ARS' && cotizStr ? (parseFloat(cotizStr) || null) : null;
+
+  // Tarjeta: en crédito (cuotas o unico) viene del selector del paso 3
+  const tarjetaId = form.querySelector('#hid-tarjeta-cuot')?.value
+                 || form.querySelector('#sel-tarjeta-simple')?.value
+                 || fd.get('tarjeta_id') || null;
+
+  // Cuotas: del hidden que sincronizamos al elegir chip o manual
+  const cuotasTotal = tipo === 'cuotas' ? (parseInt(form.querySelector('#hid-cuotas-total')?.value || fd.get('cuotas_total') || '1')) : 1;
+
   const compartido = fd.get('comp_persona')
     ? { persona: fd.get('comp_persona'), porcentaje_otro: parseFloat(fd.get('comp_porc')||0) }
     : null;
 
   const base = editingId ? (await DB.get('gastos', editingId) || {}) : {};
-  const moneda = fd.get('moneda') || 'ARS';
-  const cotizacionRef = moneda !== 'ARS' ? (parseFloat(fd.get('cotizacion')) || null) : null;
   const g = {
     ...base,
     id: editingId || uuid(),
@@ -2597,24 +2766,24 @@ async function handleSubmitGasto(form) {
     deleted: false,
     fecha: fd.get('fecha'),
     monto: parseFloat(fd.get('monto')),
-    moneda,                              // 'ARS' | 'USD' | 'EUR' | 'BRL'
-    cotizacion_referencia: cotizacionRef, // Cotización al momento de la compra (referencia)
-    cotizacion_al_pagar: base.cotizacion_al_pagar || null,  // Se setea al cerrar período
+    moneda,
+    cotizacion_referencia: cotizacionRef,
+    cotizacion_al_pagar: base.cotizacion_al_pagar || null,
     descripcion: fd.get('descripcion'),
-    categoria: fd.get('categoria') || 'general',
-    subcategoria: fd.get('subcategoria') || null,
-    metodo_pago: fd.get('metodo_pago') || 'efectivo',
+    categoria: fd.get('categoria') || form.querySelector('#inp-categoria-gasto')?.value || 'general',
+    subcategoria: fd.get('subcategoria') || form.querySelector('#inp-subcategoria-gasto')?.value || null,
+    metodo_pago: metodo,
     tipo,
-    tarjeta_id: tipo === 'cuotas' ? (fd.get('tarjeta_id') || null) : (fd.get('tarjeta_id_simple') || null),
+    tarjeta_id: metodo === 'credito' ? tarjetaId : (tarjetaId || null),
     cuenta_id: fd.get('cuenta_id') || null,
-    cuotas_total: tipo === 'cuotas' ? parseInt(fd.get('cuotas_total')||1) : 1,
+    cuotas_total: cuotasTotal,
     cuota_numero: base.cuota_numero || 1,
     compartido,
     es_amortizacion_anual: tipo === 'amortizacion',
     adjunto_ref: base.adjunto_ref || null,
   };
   await DB.put('gastos', g); notificarCambioLocal();
-  toast(editingId ? 'Gasto actualizado' : 'Gasto registrado');
+  toast(editingId ? 'Gasto actualizado' : '✓ Gasto registrado');
   if (!editingId && state.ajustes?.notificaciones?.confirmar_movimientos) {
     Notif.confirmarMovimiento({ tipo: 'gasto', descripcion: g.descripcion, monto: g.monto });
   }

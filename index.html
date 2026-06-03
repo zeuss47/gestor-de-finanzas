@@ -1015,168 +1015,162 @@
 
 <!-- Gasto -->
 <dialog id="dlg-gasto">
-  <form method="dialog" class="form-modern" style="min-width:min(94vw,480px);max-width:520px">
+  <form method="dialog" class="gasto-wizard" style="min-width:min(96vw,440px);max-width:460px">
     <input type="hidden" name="_editing_id" />
+    <!-- Campos ocultos necesarios para handleSubmitGasto -->
+    <input type="hidden" name="metodo_pago"      id="hid-metodo-pago"   value="efectivo" />
+    <input type="hidden" name="tipo"              id="hid-tipo-gasto"    value="unico" />
+    <input type="hidden" name="cuotas_total"      id="hid-cuotas-total"  value="1" />
+    <input type="hidden" name="tarjeta_id"        id="hid-tarjeta-cuot"  value="" />
+    <input type="hidden" name="moneda"            id="hid-moneda-gasto"  value="ARS" />
+    <input type="hidden" name="cotizacion"        id="hid-cotiz-gasto"   value="" />
+    <input type="hidden" name="comp_persona"      value="" />
+    <input type="hidden" name="comp_porc"         value="" />
 
-    <!-- Header compacto -->
-    <div class="form-modern-header">
-      <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--brand),var(--neon-purple))">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+    <!-- ── Header con stepper ── -->
+    <div class="gasto-wizard-header">
+      <button type="button" id="gasto-btn-back" class="gasto-back-btn" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="gasto-stepper">
+        <div class="gasto-step-dot active" data-step="1"></div>
+        <div class="gasto-step-line"></div>
+        <div class="gasto-step-dot"       data-step="2"></div>
+        <div class="gasto-step-line"></div>
+        <div class="gasto-step-dot"       data-step="3"></div>
       </div>
-      <div>
-        <h3 class="ff-display text-xl font-bold tracking-tight" id="dlg-gasto-titulo">Nuevo gasto</h3>
-        <p class="text-xs" style="color:var(--ink-muted)" id="lbl-descripcion-gasto">¿Qué compraste?</p>
-      </div>
+      <button type="button" value="cancel" formnovalidate
+        style="background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:.75rem;padding:.25rem .4rem"
+        onclick="this.closest('dialog').close()">✕</button>
     </div>
 
-    <!-- Body: formulario simple -->
-    <div class="form-modern-body">
+    <!-- ── Ventana deslizante ── -->
+    <div class="gasto-slides-wrap">
+      <div class="gasto-slides" id="gasto-slides">
 
-      <!-- Qué compraste -->
-      <div class="form-section">
-        <input name="descripcion" required placeholder="Ej: Supermercado, Nafta, Almuerzo…" class="input input-lg" autocomplete="off" />
-      </div>
-
-      <!-- Monto y fecha en la misma fila -->
-      <div class="grid grid-cols-2 gap-3">
-        <div class="form-section">
-          <label class="form-label">Monto</label>
-          <div class="input-with-prefix input-with-currency">
-            <span class="input-prefix" id="gasto-moneda-prefix">$</span>
-            <input name="monto" required type="number" step="0.01" placeholder="0" class="input input-lg" data-bind-gasto="monto" />
-            <select name="moneda" class="currency-selector" id="gasto-moneda">
-              <option value="ARS">ARS</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="BRL">BRL</option>
-            </select>
+        <!-- PASO 1: Categoría + Subcategoría -->
+        <div class="gasto-slide" data-slide="1">
+          <div class="gasto-slide-title">¿En qué gastaste?</div>
+          <div class="chip-row chip-row-big" id="chips-categoria-gasto">
+            <!-- Se renderiza dinámicamente desde las categorías del usuario -->
           </div>
-        </div>
-        <div class="form-section">
-          <label class="form-label">Fecha</label>
-          <input name="fecha" required type="date" class="input input-lg" />
-        </div>
-      </div>
-
-      <!-- Categoría: chips rápidos + subcategoría dinámica -->
-      <div class="form-section">
-        <label class="form-label">Categoría</label>
-        <div class="chip-row" id="chips-categoria-gasto">
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="comida"/><span>🛒 Comida</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="combustible"/><span>⛽ Combustible</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="hogar"/><span>🏠 Hogar</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="ocio"/><span>🎬 Ocio</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="restaurante"/><span>🍽 Restaurante</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="salud"/><span>💊 Salud</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="ropa"/><span>👗 Ropa</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="transporte"/><span>🚌 Transporte</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="servicios"/><span>💡 Servicios</span></label>
-          <label class="cat-chip"><input type="radio" name="cat_quick" value="kiosco"/><span>🥤 Kiosco</span></label>
-        </div>
-        <input name="categoria" placeholder="O escribí otra categoría…" class="input mt-2" data-bind-gasto="categoria" />
-        <!-- Subcategoría: aparece solo cuando la categoría tiene subcategorías definidas -->
-        <div id="row-subcategoria-gasto" hidden style="margin-top:.5rem">
-          <label class="form-label" style="margin-bottom:.25rem">Subcategoría</label>
-          <div class="chip-row" id="chips-subcategoria-gasto"></div>
-          <input name="subcategoria" placeholder="O escribí una subcategoría…" class="input mt-2" id="inp-subcategoria-gasto" />
-        </div>
-      </div>
-
-      <!-- ¿Con qué pagás? — tarjeta o cuenta en una sola fila compacta -->
-      <div class="form-section">
-        <label class="form-label">¿Con qué pagás?</label>
-        <div class="gasto-pago-tabs">
-          <button type="button" class="gasto-pago-tab active" data-pago="cuenta">💳 Cuenta / Efectivo</button>
-          <button type="button" class="gasto-pago-tab" data-pago="credito">🃏 Tarjeta crédito</button>
-        </div>
-        <!-- Cuenta (efectivo/débito/transferencia) -->
-        <div id="pago-cuenta-wrap">
-          <select name="cuenta_id" class="input mt-2" id="sel-cuenta-gasto">
-            <option value="">Sin cuenta específica</option>
-          </select>
-          <input type="hidden" name="metodo_pago" value="efectivo" id="hid-metodo-pago" />
-        </div>
-        <!-- Tarjeta crédito -->
-        <div id="pago-credito-wrap" hidden>
-          <select name="tarjeta_id_simple" class="input mt-2" id="sel-tarjeta-simple">
-            <option value="">Elegir tarjeta…</option>
-          </select>
-          <input type="hidden" name="metodo_pago" id="hid-metodo-pago-cred" value="credito" />
-        </div>
-      </div>
-
-      <!-- Cotización (solo si moneda != ARS) -->
-      <div class="form-section" id="row-cotizacion" hidden>
-        <label class="form-label">Cotización <span style="color:var(--brand);font-weight:700;font-size:.65rem" id="cot-currency-label">USD</span></label>
-        <div class="input-with-prefix">
-          <span class="input-prefix">$</span>
-          <input name="cotizacion" type="number" step="0.01" placeholder="0" class="input" id="gasto-cotizacion" />
-        </div>
-        <div class="cotizacion-equivalente" id="cot-equiv" hidden>
-          ≈ <b style="color:var(--brand)" id="cot-equiv-valor">$0</b> ARS
-        </div>
-      </div>
-
-      <!-- Info ciclo tarjeta -->
-      <div id="ciclo-info" class="ciclo-info-banner" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-5 h-5 flex-shrink-0">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-        <div class="flex-1 min-w-0">
-          <p class="ciclo-info-title" id="ciclo-info-title">—</p>
-          <p class="ciclo-info-sub"   id="ciclo-info-sub">—</p>
-        </div>
-      </div>
-
-      <!-- Opciones avanzadas (colapsadas) -->
-      <details class="form-collapse">
-        <summary>Opciones avanzadas</summary>
-        <div style="display:flex;flex-direction:column;gap:.75rem;margin-top:.75rem">
-          <!-- Tipo de pago -->
-          <div>
-            <label class="form-label">Tipo de pago</label>
-            <div class="type-pills">
-              <label class="type-pill"><input type="radio" name="tipo" value="unico" checked/><span>Un pago</span></label>
-              <label class="type-pill"><input type="radio" name="tipo" value="cuotas"/><span>📦 Cuotas</span></label>
-              <label class="type-pill"><input type="radio" name="tipo" value="recurrente"/><span>🔁 Recurrente</span></label>
-              <label class="type-pill"><input type="radio" name="tipo" value="amortizacion"/><span>📅 Amort.</span></label>
-            </div>
+          <input name="categoria" id="inp-categoria-gasto" placeholder="Otra categoría…" class="input mt-3"
+                 autocomplete="off" style="font-size:.9rem" />
+          <!-- Subcategoría: aparece si la categoría elegida las tiene -->
+          <div id="row-subcategoria-gasto" hidden style="margin-top:.9rem">
+            <p class="gasto-slide-sublabel">Subcategoría</p>
+            <div class="chip-row chip-row-sub" id="chips-subcategoria-gasto"></div>
+            <input name="subcategoria" id="inp-subcategoria-gasto" placeholder="Otra subcategoría…"
+                   class="input mt-2" autocomplete="off" style="font-size:.85rem" />
           </div>
-          <!-- Cuotas -->
-          <div id="row-cuotas" hidden>
-            <label class="form-label">Cuotas</label>
-            <div class="grid grid-cols-2 gap-2">
-              <input name="cuotas_total" type="number" min="1" placeholder="N° cuotas" class="input" />
-              <select name="tarjeta_id" class="input" id="sel-tarjeta-cuotas">
-                <option value="">Elegir tarjeta…</option>
+          <!-- Botón solo si no hay autoavance (escribió una cat manualmente) -->
+          <button type="button" id="gasto-next-1" class="btn-primary w-full mt-4">
+            Siguiente →
+          </button>
+        </div>
+
+        <!-- PASO 2: Descripción + Monto + Fecha -->
+        <div class="gasto-slide" data-slide="2">
+          <div class="gasto-slide-badge" id="gasto-badge-cat">🛒 Comida</div>
+          <div class="gasto-slide-title">¿Cuánto y cuándo?</div>
+          <div class="form-section">
+            <input name="descripcion" required id="inp-descripcion-gasto"
+                   placeholder="Ej: Supermercado, Nafta, Almuerzo…" class="input input-lg" autocomplete="off" />
+          </div>
+          <div class="form-section">
+            <label class="form-label">Monto</label>
+            <div class="input-with-prefix gasto-monto-row">
+              <span class="input-prefix" id="gasto-moneda-prefix">$</span>
+              <input name="monto" required type="number" step="0.01" placeholder="0"
+                     class="input input-lg gasto-monto-big" data-bind-gasto="monto" />
+              <select class="currency-selector" id="gasto-moneda-sel"
+                      onchange="document.getElementById('hid-moneda-gasto').value=this.value;window._gsActualizarCotiz?.()">
+                <option value="ARS">ARS</option><option value="USD">USD</option>
+                <option value="EUR">EUR</option><option value="BRL">BRL</option>
               </select>
             </div>
-          </div>
-          <!-- Gasto compartido -->
-          <div>
-            <label class="form-label">Gasto compartido</label>
-            <div class="grid grid-cols-2 gap-2">
-              <input name="comp_persona" placeholder="¿Con quién?" class="input" />
-              <input name="comp_porc" type="number" min="0" max="100" placeholder="% del otro" class="input" />
+            <!-- Cotización inline cuando no es ARS -->
+            <div id="row-cotizacion" hidden style="margin-top:.5rem">
+              <div class="input-with-prefix">
+                <span class="input-prefix" style="font-size:.75rem" id="cot-currency-label">USD</span>
+                <input id="gasto-cotizacion" type="number" step="0.01" placeholder="Cotización"
+                       class="input" style="font-size:.85rem"
+                       oninput="document.getElementById('hid-cotiz-gasto').value=this.value;window._gsActualizarEquiv?.()"/>
+              </div>
+              <div class="cotizacion-equivalente" id="cot-equiv" hidden>
+                ≈ <b style="color:var(--brand)" id="cot-equiv-valor">$0</b> ARS
+              </div>
             </div>
           </div>
+          <div class="form-section">
+            <label class="form-label">Fecha</label>
+            <input name="fecha" required type="date" class="input input-lg" id="inp-fecha-gasto" />
+          </div>
+          <button type="button" id="gasto-next-2" class="btn-primary w-full mt-1">
+            Siguiente →
+          </button>
         </div>
-      </details>
 
-    </div>
+        <!-- PASO 3: Pago + Cuotas + Ciclo -->
+        <div class="gasto-slide" data-slide="3">
+          <div class="gasto-slide-badge" id="gasto-badge-monto">$ 0</div>
+          <div class="gasto-slide-title">¿Cómo pagás?</div>
+          <div class="gasto-pago-tabs">
+            <button type="button" class="gasto-pago-tab active" data-pago="cuenta">💳 Cuenta / Efectivo</button>
+            <button type="button" class="gasto-pago-tab" data-pago="credito">🃏 Tarjeta crédito</button>
+          </div>
 
-    <!-- Footer fijo -->
-    <div class="form-modern-footer">
-      <button value="cancel" formnovalidate class="btn-secondary flex-1">Cancelar</button>
-      <button value="save" class="btn-primary flex-1">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-        Guardar
-      </button>
-    </div>
+          <!-- Cuenta -->
+          <div id="pago-cuenta-wrap" style="margin-top:.6rem">
+            <select name="cuenta_id" class="input" id="sel-cuenta-gasto">
+              <option value="">Sin cuenta específica</option>
+            </select>
+          </div>
+
+          <!-- Tarjeta crédito -->
+          <div id="pago-credito-wrap" hidden style="margin-top:.6rem">
+            <select name="tarjeta_id_simple" class="input" id="sel-tarjeta-simple">
+              <option value="">Elegir tarjeta…</option>
+            </select>
+            <!-- Cuotas -->
+            <div id="wrap-cuotas-gasto" style="margin-top:.65rem">
+              <label class="form-label">¿En cuántas cuotas?</label>
+              <div class="chip-row chip-row-cuotas" id="chips-cuotas-gasto">
+                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="1" checked/><span>1 pago</span></label>
+                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="3"/><span>3</span></label>
+                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="6"/><span>6</span></label>
+                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="9"/><span>9</span></label>
+                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="12"/><span>12</span></label>
+                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="18"/><span>18</span></label>
+                <label class="cat-chip"><input type="radio" name="cuotas_radio" value="24"/><span>24</span></label>
+              </div>
+              <input id="inp-cuotas-manual" type="number" min="1" max="48" placeholder="Otro número de cuotas…"
+                     class="input mt-2" style="font-size:.85rem"
+                     oninput="document.getElementById('hid-cuotas-total').value=this.value||1" />
+            </div>
+            <!-- Ciclo de facturación de la tarjeta seleccionada -->
+            <div id="ciclo-info" class="ciclo-info-banner" hidden style="margin-top:.65rem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-5 h-5 flex-shrink-0">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <div class="flex-1 min-w-0">
+                <p class="ciclo-info-title" id="ciclo-info-title">—</p>
+                <p class="ciclo-info-sub"   id="ciclo-info-sub">—</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Guardar -->
+          <button value="save" class="btn-primary w-full mt-4" style="font-size:1rem;padding:.8rem">
+            ✓ Guardar gasto
+          </button>
+          <button value="cancel" type="button" formnovalidate
+                  style="display:block;width:100%;margin-top:.5rem;background:none;border:none;color:var(--ink-muted);font-size:.8rem;cursor:pointer;padding:.3rem"
+                  onclick="this.closest('dialog').close()">Cancelar</button>
+        </div>
+
+      </div><!-- /.gasto-slides -->
+    </div><!-- /.gasto-slides-wrap -->
   </form>
 </dialog>
 

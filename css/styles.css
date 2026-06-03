@@ -619,6 +619,44 @@ html.light #bottom-nav { background: rgba(240,244,255,0.85); }
   background: linear-gradient(90deg, var(--brand), var(--brand-2));
 }
 
+/* ── Bottom nav: ola sincronizada con el btn-add ─────────────────
+   El ::before crea una "loma" detrás del botón central que sube y
+   baja con el mismo timing que btn-add-loma.                      */
+@keyframes nav-loma {
+  0%   { transform: translateY(0) scaleX(1); }
+  30%  { transform: translateY(-5px) scaleX(1.04); }
+  60%  { transform: translateY(-2.5px) scaleX(1.02); }
+  100% { transform: translateY(0) scaleX(1); }
+}
+#bottom-nav::before {
+  content: '';
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 72px;
+  height: 36px;
+  background: rgba(7,9,15,0.85);
+  backdrop-filter: blur(28px);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  z-index: -1;
+  animation: nav-loma 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+html.light #bottom-nav::before { background: rgba(240,244,255,0.85); }
+
+/* Los iconos izquierdo/derecho al btn-add vibran suavemente en oposición */
+@keyframes nav-icons-breathe {
+  0%,100% { transform: translateY(0); }
+  30%     { transform: translateY(2px); }
+  60%     { transform: translateY(1px); }
+}
+#bottom-nav .nav-btn:nth-child(2),
+#bottom-nav .nav-btn:nth-child(4) {
+  animation: nav-icons-breathe 2.8s ease-in-out infinite;
+  animation-delay: 0.05s;
+}
+
 /* btn-add central — animación tipo "loma": sube suavemente como una colina */
 @keyframes btn-add-loma {
   0%   { transform: translateY(0)   scale(1);    box-shadow: 0 0 0 4px rgba(99,102,241,0.15), 0 8px 24px var(--brand-glow); }
@@ -1855,6 +1893,8 @@ dialog form.form-modern { padding: 0 !important; }
   width: min(94vw, 600px) !important;
   max-width: 620px;
 }
+/* El wizard del dlg-gasto usa su propio overflow */
+#dlg-gasto { padding: 0; overflow: hidden; border-radius: 1.25rem; }
 
 /* Settings necesita ancho específico para mostrar todas las tabs */
 #dlg-settings {
@@ -3925,6 +3965,115 @@ body.view-analisis #main-widgets::before {
 .edc-row-field { flex: 1; min-width: 130px; display: flex; flex-direction: column; gap: .2rem; }
 .edc-row-field span { font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); }
 .edc-row-field input { padding: .35rem .5rem; font-size: .8rem; }
+
+/* ══════════════════════════════════════════════════════════════
+   GASTO WIZARD — formulario multi-paso
+══════════════════════════════════════════════════════════════ */
+.gasto-wizard {
+  display: flex; flex-direction: column;
+  background: var(--surface, #080a15);
+  border-radius: 1.25rem; overflow: hidden;
+  width: 100%;
+}
+/* Header con stepper */
+.gasto-wizard-header {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .85rem 1rem .75rem;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,.07));
+  flex-shrink: 0;
+}
+.gasto-back-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--ink-muted); padding: .2rem; line-height: 0;
+  border-radius: 50%;
+  transition: color .15s, background .15s;
+}
+.gasto-back-btn:hover { color: var(--brand); background: rgba(0,240,255,.08); }
+.gasto-stepper {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 0;
+}
+.gasto-step-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--surface-3, rgba(255,255,255,.1));
+  border: 1.5px solid var(--border, rgba(255,255,255,.15));
+  transition: background .3s, border-color .3s, transform .3s;
+  flex-shrink: 0;
+}
+.gasto-step-dot.active {
+  background: var(--brand); border-color: var(--brand);
+  transform: scale(1.25);
+  box-shadow: 0 0 8px var(--brand-glow);
+}
+.gasto-step-dot.done {
+  background: var(--success, #10b981); border-color: var(--success, #10b981);
+}
+.gasto-step-line {
+  flex: 1; max-width: 48px; height: 2px;
+  background: var(--border, rgba(255,255,255,.12));
+  transition: background .4s;
+}
+.gasto-step-line.done { background: var(--success, #10b981); }
+
+/* Contenedor deslizante */
+.gasto-slides-wrap {
+  overflow: hidden; flex: 1;
+  position: relative;
+  min-height: 280px;
+}
+.gasto-slides {
+  display: flex;
+  width: 300%; /* 3 pasos */
+  transition: transform .38s cubic-bezier(.55,0,.1,1);
+  will-change: transform;
+}
+.gasto-slides[data-current="1"] { transform: translateX(0); }
+.gasto-slides[data-current="2"] { transform: translateX(-33.333%); }
+.gasto-slides[data-current="3"] { transform: translateX(-66.666%); }
+
+.gasto-slide {
+  width: 33.333%;
+  padding: 1.1rem 1.1rem 1.3rem;
+  flex-shrink: 0;
+  display: flex; flex-direction: column;
+  box-sizing: border-box;
+}
+.gasto-slide-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.15rem; font-weight: 700;
+  color: var(--ink); margin-bottom: .85rem; letter-spacing: -.01em;
+}
+.gasto-slide-sublabel {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink-muted); margin-bottom: .4rem;
+}
+.gasto-slide-badge {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .22rem .65rem; border-radius: 999px;
+  background: rgba(0,240,255,.08); border: 1px solid rgba(0,240,255,.2);
+  color: var(--brand); font-size: .8rem; font-weight: 600;
+  margin-bottom: .6rem; align-self: flex-start;
+}
+
+/* Chips grandes para la categoría (paso 1) */
+.chip-row-big {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem;
+}
+.chip-row-big .cat-chip { justify-content: center; }
+.chip-row-big .cat-chip span {
+  font-size: .82rem; padding: .55rem .4rem;
+  display: flex; flex-direction: column; align-items: center; gap: .15rem;
+  line-height: 1.2; white-space: normal; text-align: center;
+}
+/* Chips de cuotas */
+.chip-row-cuotas { flex-wrap: wrap; gap: .35rem; }
+.chip-row-cuotas .cat-chip span { font-size: .82rem; padding: .4rem .65rem; }
+/* Subcategoría chips más compactos */
+.chip-row-sub { flex-wrap: wrap; gap: .3rem; }
+.chip-row-sub .cat-chip span { font-size: .75rem; padding: .3rem .6rem; }
+
+/* Monto big en paso 2 */
+.gasto-monto-big { font-size: 1.5rem !important; font-weight: 800 !important; }
+.gasto-monto-row { gap: 0; }
 
 /* ── Tabs de pago en formulario de gasto ──────────────────────── */
 .gasto-pago-tabs { display: flex; gap: .4rem; }
