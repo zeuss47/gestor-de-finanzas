@@ -905,7 +905,8 @@ function renderTarjetas(el) {
     const pct = Math.min(100, r.porcentaje_limite_usado);
     const urgente = r.dias_para_cierre <= 2 || r.dias_para_vencimiento <= 2;
     const esCicloActivo = cicloMasProximo && r.tarjeta_id === cicloMasProximo.tarjeta_id;
-    const claseUrgente = urgente ? 'pulse-warn' : '';
+    // Sin pulso: la urgencia ya se indica con el color de los badges de fecha
+    const claseUrgente = urgente ? 'card-urgente' : '';
     // Gradiente generado desde el color elegido por el usuario (todas las tarjetas)
     const colorBase = t.color || '#6366f1';
     const bgStyle = `background:${_gradienteTarjeta(colorBase)};`;
