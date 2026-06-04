@@ -4564,14 +4564,25 @@ body.view-analisis #main-widgets::before {
 .gasto-slides[data-current="2"] { transform: translateX(-33.333%); }
 .gasto-slides[data-current="3"] { transform: translateX(-66.666%); }
 
-/* ── Modo "una sola pantalla" (flat): todos los campos juntos, sin pasos ── */
-.gasto-wizard.flat .gasto-slides-wrap { overflow: visible; min-height: 0; }
+/* ── Modo "una sola pantalla" (flat): todos los campos juntos, sin pasos ──
+   El form se limita al alto del diálogo y el contenido SCROLLEA adentro (header
+   fijo arriba), así entra todo y nada se recorta (Guardar, calculadora, etc.). */
+.gasto-wizard.flat { max-height: 90dvh; }
+.gasto-wizard.flat .gasto-slides-wrap {
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto; min-height: 0;
+  overscroll-behavior: contain;
+}
 .gasto-wizard.flat .gasto-slides {
   display: flex; flex-direction: column; width: 100%;
   transform: none !important; transition: none; will-change: auto;
 }
-.gasto-wizard.flat .gasto-slide { width: 100%; padding: .35rem 1.1rem; }
-.gasto-wizard.flat .gasto-slide:first-of-type { padding-top: .9rem; }
+.gasto-wizard.flat .gasto-slide { width: 100%; padding: .25rem 1.1rem; }
+.gasto-wizard.flat .gasto-slide:first-of-type { padding-top: .7rem; }
+/* Chips de categoría más compactos en una sola pantalla (menos alto). */
+.gasto-wizard.flat .chip-row-big { gap: .4rem; }
+.gasto-wizard.flat .chip-row-big .cat-chip span { padding: .5rem .3rem; font-size: .72rem; }
 .gasto-wizard.flat .gasto-stepper,
 .gasto-wizard.flat .gasto-back-btn,
 .gasto-wizard.flat .gasto-slide-badge,

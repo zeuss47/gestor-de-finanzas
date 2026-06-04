@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.68",
-    "build":  85,
-    "modified":  "2026-06-04T00:11:38Z",
-    "commit":  "M css/styles.css",
-    "notes":  "Auto-update 2026-06-03 21:11"
+    "version":  "1.69",
+    "build":  86,
+    "modified":  "2026-06-04T00:27:12Z",
+    "commit":  "M css/styles.css, M js/app.js, tests/_shots/dim_calc.png, tests/_shots/dim_gasto.png",
+    "notes":  "Auto-update 2026-06-03 21:27"
 }

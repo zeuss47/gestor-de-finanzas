@@ -6932,7 +6932,8 @@ async function init() {
 
   // Event listeners
   // Botón + → diálogo de selección
-  document.getElementById('btn-add').onclick = () => document.getElementById('dlg-choice').showModal();
+  // El + entra DIRECTO a la carga de gasto; desde ahí el toggle cambia a ingreso.
+  document.getElementById('btn-add').onclick = () => openDialog('dlg-gasto');
   document.getElementById('choice-gasto').onclick = () => {
     document.getElementById('dlg-choice').close();
     openDialog('dlg-gasto');
