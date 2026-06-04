@@ -3247,12 +3247,17 @@ function renderMovimientos() {
     // Total neto del día (gastos solo en ARS para el resumen rápido)
     const totalDiaArs = grupo.filter(x => x.tipo === 'gasto' && (!x.moneda || x.moneda === 'ARS'))
       .reduce((a, x) => a + x.monto, 0);
+    // Cada día va en SU PROPIO bloque (encabezado + sus ítems juntos): así en el
+    // layout de 2 columnas (desktop) el grupo no se parte entre columnas.
+    const itemsHtml = grupo.map(it => it.html).join('');
     list.insertAdjacentHTML('beforeend', `
-      <div class="mov-period-header">
-        <span class="mov-period-fecha">${escapeHtml(fmtCabecera(fecha))}</span>
-        <span class="mov-period-total">${grupo.length} ítem${grupo.length===1?'':'s'}${totalDiaArs ? ` · ${FMT.format(totalDiaArs)}` : ''}</span>
+      <div class="mov-period-group">
+        <div class="mov-period-header">
+          <span class="mov-period-fecha">${escapeHtml(fmtCabecera(fecha))}</span>
+          <span class="mov-period-total">${grupo.length} ítem${grupo.length===1?'':'s'}${totalDiaArs ? ` · ${FMT.format(totalDiaArs)}` : ''}</span>
+        </div>
+        ${itemsHtml}
       </div>`);
-    for (const it of grupo) list.insertAdjacentHTML('beforeend', it.html);
   }
 
   // ── Handlers ────────────────────────────────────────────────

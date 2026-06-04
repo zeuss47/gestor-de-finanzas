@@ -424,7 +424,8 @@ body { overflow-x: clip; }
   #section-movimientos .space-y-2 {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: .75rem;
+    gap: .75rem 1.25rem;
+    align-items: start;       /* cada bloque-día a su alto, sin estirarse */
   }
   #section-movimientos #mov-empty { grid-column: 1 / -1; }
 }
@@ -698,15 +699,17 @@ html.light #bottom-nav::before { background: #eef2ff; }
 .mov-filtro-todos:hover { color: var(--ink); border-color: var(--ink-2); }
 .mov-filtro-todos.active { color: var(--brand); border-color: var(--brand); }
 
+/* Cada día = un bloque (encabezado + sus gastos juntos). Así en el layout de
+   2 columnas (desktop) el grupo NO se parte entre columnas. */
+.mov-period-group { display: flex; flex-direction: column; gap: .5rem; break-inside: avoid; }
 /* Header de período (agrupación por día) */
 .mov-period-header {
   display: flex; align-items: baseline; justify-content: space-between;
-  gap: .5rem; margin: .9rem .15rem .4rem;
+  gap: .5rem; margin: .2rem .15rem .15rem;
   padding-bottom: .35rem; border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 2;
   background: linear-gradient(var(--bg, #050614) 70%, transparent);
 }
-.mov-period-header:first-child { margin-top: .2rem; }
 .mov-period-fecha {
   font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: .82rem;
   color: var(--ink); text-transform: capitalize; letter-spacing: -.01em;

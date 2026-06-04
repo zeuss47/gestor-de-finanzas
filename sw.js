@@ -1,29 +1,29 @@
 /**
- * sw.js ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Service Worker
+ * sw.js ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Service Worker
  * ----------------------
  * Estrategias:
  *
  *  1. INSTALL: precache del shell (HTML, CSS, JS, manifest).
  *  2. FETCH:
- *       - NavegaciÃƒÆ’Ã‚Â³n HTML -> Network-first con fallback al shell cacheado
+ *       - NavegaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n HTML -> Network-first con fallback al shell cacheado
  *         (modo offline: muestra la app sin recargar).
- *       - Assets estÃƒÆ’Ã‚Â¡ticos (js/css/png/svg) -> Cache-first.
+ *       - Assets estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ticos (js/css/png/svg) -> Cache-first.
  *       - API de GitHub (api.github.com) -> Network-only, sin cache, para
  *         no servir datos viejos.
  *  3. SYNC (Background Sync): cuando el navegador detecta que recuperaste
- *     conectividad, dispara la tarea "sync-data". AquÃƒÆ’Ã‚Â­ avisamos al cliente
+ *     conectividad, dispara la tarea "sync-data". AquÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ avisamos al cliente
  *     que ejecute syncAll() (el SW no tiene acceso directo al PAT del
- *     usuario porque vive en IndexedDB; pero sÃƒÆ’Ã‚Â­ puede abrir IndexedDB y
+ *     usuario porque vive en IndexedDB; pero sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ puede abrir IndexedDB y
  *     publicar un mensaje al cliente).
  *  4. NOTIFICATIONCLICK: enfoca/abre la PWA y, si el payload contiene
- *     una ruta de acciÃƒÆ’Ã‚Â³n, la pasa por la querystring.
+ *     una ruta de acciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n, la pasa por la querystring.
  */
 
-const VERSION = 'v3.3.0-pages-b98';
+const VERSION = 'v3.3.0-pages-b99';
 const SHELL_CACHE = `shell-${VERSION}`;
 
-// Base scope dinÃƒÆ’Ã‚Â¡mico: el SW se registra en su propio directorio,
-// asÃƒÆ’Ã‚Â­ funciona igual en localhost que en /usuario.github.io/repo/.
+// Base scope dinÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡mico: el SW se registra en su propio directorio,
+// asÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ funciona igual en localhost que en /usuario.github.io/repo/.
 const BASE = new URL(self.registration.scope).pathname;
 
 const SHELL_FILES = [
@@ -65,7 +65,7 @@ self.addEventListener('activate', (event) => {
     await Promise.all(keys.filter(k => k !== SHELL_CACHE).map(k => caches.delete(k)));
     await self.clients.claim();
 
-    // Habilitar navigation preload si estÃƒÆ’Ã‚Â¡ disponible (acelera la primera nav)
+    // Habilitar navigation preload si estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ disponible (acelera la primera nav)
     if ('navigationPreload' in self.registration) {
       try { await self.registration.navigationPreload.enable(); } catch {}
     }
@@ -84,7 +84,7 @@ self.addEventListener('fetch', (event) => {
   // No tocamos la API de GitHub: siempre online para datos frescos.
   if (url.hostname === 'api.github.com') return;
 
-  // NavegaciÃƒÆ’Ã‚Â³n: network-first, fallback shell.
+  // NavegaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n: network-first, fallback shell.
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       try {
@@ -100,8 +100,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // CSS y JS: network-first para que siempre se vea la ÃƒÆ’Ã‚Âºltima versiÃƒÆ’Ã‚Â³n.
-  // Solo se usa cachÃƒÆ’Ã‚Â© si la red falla (modo offline real).
+  // CSS y JS: network-first para que siempre se vea la ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºltima versiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n.
+  // Solo se usa cachÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© si la red falla (modo offline real).
   if (['style', 'script'].includes(request.destination)) {
     event.respondWith((async () => {
       const cache = await caches.open(SHELL_CACHE);
@@ -116,9 +116,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ImÃƒÆ’Ã‚Â¡genes y fuentes: STALE-WHILE-REVALIDATE.
+  // ImÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡genes y fuentes: STALE-WHILE-REVALIDATE.
   // Servimos al instante lo cacheado (cero parpadeo) y, en paralelo, traemos la
-  // versiÃƒÆ’Ã‚Â³n nueva y la guardamos para la prÃƒÆ’Ã‚Â³xima. AsÃƒÆ’Ã‚Â­ los assets no crÃƒÆ’Ã‚Â­ticos se
+  // versiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n nueva y la guardamos para la prÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³xima. AsÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ los assets no crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ticos se
   // actualizan solos en background sin que se note en pantalla.
   if (['image', 'font'].includes(request.destination)) {
     event.respondWith((async () => {
@@ -150,9 +150,9 @@ self.addEventListener('sync', (event) => {
 
 /**
  * No podemos invocar syncAll() directamente desde el SW (depende de import
- * dinÃƒÆ’Ã‚Â¡mico y de variables sÃƒÆ’Ã‚Â³lo accesibles al cliente). En su lugar enviamos
+ * dinÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡mico y de variables sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³lo accesibles al cliente). En su lugar enviamos
  * un mensaje a TODOS los clients activos para que ejecuten la sync.
- * Si no hay clientes vivos, lo intentamos al prÃƒÆ’Ã‚Â³ximo arranque.
+ * Si no hay clientes vivos, lo intentamos al prÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ximo arranque.
  */
 async function triggerClientSync() {
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
