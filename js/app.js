@@ -1417,7 +1417,7 @@ function renderTarjetas(el) {
             <p class="text-white text-xs font-semibold">${fmtFecha(rango.inicio)} → ${fmtFecha(rango.fin)}</p>
           </div>`;
         })()}
-        <!-- Fechas (formato compacto: "Cierra 20/jun · 21d") -->
+        <!-- Fechas + botón de pago -->
         <div class="flex justify-between items-center gap-1.5 relative z-10">
           ${(() => {
             const fmtCorto = (iso) => {
@@ -1438,14 +1438,35 @@ function renderTarjetas(el) {
             `;
           })()}
         </div>
+        <!-- Botón pagar: siempre visible en la tarjeta, discreto, no tapa el click del drawer -->
+        ${(() => {
+          const yaPagado = (t.ciclos_pagados || []).includes(r.periodo);
+          return yaPagado
+            ? `<div class="cc-pay-btn cc-pay-done" data-tarjeta-id="${t.id}" data-periodo="${r.periodo}" data-total="0">
+                 <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 8 6 12 14 4"/></svg>
+                 Pagado
+               </div>`
+            : `<button type="button" class="cc-pay-btn cc-pay-pending" data-tarjeta-id="${t.id}" data-periodo="${r.periodo}" data-total="${r.total_resumen}" title="Registrar pago de ${escapeHtml(t.nombre)}">
+                 <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="14" height="10" rx="2"/><line x1="1" y1="8" x2="15" y2="8"/><line x1="4" y1="12" x2="7" y2="12"/></svg>
+                 Pagar ${FMT.format(r.total_resumen)}
+               </button>`;
+        })()}
       </div>`);
   }
   // Botón "+ Nueva" se quitó — crear desde Ajustes → Cuentas
 
-  // Click en cada tarjeta → drawer de uso detallado
+  // Botón "Pagar" en la tarjeta: abre dlg-pago-ciclo sin abrir el drawer
+  el.querySelectorAll('.cc-pay-pending').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      abrirPagoCiclo(btn.dataset.tarjetaId, btn.dataset.periodo, parseFloat(btn.dataset.total) || 0);
+    });
+  });
+
+  // Click en cada tarjeta → drawer de uso detallado (excluye el botón de pago)
   el.querySelectorAll('.credit-card[data-tarjeta-id]').forEach(card => {
     card.addEventListener('click', (e) => {
-      // Evitar que el click en el widget bubble dispare el historial general
+      if (e.target.closest('.cc-pay-btn, .cc-pay-pending')) return;
       e.stopPropagation();
       abrirDrawerTarjeta(card.dataset.tarjetaId);
     });

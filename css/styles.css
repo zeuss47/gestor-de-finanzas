@@ -1396,6 +1396,35 @@ html.light #app-header { background: rgba(240,244,255,0.8); }
   transform: translateY(-5px) scale(1.015);
   box-shadow: 0 16px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.25);
 }
+/* ── Botón de pago inline en la tarjeta del dashboard ── */
+.cc-pay-btn {
+  position: relative; z-index: 10;
+  display: inline-flex; align-items: center; gap: .32rem;
+  width: 100%; justify-content: center;
+  margin-top: .6rem; padding: .38rem .7rem;
+  border-radius: .6rem; font-size: .7rem; font-weight: 700;
+  letter-spacing: .02em; cursor: pointer;
+  font-family: inherit; transition: all .15s ease;
+}
+.cc-pay-pending {
+  border: 1.5px solid rgba(255,255,255,.55);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  backdrop-filter: blur(6px);
+}
+.cc-pay-pending:hover {
+  background: rgba(255,255,255,.22);
+  border-color: rgba(255,255,255,.8);
+  transform: scale(1.02);
+}
+.cc-pay-pending:active { transform: scale(.97); }
+.cc-pay-done {
+  border: 1.5px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.07);
+  color: rgba(255,255,255,.55);
+  pointer-events: none;
+  font-size: .67rem;
+}
 /* Brillo que barre */
 .credit-card::before {
   content: '';
