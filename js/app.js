@@ -115,7 +115,7 @@ function mostrarBannerActualizacion(v) {
  * (dígitos + operaciones + − × ÷) y escribe el resultado en el campo.
  * Evaluación segura (sin eval): tokeniza y resuelve con shunting-yard.
  */
-const _calc = { input: null, expr: '', pop: null };
+const _calc = { input: null, expr: '', pop: null, sheetWrap: null };
 
 /** Evalúa una expresión aritmética (+ − × ÷ y decimales) sin usar eval(). */
 function _calcEval(expr) {
@@ -232,6 +232,22 @@ function _calcAbrir(input, opts = {}) {
   if (flatForm) {
     _calc.pop.classList.add('calc-sheet');
     if (_calc.pop.parentElement !== flatForm) flatForm.appendChild(_calc.pop);
+    // El teclado flotante tapa la zona inferior: reservamos ese alto en el
+    // scroll y subimos el campo de monto por ENCIMA del teclado (como hace el
+    // teclado nativo), para que el ingreso/monto nunca quede tapado.
+    const wrap = flatForm.querySelector('.gasto-slides-wrap');
+    _calc.sheetWrap = wrap || null;
+    requestAnimationFrame(() => {
+      if (!_calc.pop || _calc.pop.hidden || !wrap) return;
+      const sheetH = _calc.pop.offsetHeight;
+      wrap.style.paddingBottom = (sheetH + 16) + 'px';
+      const row = input.closest('.calc-row') || input.closest('.form-section') || input;
+      const wrapRect = wrap.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const visibleH = Math.max(120, wrapRect.height - sheetH); // zona NO tapada
+      const target = wrap.scrollTop + (rowRect.top - wrapRect.top) - visibleH * 0.35;
+      wrap.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    });
   } else {
     _calc.pop.classList.remove('calc-sheet');
     // Insertar el teclado INLINE, después de la FILA del campo. Si el monto está
@@ -274,8 +290,9 @@ function _calcCommit() {
  *  paso / cambio de campo); commit=false descarta (Escape). */
 function _calcCerrar(commit = false) {
   if (commit) _calcCommit();
-  if (_calc.pop) _calc.pop.hidden = true;
+  if (_calc.pop) { _calc.pop.hidden = true; _calc.pop.classList.remove('calc-sheet'); }
   if (_calc.input) _calc.input.removeAttribute('readonly');
+  if (_calc.sheetWrap) { _calc.sheetWrap.style.paddingBottom = ''; _calc.sheetWrap = null; }
   _calc.input = null; _calc.expr = '';
 }
 
