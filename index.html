@@ -2963,11 +2963,17 @@
 <!-- ===== TOAST =============================================== -->
 <div id="toast"></div>
 
-<!-- ===== OVERLAY: BILLETE VOLANDO (sync) ===================== -->
+<!-- ===== OVERLAY: ÉXITO DE SINCRONIZACIÓN ==================== -->
 <div id="flying-money-overlay" role="presentation" aria-hidden="true">
   <div class="flying-bill-txt">
-    <h2 id="fmo-title">Sincronizando…</h2>
-    <p id="fmo-sub">Actualizando tus datos</p>
+    <div class="sync-check" aria-hidden="true">
+      <svg viewBox="0 0 52 52">
+        <circle class="sync-check-ring" cx="26" cy="26" r="23" fill="none"/>
+        <path class="sync-check-mark" fill="none" d="M14 27 l8 8 l16 -16"/>
+      </svg>
+    </div>
+    <h2 id="fmo-title">¡Sincronizado!</h2>
+    <p id="fmo-sub">Datos actualizados</p>
   </div>
   <!-- Los billetes se inyectan por JS -->
 </div>

@@ -72,6 +72,22 @@ if (Test-Path $versionFile) {
     }
 }
 
+# ─── 1b. Bumpear la VERSION del Service Worker con el build ────────
+# Cada deploy debe cambiar sw.js para que el navegador detecte el SW nuevo
+# (si sw.js no cambia, nunca se dispara 'updatefound' → no se detecta el update).
+$swFile = "$REPO\sw.js"
+if ((Test-Path $swFile) -and $newBuild) {
+    try {
+        $sw = Get-Content $swFile -Raw
+        # Conserva la base (ej. 'v3.3.0-pages') y reemplaza/agrega el sufijo -b<build>.
+        $swNew = [regex]::Replace($sw, "const VERSION = '([^']*?)(?:-b\d+)?';", "const VERSION = '`${1}-b$newBuild';")
+        if ($swNew -ne $sw) {
+            [System.IO.File]::WriteAllText($swFile, $swNew)   # UTF-8 sin BOM
+            & git add sw.js 2>$null
+        }
+    } catch { }
+}
+
 # ─── 2. Add + commit + push ──────────────────────────────────────
 & git add -A 2>$null
 

@@ -56,23 +56,27 @@ let _updateDisponible = null;   // info de version.json cuando hay update sin ap
  */
 async function chequearActualizacion(manual = false) {
   try {
-    const r = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
-    if (!r.ok) return;
-    const v = await r.json();
-    const buildActual = state.version?.build || parseInt(localStorage.getItem('app_last_build') || '0');
-    if (v.build && buildActual && v.build > buildActual) {
-      // Hay versión nueva: pedir al SW que se actualice (descarga el shell nuevo)
-      try { await _swReg?.update(); } catch {}
+    // Mecanismo CONFIABLE: forzar al navegador a re-chequear el Service Worker.
+    // Si el shell nuevo cambió (cada deploy bumpea la VERSION del SW), el navegador
+    // instala un SW nuevo → dispara 'updatefound' → notificarUpdateDisponible().
+    let reg = _swReg;
+    if (!reg && 'serviceWorker' in navigator) {
+      try { reg = await navigator.serviceWorker.getRegistration(); } catch {}
+    }
+    if (reg) {
+      try { await reg.update(); } catch {}
+      // Esperar a que installing → installed dispare el evento.
+      await new Promise(res => setTimeout(res, 600));
+    }
+    const hayNuevo = _hayActualizacionSW || !!(reg && reg.waiting);
+    if (hayNuevo) {
       const auto = state.ajustes?.auto_update !== false; // default ON
       if (auto) {
-        // Silencioso: el SW nuevo se activará y controllerchange recargará.
+        if (manual) toast('Aplicando actualización…', 1800);
         aplicarActualizacionSiCorresponde();
-        // Si no hay SW (o ya estaba en control), forzamos una recarga suave.
-        if (!_hayActualizacionSW) setTimeout(() => location.reload(), 800);
       } else {
-        // Sin auto-update: mostramos el aviso AL LADO de la versión (no un banner).
-        _updateDisponible = v;
-        actualizarVersionUI();
+        await notificarUpdateDisponible();   // aviso "✨ Actualizar" junto a la versión
+        if (manual) toast('✨ Hay una versión nueva disponible', 2500);
       }
     } else if (manual) {
       toast('✓ Ya tenés la última versión', 2000);
@@ -80,6 +84,16 @@ async function chequearActualizacion(manual = false) {
   } catch (e) {
     if (manual) toast('No se pudo verificar actualizaciones', 2500);
   }
+}
+
+/** Marca que hay update disponible y muestra el aviso al lado de la versión. */
+async function notificarUpdateDisponible() {
+  try {
+    const r = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (r.ok) _updateDisponible = await r.json();
+  } catch {}
+  if (!_updateDisponible) _updateDisponible = state.version || { version: 'nueva' };
+  actualizarVersionUI();
 }
 
 /** Aplica la actualización del SW (skip waiting) si el usuario tiene auto-update. */
@@ -4081,7 +4095,8 @@ const syncCallbacks = {
   onStart: (motivo) => {
     setSyncIndicator('progress');
     document.getElementById('btn-sync')?.classList.add('syncing');
-    if (motivo === 'manual') mostrarAnimacionSync(false);
+    // La animación full-screen se muestra UNA sola vez, al FINALIZAR (onSuccess).
+    // Durante el proceso, el botón gira (clase .syncing).
   },
   onProgress: () => {},
   onSuccess: async (result, motivo) => {
@@ -4089,7 +4104,7 @@ const syncCallbacks = {
     setSyncIndicator('ok');
     actualizarTimestampSync();
     document.getElementById('btn-sync')?.classList.remove('syncing');
-    if (motivo === 'manual') mostrarAnimacionSync(true);
+    if (motivo === 'manual') mostrarAnimacionSync();
     try { await chequeoMargenDisponible(); } catch {}
   },
   onError: (err, motivo) => {
@@ -4145,54 +4160,61 @@ function actualizarTimestampSync() {
   });
 }
 
-/** Animación de "billete volando" pantalla completa durante el sync. */
-function mostrarAnimacionSync(ok = true) {
+/**
+ * Animación de éxito al FINALIZAR la sincronización (se ejecuta una sola vez).
+ * Check animado + halo + ráfaga de monedas/billetes que estallan desde el centro.
+ */
+let _syncAnimToken = 0;
+function mostrarAnimacionSync() {
   const overlay = document.getElementById('flying-money-overlay');
   if (!overlay) return;
+  const token = ++_syncAnimToken;           // evita solapes si se llama de nuevo
   const title = document.getElementById('fmo-title');
   const sub   = document.getElementById('fmo-sub');
-  if (title) title.textContent = ok ? '¡Sincronizado!' : 'Sincronizando…';
-  if (sub) sub.textContent = ok ? 'Datos actualizados' : 'Contactando GitHub…';
+  if (title) title.textContent = '¡Sincronizado!';
+  if (sub)   sub.textContent   = 'Datos actualizados';
 
-  // Crear billetes animados
-  const BILLS = ['💵','💸','🪙','💶','💴'];
-  const W = window.innerWidth, H = window.innerHeight;
+  // Limpiar partículas previas y reiniciar el estado de animación.
   overlay.querySelectorAll('.flying-bill').forEach(b => b.remove());
-  const count = 7;
+  overlay.classList.remove('show', 'closing');
+  void overlay.offsetWidth;                  // reflow → reinicia keyframes
+
+  // Ráfaga radial de monedas/billetes desde el centro hacia afuera.
+  const BILLS = ['💵','🪙','💸','💶','💴','🪙','💵','🪙'];
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  const count = 14;
   for (let i = 0; i < count; i++) {
     const el = document.createElement('div');
     el.className = 'flying-bill';
     el.textContent = BILLS[i % BILLS.length];
-    // Punto de origen: área del botón de sync (arriba derecha) o centro
-    const ox = W * (.5 + (Math.random()-.5)*.4);
-    const oy = H * (.4 + (Math.random()-.5)*.5);
-    // Trayectoria parabólica
-    const midX = (Math.random() - .5) * 200;
-    const midY = -80 - Math.random() * 120;
-    const endX = (Math.random() - .5) * 400;
-    const endY = (Math.random() > .5 ? -1 : 1) * (200 + Math.random() * 200);
-    const rot0 = (Math.random()-.5)*40;
-    const rot1 = rot0 + (Math.random()-.5)*120;
-    const rot2 = rot1 + (Math.random()-.5)*180;
+    // Ángulo distribuido en círculo + algo de aleatoriedad → estallido parejo.
+    const ang = (i / count) * Math.PI * 2 + (Math.random() - .5) * .5;
+    const dist = 120 + Math.random() * 180;
+    const endX = Math.cos(ang) * dist;
+    const endY = Math.sin(ang) * dist - 40;       // leve sesgo hacia arriba
+    const midX = endX * .45, midY = endY * .45 - 30;
+    const rot1 = (Math.random() - .5) * 160;
+    const rot2 = rot1 + (Math.random() - .5) * 220;
     el.style.cssText = `
-      left:${ox}px; top:${oy}px;
-      --bx0:0px; --by0:0px; --br0:${rot0}deg;
+      left:${cx}px; top:${cy}px;
       --bx1:${midX}px; --by1:${midY}px; --br1:${rot1}deg;
       --bx2:${endX}px; --by2:${endY}px; --br2:${rot2}deg;
-      animation-delay: ${i * 0.12}s;
-      font-size: ${1.4 + Math.random()*.8}rem;
+      animation-delay:${i * 0.025}s;
+      font-size:${1.3 + Math.random() * .9}rem;
     `;
     overlay.appendChild(el);
   }
 
   overlay.classList.add('show');
+  // Cerrar suave tras ~1.9s (más ágil que antes; una sola pasada).
   setTimeout(() => {
-    overlay.style.animation = 'fmo-out .4s ease forwards';
+    if (token !== _syncAnimToken) return;    // otra animación tomó el control
+    overlay.classList.add('closing');
     setTimeout(() => {
-      overlay.classList.remove('show');
-      overlay.style.animation = '';
-    }, 400);
-  }, ok ? 2600 : 1800);
+      if (token !== _syncAnimToken) return;
+      overlay.classList.remove('show', 'closing');
+    }, 380);
+  }, 1900);
 }
 
 // Sync manual (botón)
@@ -6964,7 +6986,9 @@ async function init() {
   // Service Worker + auto-update
   if ('serviceWorker' in navigator) {
     try {
-      const reg = await navigator.serviceWorker.register('./sw.js');
+      // updateViaCache:'none' → el navegador NO cachea sw.js, así detecta cada
+      // deploy nuevo (la VERSION del SW se bumpea en cada push).
+      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
       _swReg = reg;
       if ('sync' in reg) {
         try { await reg.sync.register('sync-data'); } catch {}
@@ -6976,11 +7000,20 @@ async function init() {
         if (!nuevo) return;
         nuevo.addEventListener('statechange', () => {
           if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+            // Hay un SW nuevo esperando = versión nueva DETECTADA.
             _hayActualizacionSW = true;
-            aplicarActualizacionSiCorresponde();
+            const auto = state.ajustes?.auto_update !== false;
+            if (auto) aplicarActualizacionSiCorresponde();
+            else notificarUpdateDisponible();   // aviso "✨ Actualizar" junto a la versión
           }
         });
       });
+      // Si al registrar ya había un SW esperando (update detectado en sesión previa).
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        _hayActualizacionSW = true;
+        if (state.ajustes?.auto_update !== false) aplicarActualizacionSiCorresponde();
+        else notificarUpdateDisponible();
+      }
     } catch (e) {
       console.warn('SW register failed', e);
     }
