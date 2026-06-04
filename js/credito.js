@@ -10,6 +10,17 @@
 
 import { fechasCiclo, cuotaEnPeriodo } from './cards.js';
 
+/** Monto del gasto en ARS (convierte moneda extranjera; aplica compartido). */
+function _montoARS(g) {
+  let cotiz = 1;
+  if (g.moneda && g.moneda !== 'ARS') {
+    cotiz = Number(g.cotizacion_al_pagar) || Number(g.cotizacion_referencia) || 1;
+  }
+  let m = (Number(g.monto) || 0) * cotiz;
+  if (g.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0) / 100);
+  return m;
+}
+
 /**
  * Devuelve TODOS los gastos en cuotas que tienen al menos 1 cuota pendiente.
  * Para cada uno calcula:
@@ -95,9 +106,8 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
   const gastosFijosMes = gastos
     .filter(g => !g.deleted && !g.tarjeta_id && !g.es_pago_tarjeta && !(g.es_habitual && !g.cuenta_id) && g.fecha?.startsWith(mesActual))
     .reduce((a, g) => {
-      let m = g.monto;
-      if (g.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0)/100);
-      if (g.tipo === 'amortizacion') m = m / 12;
+      let m = _montoARS(g);
+      if (g.tipo === 'amortizacion' || g.es_amortizacion_anual) m = m / 12;
       return a + m;
     }, 0);
 
@@ -112,9 +122,8 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
   const sumaHabituales = gastos
     .filter(g => !g.deleted && !g.tarjeta_id && !g.es_pago_tarjeta && !(g.es_habitual && !g.cuenta_id) && mesesRef.some(mm => g.fecha?.startsWith(mm)))
     .reduce((a, g) => {
-      let m = g.monto;
-      if (g.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0)/100);
-      if (g.tipo === 'amortizacion') m = m / 12;
+      let m = _montoARS(g);
+      if (g.tipo === 'amortizacion' || g.es_amortizacion_anual) m = m / 12;
       return a + m;
     }, 0);
   const gastosHabituales = sumaHabituales / 3;

@@ -888,50 +888,92 @@ async function reloadAll() {
 }
 
 /* ============ Estado global local (espeja /api/estado) ============ */
+/**
+ * Cotización ARS de un gasto en moneda extranjera. 1 si es ARS.
+ * Prioriza la cotización guardada en el gasto; si falta, usa tipos_cambio de ajustes.
+ */
+function _cotizacionGasto(g) {
+  if (!g || !g.moneda || g.moneda === 'ARS') return 1;
+  const c = Number(g.cotizacion_al_pagar) || Number(g.cotizacion_referencia) || 0;
+  if (c > 0) return c;
+  const tc = Number(state.ajustes?.tipos_cambio?.[g.moneda]?.valor) || 0;
+  return tc > 0 ? tc : 1;
+}
+
+/**
+ * Monto EFECTIVO de un gasto en ARS — REGLA ÚNICA para toda la app.
+ * Reemplaza las ~7 reimplementaciones que diferían entre widgets.
+ *  - Convierte moneda extranjera a ARS (antes se sumaba el monto crudo → bug).
+ *  - Aplica gasto compartido (resta la parte de la otra persona).
+ *  - Con { mensual: true } prorratea la amortización anual /12 (vistas de flujo
+ *    mensual). En contextos de saldo real (efectivo que salió) se usa el total.
+ */
+function montoARS(g, { mensual = false } = {}) {
+  let m = (Number(g?.monto) || 0) * _cotizacionGasto(g);
+  if (g?.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0) / 100);
+  if (mensual && (g?.tipo === 'amortizacion' || g?.es_amortizacion_anual)) m = m / 12;
+  return m;
+}
+
 function computarEstadoGlobal() {
   const hoy = new Date();
   const mk = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
 
+  // ── SALDO LÍQUIDO REAL (acumulado, no del mes) ──────────────────────────
+  // = saldo inicial de las cuentas + TODOS los ingresos − TODOS los gastos
+  // líquidos (efectivo que salió). NO es un flujo mensual: refleja la plata que
+  // realmente tenés. El consumo en tarjeta NO baja el efectivo hasta pagarse;
+  // el pago de tarjeta SÍ (es un gasto líquido con es_pago_tarjeta).
+  let saldoCuentas = 0;
+  for (const c of state.cuentas) { if (!c.deleted) saldoCuentas += Number(c.saldo_inicial) || 0; }
+
+  let ingresosTotales = 0;
+  for (const i of state.ingresos) {
+    if (i.deleted) continue;
+    ingresosTotales += (i.sueldo_neto || 0) + (i.bonos || 0);
+  }
+
+  let gastosLiquidosTotales = 0;
+  for (const g of state.gastos) {
+    if (g.deleted) continue;
+    if (g.tarjeta_id) continue;                                  // consumo en tarjeta: aún no es efectivo
+    if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;  // contador puro: no descuenta
+    gastosLiquidosTotales += montoARS(g);                        // moneda + compartido (amortización full = efectivo real)
+  }
+  const saldoLiquido = saldoCuentas + ingresosTotales - gastosLiquidosTotales;
+
+  // Deuda de tarjetas = cargo del próximo resumen (lo que vas a deber).
+  const deudaTarjetas = state.resumenes.reduce((a,r)=> a + (r.total_resumen || 0), 0);
+  const proyectado = saldoLiquido - deudaTarjetas;   // saldo si pagaras la tarjeta
+
+  // ── MÉTRICAS DEL MES (flujo, para widgets de análisis) ──────────────────
   const ingresosMes = state.ingresos
-    .filter(i => i.periodo_aplicacion === mk)
+    .filter(i => !i.deleted && i.periodo_aplicacion === mk)
     .reduce((a,i) => a + (i.sueldo_neto || 0) + (i.bonos || 0), 0);
 
   let egresosMes = 0;
-  let egresosLiquidos = 0;
   for (const g of state.gastos) {
-    if (!g.fecha?.startsWith(mk)) continue;
-    // Habitual SIN cuenta = contador puro: no descuenta de ningún balance
-    if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;
-    if (g.tipo === 'amortizacion' || g.es_amortizacion_anual) {
-      egresosMes += g.monto / 12;
-      continue;
-    }
-    let monto = g.monto;
-    if (g.compartido) monto = monto * (1 - (g.compartido.porcentaje_otro || 0)/100);
-    egresosMes += monto;
-    if (!g.tarjeta_id) egresosLiquidos += monto;
+    if (g.deleted || !g.fecha?.startsWith(mk)) continue;
+    if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;  // contador puro
+    if (g.es_pago_tarjeta) continue;                              // el pago no es consumo nuevo (ya está en la deuda)
+    egresosMes += montoARS(g, { mensual: true });
   }
-  const deudaTarjetas = state.resumenes.reduce((a,r)=> a + r.total_resumen, 0);
-  const liquido = ingresosMes - egresosLiquidos;
-  const proyectado = liquido - deudaTarjetas;
 
-  // Promedio 3 meses anteriores
+  // Promedio 3 meses anteriores (consumo, no pagos de tarjeta)
   const buckets = new Map();
   for (const g of state.gastos) {
-    if (!g.fecha) continue;
-    if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue; // contador puro
+    if (g.deleted || !g.fecha) continue;
+    if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;
+    if (g.es_pago_tarjeta) continue;
     const k = g.fecha.slice(0,7);
     if (k === mk) continue;
-    let m = g.monto;
-    if (g.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0)/100);
-    if (g.tipo === 'amortizacion') m = m/12;
-    buckets.set(k, (buckets.get(k)||0) + m);
+    buckets.set(k, (buckets.get(k)||0) + montoARS(g, { mensual: true }));
   }
   const last3 = [...buckets.keys()].sort().slice(-3);
   const prom3 = last3.length ? last3.reduce((a,k)=>a+buckets.get(k),0)/last3.length : 0;
 
   return {
-    saldo_liquido: liquido,
+    saldo_liquido: saldoLiquido,
     saldo_proyectado: proyectado,
     ingresos_netos_mes: ingresosMes,
     egresos_mes: egresosMes,
@@ -1262,9 +1304,8 @@ function calcularSaldoCuenta(cuenta) {
     if (g.deleted || g.cuenta_id !== cuenta.id) continue;
     // Solo afecta saldo de cuenta si NO está en tarjeta
     if (g.tarjeta_id) continue;
-    let m = g.monto;
-    if (g.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0) / 100);
-    saldo -= m;
+    if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;  // contador puro (defensivo)
+    saldo -= montoARS(g);   // moneda + compartido unificados
   }
   return saldo;
 }
@@ -1830,7 +1871,7 @@ function renderBalance(el) {
   const modo = diasRango <= 35 ? 'dia' : diasRango <= 120 ? 'semana' : 'mes';
 
   const enRango = (iso) => { if (!iso) return false; const d = new Date(iso + 'T12:00:00'); return d >= desde && d <= hasta; };
-  const gastoEf = (g) => { let m = g.monto || 0; if (g.compartido) m *= (1 - (g.compartido.porcentaje_otro || 0)/100); return m; };
+  const gastoEf = (g) => montoARS(g, { mensual: true });   // moneda + compartido + amortización /12
 
   // Clave de bucket para una fecha
   const bucketKey = (d) => {
@@ -2094,12 +2135,10 @@ function renderResumenAnual(el) {
 
   const gastosPorMes = new Map();
   for (const g of state.gastos) {
-    if (!g.fecha?.startsWith(pfx)) continue;
+    if (g.deleted || !g.fecha?.startsWith(pfx)) continue;
+    if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
     const mk = g.fecha.slice(0,7);
-    let m = g.monto;
-    if (g.compartido) m = m * (1-(g.compartido.porcentaje_otro||0)/100);
-    if (g.tipo === 'amortizacion') m = m/12;
-    gastosPorMes.set(mk, (gastosPorMes.get(mk)||0) + m);
+    gastosPorMes.set(mk, (gastosPorMes.get(mk)||0) + montoARS(g, { mensual: true }));
   }
   const egresosYTD = [...gastosPorMes.values()].reduce((a,b)=>a+b,0);
   const mesesConDatos = gastosPorMes.size || 1;
@@ -2137,14 +2176,13 @@ function renderFlujoMensual(el) {
 
   const buckets = new Map(), ingrMap = new Map();
   for (const g of state.gastos) {
-    if (!g.fecha) continue;
+    if (g.deleted || !g.fecha) continue;
+    if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
     const k = g.fecha.slice(0,7);
-    let m = g.monto;
-    if (g.compartido) m = m*(1-(g.compartido.porcentaje_otro||0)/100);
-    if (g.tipo === 'amortizacion') m = m/12;
-    buckets.set(k, (buckets.get(k)||0)+m);
+    buckets.set(k, (buckets.get(k)||0) + montoARS(g, { mensual: true }));
   }
   for (const i of state.ingresos) {
+    if (i.deleted) continue;
     const k = i.periodo_aplicacion; if(!k) continue;
     ingrMap.set(k, (ingrMap.get(k)||0)+(i.sueldo_neto||0)+(i.bonos||0));
   }
@@ -2192,12 +2230,11 @@ function renderCategorias(el) {
 
   const catMap = new Map();
   for (const g of state.gastos) {
+    if (g.deleted) continue;
     if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // pago tarjeta / habitual-contador no es consumo
     if (!g.fecha?.startsWith(mk)) continue;
     const cat = g.categoria || 'general';
-    let m = g.monto;
-    if (g.compartido) m = m*(1-(g.compartido.porcentaje_otro||0)/100);
-    catMap.set(cat, (catMap.get(cat)||0)+m);
+    catMap.set(cat, (catMap.get(cat)||0) + montoARS(g, { mensual: true }));
   }
 
   const sorted = [...catMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6);
@@ -3004,7 +3041,7 @@ function actualizarKpiStrip() {
     const el = document.getElementById(id);
     if (el) el.textContent = label || (val >= 0 ? '↑ positivo' : '↓ negativo');
   };
-  trend('kpi-liquido-trend',  e.saldo_liquido,    e.periodo);
+  trend('kpi-liquido-trend',  e.saldo_liquido,    'disponible');
   trend('kpi-ingresos-trend', e.ingresos_netos_mes, 'este mes');
   trend('kpi-egresos-trend',  e.egresos_mes,      'este mes');
   trend('kpi-margen-trend',   e.margen_libre_mes, e.margen_libre_mes >= 0 ? '✓ superávit' : '⚠ déficit');
@@ -6527,11 +6564,8 @@ const _widgetRenderers = {
   // ── CUENTAS: lista de cuentas con saldo y gráfico de saldos ─────
   cuentas: () => {
     const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
-    const saldoCuenta = (c) => {
-      const ingresoCuenta = (state.ingresos || []).filter(i => !i.deleted && i.cuenta_id === c.id).reduce((a,i) => a + ((i.sueldo_neto||0)+(i.bonos||0)), 0);
-      const gastoCuenta   = (state.gastos   || []).filter(g => !g.deleted && g.cuenta_id === c.id).reduce((a,g) => a + (g.monto||0), 0);
-      return (c.saldo_inicial || 0) + ingresoCuenta - gastoCuenta;
-    };
+    // Usa la fórmula canónica (excluye tarjeta, convierte moneda, aplica compartido).
+    const saldoCuenta = (c) => calcularSaldoCuenta(c);
     const saldoTotal = cuentas.reduce((a,c) => a + saldoCuenta(c), 0);
     _hdSetKPIs([
       { label: 'Saldo total', value: FMT.format(saldoTotal), color: saldoTotal>=0?'var(--success)':'var(--danger)' },

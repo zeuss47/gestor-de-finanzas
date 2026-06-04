@@ -148,9 +148,16 @@ function montoIngreso(i) {
   return (Number(i.sueldo_neto) || 0) + (Number(i.bonos) || 0);
 }
 
-/** Monto efectivo del gasto: respeta compartido y amortizaciones. */
+/** Cotización ARS de un gasto en moneda extranjera (1 si es ARS). */
+function cotizGasto(g) {
+  if (!g || !g.moneda || g.moneda === 'ARS') return 1;
+  const c = Number(g.cotizacion_al_pagar) || Number(g.cotizacion_referencia) || 0;
+  return c > 0 ? c : 1;
+}
+
+/** Monto efectivo del gasto en ARS: convierte moneda, respeta compartido y amortizaciones. */
 function montoEfectivo(g) {
-  let m = Number(g.monto) || 0;
+  let m = (Number(g.monto) || 0) * cotizGasto(g);   // ← convierte USD/EUR/BRL a ARS
   if (g.compartido && typeof g.compartido.porcentaje_otro === 'number') {
     m = m * (1 - g.compartido.porcentaje_otro / 100);
   }
@@ -186,12 +193,28 @@ export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tar
     ingresosAcum += montoIngreso(i);
   }
 
+  // Cuántas cuotas YA se facturaron por gasto (para no contar el total de golpe).
+  // Las cuotas FUTURAS se inyectan aparte en `egresoExtraPorMes` (más abajo);
+  // contar acá el monto FULL las duplicaba → proyección demasiado pesimista.
+  const cuotasPagadasPorGasto = new Map();
+  for (const c of (cuotasPendientes || [])) {
+    if (c && c.gasto_id) cuotasPagadasPorGasto.set(c.gasto_id, c);
+  }
+
   let gastosAcum = 0;            // gastos liquidos (sin tarjeta) ya impactados
   let resumenesPendientes = 0;   // gastos con tarjeta pendientes de pago
   for (const g of gastos) {
     if (g.deleted) continue;
     if (!g.fecha || g.fecha > hoy) continue;
-    const m = montoEfectivo(g);
+    let m;
+    if (g.tipo === 'cuotas' && g.cuotas_total > 0) {
+      // Solo las cuotas YA facturadas (no el total). El resto va a egresoExtraPorMes.
+      const info = cuotasPagadasPorGasto.get(g.id);
+      const facturadas = info ? Math.max(0, info.cuotas_pagadas) : g.cuotas_total; // sin pendientes ⇒ todas pagadas
+      m = (montoEfectivo(g) / g.cuotas_total) * facturadas;
+    } else {
+      m = montoEfectivo(g);
+    }
     if (g.tarjeta_id) resumenesPendientes += m;
     else gastosAcum += m;
   }
