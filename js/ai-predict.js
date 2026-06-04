@@ -136,6 +136,18 @@ function addDays(ymd, n) {
   return `${y}-${m}-${dd}`;
 }
 
+/**
+ * Monto de un ingreso. Los registros de ingreso NO tienen campo `monto`:
+ * guardan `sueldo_neto` (+ `bonos`). En toda la app el ingreso vale
+ * `sueldo_neto + bonos`; acá debe ser igual (antes leía `i.monto` → 0 → la
+ * proyección ignoraba TODOS los ingresos y daba saldos/alertas erróneos).
+ */
+function montoIngreso(i) {
+  if (!i) return 0;
+  if (typeof i.monto === 'number') return i.monto;   // compat por si algún día existe
+  return (Number(i.sueldo_neto) || 0) + (Number(i.bonos) || 0);
+}
+
 /** Monto efectivo del gasto: respeta compartido y amortizaciones. */
 function montoEfectivo(g) {
   let m = Number(g.monto) || 0;
@@ -171,7 +183,7 @@ export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tar
   for (const i of ingresos) {
     if (i.deleted) continue;
     if (!i.fecha || i.fecha > hoy) continue;
-    ingresosAcum += Number(i.monto) || 0;
+    ingresosAcum += montoIngreso(i);
   }
 
   let gastosAcum = 0;            // gastos liquidos (sin tarjeta) ya impactados
@@ -192,7 +204,7 @@ export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tar
   for (const i of ingresos) {
     if (i.deleted || !i.fecha) continue;
     const mk = monthKey(i.fecha);
-    ingresosMes.set(mk, (ingresosMes.get(mk) || 0) + (Number(i.monto) || 0));
+    ingresosMes.set(mk, (ingresosMes.get(mk) || 0) + montoIngreso(i));
   }
   for (const g of gastos) {
     if (g.deleted || !g.fecha) continue;
