@@ -1107,8 +1107,9 @@
           <div class="chip-row chip-row-big" id="chips-categoria-gasto">
             <!-- Se renderiza dinámicamente desde las categorías del usuario -->
           </div>
-          <input name="categoria" id="inp-categoria-gasto" placeholder="Otra categoría…" class="input mt-3"
-                 autocomplete="off" style="font-size:.9rem" />
+          <!-- La categoría se elige SOLO con los chips de arriba; este campo guarda
+               el valor seleccionado (sin casilla visible de "otra categoría"). -->
+          <input type="hidden" name="categoria" id="inp-categoria-gasto" />
           <!-- Subcategoría: aparece si la categoría elegida las tiene -->
           <div id="row-subcategoria-gasto" hidden style="margin-top:.9rem">
             <p class="gasto-slide-sublabel">Subcategoría</p>
@@ -1122,14 +1123,12 @@
           </button>
         </div>
 
-        <!-- PASO 2: Descripción + Monto + Fecha -->
+        <!-- PASO 2: Monto + Fecha (la descripción ya no tiene casilla: se deriva
+             de la categoría; el campo oculto preserva la descripción al editar). -->
         <div class="gasto-slide" data-slide="2">
           <div class="gasto-slide-badge" id="gasto-badge-cat">🛒 Comida</div>
           <div class="gasto-slide-title">¿Cuánto y cuándo?</div>
-          <div class="form-section">
-            <input name="descripcion" required id="inp-descripcion-gasto"
-                   placeholder="Ej: Supermercado, Nafta, Almuerzo…" class="input input-lg" autocomplete="off" />
-          </div>
+          <input type="hidden" name="descripcion" id="inp-descripcion-gasto" />
           <!-- Monto + Fecha en la misma línea -->
           <div class="grid gap-3 calc-row" style="grid-template-columns:1.4fr 1fr;align-items:end">
             <div class="form-section">

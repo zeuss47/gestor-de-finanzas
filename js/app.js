@@ -2981,7 +2981,14 @@ function actualizarRightPanel() {
         <div class="flex items-center gap-2 py-1.5" style="border-bottom:1px solid var(--border)">
           <span class="text-base flex-shrink-0">${icon}</span>
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-medium truncate" style="color:var(--ink)">${m._tipo === 'gasto' && m.categoria ? `(${escapeHtml(m.categoria)}) - ` : ''}${escapeHtml(m.descripcion||'Movimiento')}</p>
+            <p class="text-xs font-medium truncate" style="color:var(--ink)">${(() => {
+              const cat = (m._tipo === 'gasto' && m.categoria) ? String(m.categoria) : '';
+              const desc = m.descripcion || '';
+              // Evitar "(comida) - Comida": si la descripción es la propia categoría, mostrar una sola.
+              if (cat && desc && desc.toLowerCase() !== cat.toLowerCase())
+                return `(${escapeHtml(cat)}) - ${escapeHtml(desc)}`;
+              return escapeHtml(desc || (cat ? `(${cat})` : 'Movimiento'));
+            })()}</p>
             <p class="text-[10px]" style="color:var(--ink-muted)">${m.fecha||m.periodo_aplicacion||''}</p>
           </div>
           <p class="text-xs font-bold flex-shrink-0" style="color:${color}">${sign}${FMT.format(Math.abs(monto))}</p>
@@ -3562,8 +3569,6 @@ function prepararDialogoGasto(form) {
   // ── PASO 2: monto + validar → paso 3 ─────────────────────────
   form.querySelector('#gasto-next-2')?.addEventListener('click', () => {
     const monto = parseFloat(form.querySelector('[name="monto"]')?.value || '0');
-    const desc  = form.querySelector('[name="descripcion"]')?.value?.trim() || '';
-    if (!desc)  { toast('Escribí una descripción', 2000); return; }
     if (!monto) { toast('Ingresá un monto', 2000); return; }
     // Actualizar badge monto en paso 3
     const badge = form.querySelector('#gasto-badge-monto');
@@ -3742,7 +3747,10 @@ async function handleSubmitGasto(form) {
     moneda,
     cotizacion_referencia: cotizacionRef,
     cotizacion_al_pagar: base.cotizacion_al_pagar || null,
-    descripcion: fd.get('descripcion'),
+    descripcion: (fd.get('descripcion') || '').trim()
+      || ((state.ajustes?.catalogos?.categorias_gasto || [])
+            .find(c => (c.id || c.nombre) === (fd.get('categoria') || ''))?.nombre)
+      || fd.get('categoria') || 'Gasto',
     categoria: fd.get('categoria') || form.querySelector('#inp-categoria-gasto')?.value || 'general',
     subcategoria: fd.get('subcategoria') || form.querySelector('#inp-subcategoria-gasto')?.value || null,
     metodo_pago: metodo,
