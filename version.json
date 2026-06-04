@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.82",
-    "build":  99,
-    "modified":  "2026-06-04T06:16:07Z",
-    "commit":  "M css/styles.css, M js/app.js",
-    "notes":  "Auto-update 2026-06-04 03:16"
+    "version":  "1.83",
+    "build":  100,
+    "modified":  "2026-06-04T06:25:42Z",
+    "commit":  "M js/app.js, M sw.js",
+    "notes":  "Auto-update 2026-06-04 03:25"
 }

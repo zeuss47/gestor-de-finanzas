@@ -70,14 +70,10 @@ async function chequearActualizacion(manual = false) {
     }
     const hayNuevo = _hayActualizacionSW || !!(reg && reg.waiting);
     if (hayNuevo) {
-      const auto = state.ajustes?.auto_update !== false; // default ON
-      if (auto) {
-        if (manual) toast('Aplicando actualización…', 1800);
-        aplicarActualizacionSiCorresponde();
-      } else {
-        await notificarUpdateDisponible();   // aviso "✨ Actualizar" junto a la versión
-        if (manual) toast('✨ Hay una versión nueva disponible', 2500);
-      }
+      // El botón "✨ Actualizar" SIEMPRE aparece primero; si hay auto-update,
+      // _onUpdateDetectado lo aplica solo tras un margen visible.
+      if (manual) toast('✨ Hay una versión nueva disponible', 2500);
+      await _onUpdateDetectado();
     } else if (manual) {
       toast('✓ Ya tenés la última versión', 2000);
     }
@@ -107,9 +103,27 @@ function aplicarActualizacionSiCorresponde() {
   if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
 }
 
+/**
+ * Se llama cuando se DETECTA una versión nueva. Regla clave: el botón
+ * "✨ Actualizar" SIEMPRE aparece PRIMERO (junto a la versión), aunque el
+ * auto-update esté activado. Recién después, si hay auto-update, se aplica
+ * sola tras un margen visible (para que el usuario alcance a ver el aviso).
+ */
+let _autoUpdateTimer = null;
+async function _onUpdateDetectado() {
+  _hayActualizacionSW = true;
+  await notificarUpdateDisponible();          // ← muestra el botón antes de actualizar
+  const auto = state.ajustes?.auto_update !== false;
+  if (!auto) return;                          // sin auto-update: queda esperando el toque
+  if (_autoUpdateTimer) clearTimeout(_autoUpdateTimer);
+  // Margen para que el aviso se vea unos segundos antes de recargar.
+  _autoUpdateTimer = setTimeout(() => aplicarActualizacionSiCorresponde(), 5000);
+}
+
 /** Aplica la actualización pendiente (al tocar el aviso junto a la versión). */
 function aplicarUpdateManual() {
   _hayActualizacionSW = true;
+  if (_autoUpdateTimer) { clearTimeout(_autoUpdateTimer); _autoUpdateTimer = null; }
   const waiting = _swReg?.waiting;
   if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
   else location.reload();
@@ -7067,19 +7081,15 @@ async function init() {
         if (!nuevo) return;
         nuevo.addEventListener('statechange', () => {
           if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
-            // Hay un SW nuevo esperando = versión nueva DETECTADA.
-            _hayActualizacionSW = true;
-            const auto = state.ajustes?.auto_update !== false;
-            if (auto) aplicarActualizacionSiCorresponde();
-            else notificarUpdateDisponible();   // aviso "✨ Actualizar" junto a la versión
+            // Versión nueva DETECTADA → el botón "✨ Actualizar" aparece PRIMERO
+            // (con o sin auto-update); si hay auto-update, recién después aplica.
+            _onUpdateDetectado();
           }
         });
       });
       // Si al registrar ya había un SW esperando (update detectado en sesión previa).
       if (reg.waiting && navigator.serviceWorker.controller) {
-        _hayActualizacionSW = true;
-        if (state.ajustes?.auto_update !== false) aplicarActualizacionSiCorresponde();
-        else notificarUpdateDisponible();
+        _onUpdateDetectado();
       }
     } catch (e) {
       console.warn('SW register failed', e);
