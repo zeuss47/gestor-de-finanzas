@@ -5897,10 +5897,12 @@ function _hdRenderCalendar() {
 function _hdRenderCatChips() {
   const box = document.getElementById('hd-cat-filter');
   if (!box) return;
+  const seccion = document.getElementById('hd-cat-section');
 
-  // Solo mostrar chips si estamos viendo gastos
+  // Solo mostrar chips si estamos viendo gastos (en ingresos no hay categorías).
   const tipo = _hdState.tipo;
-  if (tipo === 'ingresos') { box.innerHTML = ''; return; }
+  if (tipo === 'ingresos') { box.innerHTML = ''; if (seccion) seccion.hidden = true; return; }
+  if (seccion) seccion.hidden = false;
 
   // Extraer categorías únicas de los gastos dentro del rango
   const { from, to } = _hdRangeToDates(_hdState.range, _hdState.custom.from, _hdState.custom.to);
@@ -5912,12 +5914,6 @@ function _hdRenderCatChips() {
   }
 
   if (cats.size === 0) { box.innerHTML = ''; return; }
-
-  const CAT_ICON_CHIP = {
-    kiosco:'🥤', combustible:'⛽', comida:'🛒', super:'🛒', servicios:'💡',
-    transporte:'🚌', ocio:'🎬', auto:'🚗', hogar:'🏠', salud:'💊', ropa:'👗',
-    educacion:'📚', restaurante:'🍽', general:'📌',
-  };
 
   box.innerHTML = '';
   // Chip "Todas"
@@ -5933,12 +5929,16 @@ function _hdRenderCatChips() {
   });
   box.appendChild(allChip);
 
-  // Chip por categoría
-  for (const cat of [...cats].sort()) {
+  // Chip por categoría (con nombre e icono legibles + su color cuando está activa)
+  const catsOrden = [...cats].sort((a, b) => _hdCatInfo(a).nombre.localeCompare(_hdCatInfo(b).nombre));
+  for (const cat of catsOrden) {
+    const ci = _hdCatInfo(cat);
+    const activa = _hdState.categorias.has(cat);
     const chip = document.createElement('button');
     chip.type = 'button';
-    chip.className = 'hd-cat-chip' + (_hdState.categorias.has(cat) ? ' active' : '');
-    chip.textContent = `${CAT_ICON_CHIP[cat] || '◆'} ${cat}`;
+    chip.className = 'hd-cat-chip' + (activa ? ' active' : '');
+    chip.textContent = `${ci.icono} ${ci.nombre}`;
+    if (activa) { chip.style.color = ci.color; chip.style.borderColor = ci.color; chip.style.background = ci.color + '1f'; }
     chip.addEventListener('click', () => {
       if (_hdState.categorias.has(cat)) {
         _hdState.categorias.delete(cat);
@@ -5953,12 +5953,65 @@ function _hdRenderCatChips() {
   }
 }
 
+/** Formatea una fecha ISO (YYYY-MM-DD) de forma legible: Hoy / Ayer / "4 jun". */
+function _hdFmtFecha(iso) {
+  if (!iso) return '';
+  const hoy = new Date();
+  const isoHoy  = new Date(hoy.getTime() - hoy.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  const ay = new Date(hoy.getTime() - 86400000);
+  const isoAyer = new Date(ay.getTime() - ay.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  if (iso === isoHoy)  return 'Hoy';
+  if (iso === isoAyer) return 'Ayer';
+  const d = new Date(iso + 'T00:00:00');
+  const opts = { day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== hoy.getFullYear()) opts.year = '2-digit';
+  return d.toLocaleDateString('es-AR', opts).replace(/\./g, '');
+}
+
+/** Devuelve {nombre, icono, color} legibles de una categoría (slug o nombre). */
+function _hdCatInfo(slug) {
+  const cats = state.ajustes?.catalogos?.categorias_gasto?.length
+    ? state.ajustes.catalogos.categorias_gasto
+    : (AJUSTES_DEFAULT.catalogos?.categorias_gasto || []);
+  const s = (slug || '').toLowerCase();
+  const c = cats.find(x => (x.id || x.nombre) === slug || x.nombre?.toLowerCase() === s);
+  return {
+    nombre: c?.nombre || (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'General'),
+    icono:  c?.icono  || CAT_ICON_HD[slug] || '📌',
+    color:  c?.color  || '#94a3b8',
+  };
+}
+
+/** Actualiza los chips de la barra compacta con el filtro activo (fecha/categoría). */
+function _hdUpdateFilterSummary() {
+  const RANGOS = { mes_actual:'Este mes', mes_anterior:'Mes ant.', ultimos_30:'30 días', ultimos_90:'90 días', anio:'Año', custom:'Rango' };
+  const faF = document.getElementById('hd-fa-fecha');
+  const faC = document.getElementById('hd-fa-cat');
+  if (faF) {
+    let txt = RANGOS[_hdState.range] || 'Período';
+    if (_hdState.range === 'custom' && _hdState.custom?.from && _hdState.custom?.to)
+      txt = `${_hdFmtFecha(_hdState.custom.from)}–${_hdFmtFecha(_hdState.custom.to)}`;
+    faF.textContent = '📅 ' + txt;
+  }
+  if (faC) {
+    const n = _hdState.categorias?.size || 0;
+    let txt;
+    if (_hdState.tipo === 'ingresos') txt = '💰 Ingresos';
+    else if (n === 1) txt = '🏷 ' + _hdCatInfo([..._hdState.categorias][0]).nombre;
+    else if (n > 1)   txt = `🏷 ${n} categorías`;
+    else if (_hdState.tipo === 'gastos') txt = '💸 Gastos';
+    else txt = '🏷 Todas';
+    faC.textContent = txt;
+  }
+}
+
 function _hdRenderItems() {
   const list  = document.getElementById('hd-list');
   const empty = document.getElementById('hd-empty');
   if (!list) return;
 
   _hdRenderCatChips();
+  _hdUpdateFilterSummary();
 
   const { from, to } = _hdRangeToDates(_hdState.range, _hdState.custom.from, _hdState.custom.to);
   const { gastos, ingresos } = _hdFiltrarMovimientos(_hdState.widget, from, to);
@@ -5997,21 +6050,25 @@ function _hdRenderItems() {
     empty.classList.add('hidden');
     for (const it of items) {
       const tarj = it.tarjeta_id ? state.tarjetas.find(t => t.id === it.tarjeta_id) : null;
-      const icon = it._tipo === 'ingreso' ? '💰' : (CAT_ICON_HD[it.categoria] || '📌');
-      const color = it._tipo === 'ingreso' ? 'var(--success)' : 'var(--ink)';
-      const sign  = it._tipo === 'ingreso' ? '+' : '-';
-      const meta  = it._tipo === 'ingreso'
-        ? `Período ${it.periodo_aplicacion || '—'}`
-        : `${it.fecha}${tarj ? ' · 💳 ' + escapeHtml(tarj.nombre) : ''}`;
-      const desc = it._tipo === 'gasto' && it.categoria
-        ? `(${escapeHtml(it.categoria)}) - ${escapeHtml(it.descripcion || 'Movimiento')}`
-        : escapeHtml(it.descripcion || 'Movimiento');
+      const esIng = it._tipo === 'ingreso';
+      const ci    = esIng ? { nombre: 'Ingreso', icono: '💰', color: '#10b981' } : _hdCatInfo(it.categoria);
+      const color = esIng ? 'var(--success)' : 'var(--ink)';
+      const sign  = esIng ? '+' : '-';
+      const desc  = escapeHtml(it.descripcion || (esIng ? 'Ingreso' : 'Movimiento'));
+      // Fecha legible (Hoy/Ayer/"4 jun") + método; o período para ingresos.
+      const fechaTxt = esIng ? `Período ${escapeHtml(it.periodo_aplicacion || '—')}` : _hdFmtFecha(it.fecha);
+      const metodoTxt = tarj ? ` · 💳 ${escapeHtml(tarj.nombre)}` : '';
+      // Categoría como badge con su color.
+      const catPill = `<span class="hd-cat-pill" style="color:${ci.color};background:${ci.color}1f;border-color:${ci.color}40">${ci.icono} ${escapeHtml(ci.nombre)}</span>`;
       list.insertAdjacentHTML('beforeend', `
         <div class="hd-item">
-          <span class="hd-item-icon">${icon}</span>
+          <span class="hd-item-icon" style="background:${ci.color}1f;color:${ci.color}">${ci.icono}</span>
           <div class="hd-item-info">
-            <p class="text-sm font-semibold truncate" style="color:var(--ink)">${desc}</p>
-            <p class="text-[10px] truncate" style="color:var(--ink-muted)">${meta}</p>
+            <p class="hd-item-desc">${desc}</p>
+            <div class="hd-item-tags">
+              ${catPill}
+              <span class="hd-item-date">${fechaTxt}${metodoTxt}</span>
+            </div>
           </div>
           <span class="hd-item-monto" style="color:${color}">${sign}${FMT.format(Math.abs(it.monto))}</span>
           <button class="hd-close-btn" data-hd-del="${it._tipo}:${it.id}" title="Eliminar"
@@ -7505,6 +7562,31 @@ async function init() {
   // Botones cerrar
   document.getElementById('hd-close')?.addEventListener('click',  () => hdDlg?.close());
   document.getElementById('hd-close-2')?.addEventListener('click', () => hdDlg?.close());
+
+  // ── Bottom-sheet de filtros: abrir / cerrar / limpiar ──
+  const hdSheet = document.getElementById('hd-filtros-sheet');
+  const _hdAbrirSheet = () => { if (hdSheet) { hdSheet.hidden = false; hdSheet.classList.remove('closing'); } };
+  const _hdCerrarSheet = () => {
+    if (!hdSheet) return;
+    hdSheet.classList.add('closing');
+    setTimeout(() => { hdSheet.hidden = true; hdSheet.classList.remove('closing'); }, 220);
+  };
+  document.getElementById('hd-open-filtros')?.addEventListener('click', _hdAbrirSheet);
+  document.getElementById('hd-sheet-done')?.addEventListener('click', _hdCerrarSheet);
+  document.getElementById('hd-sheet-backdrop')?.addEventListener('click', _hdCerrarSheet);
+  document.getElementById('hd-sheet-reset')?.addEventListener('click', () => {
+    // Resetear a "Este mes" + "Todos" + sin categorías.
+    _hdState.range = 'mes_actual';
+    _hdState.custom = { from: null, to: null };
+    _hdState.tipo = 'todos';
+    _hdState.categorias.clear();
+    document.querySelectorAll('.hd-quick-btn').forEach(b => b.classList.toggle('active', b.dataset.range === 'mes_actual'));
+    document.querySelectorAll('.hd-type-btn').forEach(b => b.classList.toggle('active', b.dataset.htype === 'todos'));
+    const calWrap = document.getElementById('hd-calendar-wrap'); if (calWrap) calWrap.hidden = true;
+    _hdRenderCatChips();
+    _hdRenderItems();
+    _hdRenderChart();
+  });
 
   // Filtros rápidos de fecha
   document.querySelectorAll('.hd-quick-btn').forEach(btn => {

@@ -2426,79 +2426,97 @@
       </div>
     </div>
 
-    <!-- Filtros del drawer -->
+    <!-- Filtros del drawer: barra compacta + bottom-sheet -->
     <div class="widget-drawer-filters">
-     <!-- Dos casillas en la misma línea: Fecha (calendario) + Categoría/tipo -->
-     <div class="hd-filtros-2col">
-      <details class="hd-filtro-box">
-       <summary>📅 <span id="hd-filtro-fecha-lbl">Fecha</span></summary>
-       <div class="hd-filtro-body">
-
-      <!-- Fila 1: rangos rápidos + botón calendario -->
-      <div class="flex gap-1 flex-wrap" id="hd-quick-filters">
-        <button type="button" class="hd-quick-btn active" data-range="mes_actual">Este mes</button>
-        <button type="button" class="hd-quick-btn"        data-range="mes_anterior">Mes ant.</button>
-        <button type="button" class="hd-quick-btn"        data-range="ultimos_30">30 días</button>
-        <button type="button" class="hd-quick-btn"        data-range="ultimos_90">90 días</button>
-        <button type="button" class="hd-quick-btn"        data-range="anio">Año</button>
-        <button type="button" class="hd-quick-btn"        data-range="custom">📅 Rango</button>
+      <!-- Barra compacta: muestra los filtros activos + botón para abrir el panel -->
+      <div class="hd-filter-bar">
+        <div class="hd-filter-active">
+          <span class="hd-fa-chip" id="hd-fa-fecha">📅 Este mes</span>
+          <span class="hd-fa-chip" id="hd-fa-cat">🏷 Todas</span>
+        </div>
+        <button type="button" class="hd-filter-open" id="hd-open-filtros">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+          Filtros
+        </button>
       </div>
+    </div>
 
-      <!-- Calendario desplegable (solo cuando data-range="custom") -->
-      <div id="hd-calendar-wrap" hidden>
-        <!-- Header del calendario: navegación de mes -->
-        <div class="hd-cal-header">
-          <button type="button" id="hd-cal-prev" class="hd-cal-nav">‹</button>
-          <span id="hd-cal-month-label" class="ff-display text-sm font-semibold" style="color:var(--brand)">—</span>
-          <button type="button" id="hd-cal-next" class="hd-cal-nav">›</button>
+    <!-- Bottom-sheet de filtros (overlay sobre el drawer) -->
+    <div class="hd-filtros-sheet" id="hd-filtros-sheet" hidden>
+      <div class="hd-sheet-backdrop" id="hd-sheet-backdrop"></div>
+      <div class="hd-sheet-panel">
+        <div class="hd-sheet-grip"></div>
+        <div class="hd-sheet-head">
+          <span class="hd-sheet-title">Filtros</span>
+          <button type="button" class="hd-sheet-reset" id="hd-sheet-reset">Limpiar todo</button>
+          <button type="button" class="hd-sheet-done" id="hd-sheet-done">Listo</button>
         </div>
-        <!-- Grid de días -->
-        <div id="hd-cal-grid" class="hd-cal-grid">
-          <!-- días de la semana -->
-          <span class="hd-cal-dow">Dom</span>
-          <span class="hd-cal-dow">Lun</span>
-          <span class="hd-cal-dow">Mar</span>
-          <span class="hd-cal-dow">Mié</span>
-          <span class="hd-cal-dow">Jue</span>
-          <span class="hd-cal-dow">Vie</span>
-          <span class="hd-cal-dow">Sáb</span>
-          <!-- días se insertan por JS -->
-        </div>
-        <!-- Indicadores de selección -->
-        <div class="flex items-center gap-3 mt-2 text-xs px-1">
-          <div class="flex items-center gap-1.5">
-            <span class="hd-cal-legend-dot" style="background:var(--brand)"></span>
-            <span style="color:var(--ink-2)">Desde: <b id="hd-cal-from-label" style="color:var(--brand)">—</b></span>
+        <div class="hd-sheet-body">
+
+          <!-- ── Período ── -->
+          <div class="hd-sheet-section">
+            <p class="hd-sheet-label">Período</p>
+            <div class="hd-pill-row" id="hd-quick-filters">
+              <button type="button" class="hd-quick-btn active" data-range="mes_actual">Este mes</button>
+              <button type="button" class="hd-quick-btn"        data-range="mes_anterior">Mes ant.</button>
+              <button type="button" class="hd-quick-btn"        data-range="ultimos_30">30 días</button>
+              <button type="button" class="hd-quick-btn"        data-range="ultimos_90">90 días</button>
+              <button type="button" class="hd-quick-btn"        data-range="anio">Año</button>
+              <button type="button" class="hd-quick-btn"        data-range="custom">📅 Rango</button>
+            </div>
+            <!-- Calendario desplegable (solo cuando data-range="custom") -->
+            <div id="hd-calendar-wrap" hidden>
+              <div class="hd-cal-header">
+                <button type="button" id="hd-cal-prev" class="hd-cal-nav">‹</button>
+                <span id="hd-cal-month-label" class="ff-display text-sm font-semibold" style="color:var(--brand)">—</span>
+                <button type="button" id="hd-cal-next" class="hd-cal-nav">›</button>
+              </div>
+              <div id="hd-cal-grid" class="hd-cal-grid">
+                <span class="hd-cal-dow">Dom</span>
+                <span class="hd-cal-dow">Lun</span>
+                <span class="hd-cal-dow">Mar</span>
+                <span class="hd-cal-dow">Mié</span>
+                <span class="hd-cal-dow">Jue</span>
+                <span class="hd-cal-dow">Vie</span>
+                <span class="hd-cal-dow">Sáb</span>
+              </div>
+              <div class="flex items-center gap-3 mt-2 text-xs px-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="hd-cal-legend-dot" style="background:var(--brand)"></span>
+                  <span style="color:var(--ink-2)">Desde: <b id="hd-cal-from-label" style="color:var(--brand)">—</b></span>
+                </div>
+                <span style="color:var(--ink-muted)">→</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="hd-cal-legend-dot" style="background:var(--neon-pink)"></span>
+                  <span style="color:var(--ink-2)">Hasta: <b id="hd-cal-to-label" style="color:var(--neon-pink)">—</b></span>
+                </div>
+                <button type="button" id="hd-cal-clear" class="ml-auto text-[10px] px-2 py-0.5 rounded-full"
+                        style="background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--border)">
+                  Limpiar
+                </button>
+              </div>
+            </div>
           </div>
-          <span style="color:var(--ink-muted)">→</span>
-          <div class="flex items-center gap-1.5">
-            <span class="hd-cal-legend-dot" style="background:var(--neon-pink)"></span>
-            <span style="color:var(--ink-2)">Hasta: <b id="hd-cal-to-label" style="color:var(--neon-pink)">—</b></span>
+
+          <!-- ── Tipo ── -->
+          <div class="hd-sheet-section">
+            <p class="hd-sheet-label">Tipo de movimiento</p>
+            <div class="hd-pill-row" id="hd-type-filter">
+              <button type="button" class="hd-type-btn active" data-htype="todos">Todos</button>
+              <button type="button" class="hd-type-btn"        data-htype="ingresos">💰 Ingresos</button>
+              <button type="button" class="hd-type-btn"        data-htype="gastos">💸 Gastos</button>
+            </div>
           </div>
-          <button type="button" id="hd-cal-clear" class="ml-auto text-[10px] px-2 py-0.5 rounded-full"
-                  style="background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--border)">
-            Limpiar
-          </button>
+
+          <!-- ── Categoría ── -->
+          <div class="hd-sheet-section" id="hd-cat-section">
+            <p class="hd-sheet-label">Categoría</p>
+            <div id="hd-cat-filter" class="hd-pill-row"></div>
+          </div>
+
         </div>
       </div>
-
-       </div>
-      </details>
-
-      <details class="hd-filtro-box">
-       <summary>🏷 <span id="hd-filtro-cat-lbl">Categoría</span></summary>
-       <div class="hd-filtro-body">
-        <!-- tipo de movimiento -->
-        <div class="flex gap-1" id="hd-type-filter">
-          <button type="button" class="hd-type-btn active" data-htype="todos">Todos</button>
-          <button type="button" class="hd-type-btn"        data-htype="ingresos">💰 Ingresos</button>
-          <button type="button" class="hd-type-btn"        data-htype="gastos">💸 Gastos</button>
-        </div>
-        <!-- filtro de categorías (chips, generados por JS) -->
-        <div id="hd-cat-filter" class="flex gap-1 flex-wrap mt-2"></div>
-       </div>
-      </details>
-     </div>
+    </div>
 
     </div>
 
