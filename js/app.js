@@ -3241,9 +3241,10 @@ function renderMovimientos() {
       </div>`;
   };
   const gastoHTML = (g) => {
-    const catObj  = allCats.find(c => c.id === g.categoria || c.nombre?.toLowerCase() === (g.categoria||'').toLowerCase());
-    const icon    = catObj?.icono || CAT_ICON[g.categoria] || '📌';
-    const catColor= catObj?.color || '#94a3b8';
+    const esPago  = !!g.es_pago_tarjeta;   // pago de tarjeta: ícono y trato distinto
+    const catObj  = esPago ? null : allCats.find(c => c.id === g.categoria || c.nombre?.toLowerCase() === (g.categoria||'').toLowerCase());
+    const icon    = esPago ? '💳' : (catObj?.icono || CAT_ICON[g.categoria] || '📌');
+    const catColor= esPago ? '#a78bfa' : (catObj?.color || '#94a3b8');
     const monto   = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
     const cuotas  = g.tipo === 'cuotas' ? `cuota ${g.cuota_numero}/${g.cuotas_total}` : '';
     const tarjeta = g.tarjeta_id ? state.tarjetas.find(t=>t.id===g.tarjeta_id) : null;
@@ -3263,7 +3264,7 @@ function renderMovimientos() {
           </div>
           <div class="mov-row-meta" style="margin-top:.2rem">
             <span class="mov-cat-badge" style="background:${catColor}14;color:${catColor};border-color:${catColor}33">
-              ${icon} ${escapeHtml(catObj?.nombre || g.categoria || 'general')}
+              ${icon} ${escapeHtml(esPago ? 'Pago tarjeta' : (catObj?.nombre || g.categoria || 'general'))}
             </span>
             ${g.subcategoria ? `<span class="mov-subcat-badge">${escapeHtml(g.subcategoria)}</span>` : ''}
           </div>
@@ -3272,8 +3273,10 @@ function renderMovimientos() {
           <span class="mov-row-monto">${monedaFmt}</span>
           ${g.compartido ? `<span style="font-size:.68rem;color:var(--ink-muted)">total ${FMT.format(g.monto)}</span>` : ''}
           <div class="mov-row-actions">
-            <button class="mov-row-btn edit" data-edit-gas="${g.id}" title="Editar">${SVG_EDIT}</button>
-            <button class="mov-row-btn del"  data-del-gas="${g.id}"  title="Eliminar">${SVG_TRASH}</button>
+            ${esPago
+              ? `<span class="mov-pago-hint" title="Revertí el pago desde la tarjeta (Tarjetas → ↺ Pendiente)">↩ desde tarjeta</span>`
+              : `<button class="mov-row-btn edit" data-edit-gas="${g.id}" title="Editar">${SVG_EDIT}</button>
+                 <button class="mov-row-btn del"  data-del-gas="${g.id}"  title="Eliminar">${SVG_TRASH}</button>`}
           </div>
         </div>
       </div>`;
@@ -3283,9 +3286,10 @@ function renderMovimientos() {
   const items = [];
   for (const i of ingresosMes) items.push({ fecha: i.fecha || '', tipo: 'ingreso', signo: +1, monto: (i.sueldo_neto||0)+(i.bonos||0), html: ingresoHTML(i) });
   for (const g of gastosMes) {
-    if (g.es_pago_tarjeta) continue;
     const m = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
-    items.push({ fecha: g.fecha || '', tipo: 'gasto', signo: -1, monto: m, moneda: g.moneda, html: gastoHTML(g) });
+    // Los pagos de tarjeta SÍ se muestran en el historial (egreso real de la cuenta),
+    // pero NO se suman al "total del día" para no inflar los consumos (ya están en la deuda).
+    items.push({ fecha: g.fecha || '', tipo: 'gasto', signo: -1, monto: m, moneda: g.moneda, esPago: !!g.es_pago_tarjeta, html: gastoHTML(g) });
   }
   items.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
 
@@ -3308,8 +3312,8 @@ function renderMovimientos() {
   };
 
   for (const [fecha, grupo] of grupos) {
-    // Total neto del día (gastos solo en ARS para el resumen rápido)
-    const totalDiaArs = grupo.filter(x => x.tipo === 'gasto' && (!x.moneda || x.moneda === 'ARS'))
+    // Total neto del día (consumos en ARS; excluye pagos de tarjeta para no doble-contar)
+    const totalDiaArs = grupo.filter(x => x.tipo === 'gasto' && !x.esPago && (!x.moneda || x.moneda === 'ARS'))
       .reduce((a, x) => a + x.monto, 0);
     // Cada día va en SU PROPIO bloque (encabezado + sus ítems juntos): así en el
     // layout de 2 columnas (desktop) el grupo no se parte entre columnas.

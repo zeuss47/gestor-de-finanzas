@@ -3676,6 +3676,13 @@ body.view-analisis #main-widgets::before {
 .cl-items { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .3rem; }
 .cl-item { font-size: .8rem; color: var(--ink-2); display: flex; align-items: flex-start; gap: .5rem; line-height: 1.4; }
 .cl-item::before { content: '·'; color: var(--brand); font-weight: 900; flex-shrink: 0; margin-top: .05rem; }
+
+/* Hint en el pago de tarjeta dentro del historial (solo lectura) */
+.mov-pago-hint {
+  font-size: .6rem; color: var(--ink-muted); white-space: nowrap;
+  padding: .15rem .4rem; border-radius: .5rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
 .ver-update {
   border: none; cursor: pointer;
   font-family: 'Space Grotesk', system-ui, sans-serif;
