@@ -225,13 +225,23 @@ function _calcAplicar() { _calcCerrar(true); }
 function _calcAbrir(input, opts = {}) {
   if (_calc.input && _calc.input !== input) _calcCerrar(true); // confirmar el anterior
   _calcCrearPop();
-  // Insertar el teclado INLINE, después de la FILA del campo. Si el monto está
-  // en una grilla (monto + fecha en la misma línea) anclamos a la grilla para
-  // que el teclado quede debajo de toda la línea, no metido en una columna.
-  const anchor = input.closest('.calc-row') || input.closest('.grid')
-              || input.closest('.form-section') || input.closest('.input-with-prefix') || input;
-  if (_calc.pop.previousElementSibling !== anchor || !_calc.pop.parentElement) {
-    anchor.insertAdjacentElement('afterend', _calc.pop);
+  // En el form de UNA pantalla (.flat) el teclado NO empuja el layout: se vuelve
+  // un panel flotante anclado al fondo del diálogo (bottom-sheet). Así el form se
+  // ve completo y el teclado se superpone abajo, con "✓ Aplicar" para cerrarlo.
+  const flatForm = input.closest('.gasto-wizard.flat');
+  if (flatForm) {
+    _calc.pop.classList.add('calc-sheet');
+    if (_calc.pop.parentElement !== flatForm) flatForm.appendChild(_calc.pop);
+  } else {
+    _calc.pop.classList.remove('calc-sheet');
+    // Insertar el teclado INLINE, después de la FILA del campo. Si el monto está
+    // en una grilla (monto + fecha en la misma línea) anclamos a la grilla para
+    // que el teclado quede debajo de toda la línea, no metido en una columna.
+    const anchor = input.closest('.calc-row') || input.closest('.grid')
+                || input.closest('.form-section') || input.closest('.input-with-prefix') || input;
+    if (_calc.pop.previousElementSibling !== anchor || !_calc.pop.parentElement) {
+      anchor.insertAdjacentElement('afterend', _calc.pop);
+    }
   }
   _calc.input = input;
   _calc.expr = (input.value && parseFloat(input.value)) ? String(input.value) : '';
@@ -242,8 +252,8 @@ function _calcAbrir(input, opts = {}) {
   _calc.pop.hidden = false;
   _calcRender();
   // Asegurar que el teclado quede a la vista (salvo auto-apertura: opts.scroll=false,
-  // para no saltar lejos de las categorías cuando se abre sola al cargar el form).
-  if (opts.scroll !== false) {
+  // o panel flotante: ya está fijo abajo, no hace falta scrollear).
+  if (opts.scroll !== false && !flatForm) {
     setTimeout(() => { try { _calc.pop.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {} }, 60);
   }
 }

@@ -4588,7 +4588,23 @@ body.view-analisis #main-widgets::before {
 .gasto-wizard.flat .gasto-slide-badge,
 .gasto-wizard.flat #gasto-next-1, .gasto-wizard.flat #gasto-next-2,
 .gasto-wizard.flat #ingreso-next-1, .gasto-wizard.flat #ingreso-next-2 { display: none !important; }
-.gasto-wizard.flat .gasto-slide-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); margin: .3rem 0 .5rem; }
+.gasto-wizard.flat .gasto-slide-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); margin: .25rem 0 .35rem; }
+/* ── Una sola pantalla COMPLETA, sin deslizar ───────────────────────────
+   - Se quita la subcategoría (chips + "otra subcategoría").
+   - Se agrupan/compactan las secciones para que entre todo de una. */
+.gasto-wizard.flat #row-subcategoria-gasto { display: none !important; }
+.gasto-wizard.flat .gasto-slide { padding-top: .12rem; padding-bottom: .12rem; }
+.gasto-wizard.flat .gasto-slide:first-of-type { padding-top: .5rem; }
+.gasto-wizard.flat .form-section { margin-bottom: 0; }
+.gasto-wizard.flat .input-lg { padding-top: .5rem; padding-bottom: .5rem; font-size: .92rem; }
+.gasto-wizard.flat .gasto-monto-big { font-size: 1.15rem; }
+.gasto-wizard.flat #inp-categoria-gasto,
+.gasto-wizard.flat #inp-concepto-ingreso { margin-top: .4rem; }
+.gasto-wizard.flat .pago-chips { gap: .3rem; }
+.gasto-wizard.flat .pago-chip { padding: .4rem .65rem; font-size: .82rem; }
+.gasto-wizard.flat .grid.calc-row { gap: .55rem; }
+/* El botón Guardar pegado al final, sin margen grande que empuje el scroll. */
+.gasto-wizard.flat [value="save"] { margin-top: .6rem !important; }
 /* Toggle Gasto/Ingreso en el header */
 .mov-toggle { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: .7rem; padding: .15rem; gap: .15rem; }
 .mov-toggle button {
@@ -4834,6 +4850,25 @@ body.view-analisis #main-widgets::before {
   text-transform: uppercase; letter-spacing: .05em; font-size: .9rem;
 }
 .calc-k.calc-zero { grid-column: span 2; }
+
+/* ── Teclado como panel flotante (bottom-sheet) en el form de UNA pantalla ──
+   No empuja el layout: se ancla al fondo del diálogo y se superpone abajo.
+   Así el form se ve completo y el teclado aparece sobre la zona inferior;
+   "✓ Aplicar" lo cierra y deja a la vista cuenta + Guardar. */
+.gasto-wizard.flat { position: relative; }
+.calc-pop.calc-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 8;
+  width: auto; margin: 0;
+  border: none; border-top: 1px solid var(--brand-soft);
+  border-radius: 1.1rem 1.1rem 0 0;
+  background: var(--surface, #0b0e1a);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 -12px 34px rgba(0,0,0,.45);
+  padding: .6rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
+  animation: calc-sheet-up .2s cubic-bezier(.16,1,.3,1);
+}
+@keyframes calc-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.calc-pop.calc-sheet .calc-k { padding: .58rem 0; }
 
 /* Chips de cuenta/tarjeta en el paso "¿Cómo pagás?" (aparecen automáticamente) */
 .pago-chips { display: flex; flex-wrap: wrap; gap: .45rem; }
