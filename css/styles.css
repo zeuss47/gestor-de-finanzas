@@ -1126,21 +1126,15 @@ fieldset legend {
 .widget-in:nth-child(8), .widget:nth-child(8) { animation-delay: .42s; }
 
 /* ── Ítem 2: scroll fluido (objetivo 120fps) + transición suave de página ──
-   El scroll compone en GPU (transform:translateZ) con momentum y sin rebote
-   que propague; el contenido se mueve por el compositor, no por layout. */
+   Momentum + overscroll contenido. NOTA: NO usar `transform`/`will-change` en
+   los contenedores de scroll: crean un containing block y rompen el
+   `position: fixed` de la barra inferior y el FAB (la barra scrolleaba). */
 html { scroll-behavior: smooth; }
 body, #main-area, #main-widgets,
 #section-movimientos, #sec-tarjetas-mobile, #sec-metas-mobile {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
 }
-#main-area, #main-widgets,
-#section-movimientos, #sec-tarjetas-mobile, #sec-metas-mobile {
-  transform: translateZ(0);          /* capa propia → scroll en GPU */
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-.widget { will-change: transform, opacity; }
 /* Easing más suave en la entrada/deslizamiento de widgets */
 .widget-in, .widget { animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
 

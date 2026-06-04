@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.67",
-    "build":  84,
-    "modified":  "2026-06-03T23:56:14Z",
-    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js, js/receipt-extractor.js, tests/_...",
-    "notes":  "Auto-update 2026-06-03 20:56"
+    "version":  "1.68",
+    "build":  85,
+    "modified":  "2026-06-04T00:11:38Z",
+    "commit":  "M css/styles.css",
+    "notes":  "Auto-update 2026-06-03 21:11"
 }
