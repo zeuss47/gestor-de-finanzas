@@ -243,9 +243,13 @@ html.light #right-panel {
 
 /* ── Guard responsive: ninguna vista/pestaña genera scroll horizontal ──────
    Las vistas se adaptan al ancho real del dispositivo (S25 Ultra, iPhone, etc.)
-   sin que un input/chip de ancho fijo empuje el layout. */
-html, body { overflow-x: hidden; max-width: 100vw; }
-#main-area, #main-widgets { overflow-x: hidden; min-width: 0; max-width: 100%; }
+   sin que un input/chip de ancho fijo empuje el layout.
+   IMPORTANTE: usar `overflow-x: clip` (NO `hidden`). `clip` recorta el eje X
+   sin crear un contenedor de scroll, así NO rompe el scroll vertical táctil.
+   `overflow-x: hidden` en <html> (que tiene height:100%) lo volvía un scroller
+   de altura fija y mataba el scroll en el celular. */
+body { overflow-x: clip; }
+#main-area, #main-widgets { overflow-x: clip; min-width: 0; max-width: 100%; }
 /* Inputs de filtro de mes/fecha: que se encojan, no que estiren la fila. */
 .mov-mes-filter, input[type="month"], input[type="date"] { min-width: 0; max-width: 100%; }
 
