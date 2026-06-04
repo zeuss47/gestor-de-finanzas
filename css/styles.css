@@ -1100,6 +1100,22 @@ fieldset legend {
   white-space: nowrap;
 }
 #toast.show { display: block; animation: toast-in .22s ease-out; }
+/* Variante con acción "Deshacer" (reemplaza el confirm nativo al borrar). */
+#toast.toast-with-undo {
+  display: none;
+  align-items: center; gap: .85rem;
+  padding-right: .4rem;
+}
+#toast.toast-with-undo.show { display: inline-flex; }
+.toast-undo {
+  border: none; cursor: pointer;
+  background: var(--brand, #00f0ff); color: #00131a;
+  font-weight: 700; font-size: .78rem;
+  padding: .35rem .7rem; border-radius: calc(var(--r) - 3px);
+  white-space: nowrap; transition: filter .15s ease, transform .08s ease;
+}
+.toast-undo:hover { filter: brightness(1.08); }
+.toast-undo:active { transform: scale(.95); }
 
 /* ── Alerts / pulse-glow ─────────────────────────────────────── */
 .pulse-warn  { animation: pulse-warn  1.6s ease-in-out infinite; }

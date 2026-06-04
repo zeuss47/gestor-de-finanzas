@@ -2667,11 +2667,8 @@ function renderSueldo(el) {
     }
     tbody.querySelectorAll('[data-rec-del]').forEach(b => {
       b.addEventListener('click', async () => {
-        if (!confirm('¿Eliminar este recibo?')) return;
-        await DB.softDelete('ingresos', b.dataset.recDel);
-        notificarCambioLocal();
-        await reloadAll();
-        toast('Recibo eliminado');
+        await eliminarConDeshacer('ingresos', b.dataset.recDel, 'Recibo eliminado',
+          async () => { await reloadAll(); });
       });
     });
   }
@@ -3211,17 +3208,15 @@ function renderMovimientos() {
   list.querySelectorAll('[data-del-gas]').forEach(btn => {
     btn.onclick = async (e) => {
       e.stopPropagation();
-      if (!confirm('¿Eliminar este gasto?')) return;
-      await DB.softDelete('gastos', btn.dataset.delGas);
-      notificarCambioLocal(); toast('Gasto eliminado'); await reloadAll();
+      await eliminarConDeshacer('gastos', btn.dataset.delGas, 'Gasto eliminado',
+        async () => { await reloadAll(); });
     };
   });
   list.querySelectorAll('[data-del-ing]').forEach(btn => {
     btn.onclick = async (e) => {
       e.stopPropagation();
-      if (!confirm('¿Eliminar este ingreso?')) return;
-      await DB.softDelete('ingresos', btn.dataset.delIng);
-      notificarCambioLocal(); toast('Ingreso eliminado'); await reloadAll();
+      await eliminarConDeshacer('ingresos', btn.dataset.delIng, 'Ingreso eliminado',
+        async () => { await reloadAll(); });
     };
   });
   list.querySelectorAll('[data-edit-gas]').forEach(btn => {
@@ -4405,11 +4400,62 @@ function renderWidgetHabituales(el) {
 }
 
 /* ============ Helpers ============ */
+let _toastTimer = null;
 function toast(msg, ms=1800) {
   const t = document.getElementById('toast');
+  if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+  t.classList.remove('toast-with-undo');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), ms);
+  _toastTimer = setTimeout(() => { t.classList.remove('show'); _toastTimer = null; }, ms);
+}
+
+/**
+ * Toast con acción "Deshacer". Reemplaza al confirm() nativo del navegador
+ * (que en la PWA de GitHub Pages aparece como "[sitio].github.io dice…").
+ * Borra al instante y deja ~5s para revertir, sin diálogos.
+ */
+function toastUndo(msg, onUndo, ms = 5000) {
+  const t = document.getElementById('toast');
+  if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+  t.textContent = '';
+  t.classList.add('toast-with-undo');
+  const span = document.createElement('span');
+  span.textContent = msg;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-undo';
+  btn.textContent = '↶ Deshacer';
+  t.append(span, btn);
+  t.classList.add('show');
+  const cerrar = () => {
+    if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+    t.classList.remove('show');
+    setTimeout(() => { if (!t.classList.contains('show')) { t.textContent = ''; t.classList.remove('toast-with-undo'); } }, 250);
+  };
+  btn.onclick = async () => { cerrar(); try { await onUndo(); } catch (e) { console.error(e); } };
+  _toastTimer = setTimeout(cerrar, ms);
+}
+
+/**
+ * Borra un registro de un store con opción de Deshacer (sin confirm nativo).
+ * @param {string} store   store de IndexedDB (gastos, ingresos, cuentas, tarjetas…)
+ * @param {string} id      id del registro
+ * @param {string} msg     texto del toast (ej. "Gasto eliminado")
+ * @param {function} despues  re-render a ejecutar tras borrar y tras deshacer
+ */
+async function eliminarConDeshacer(store, id, msg, despues) {
+  const obj = await DB.get(store, id);
+  if (!obj) return;
+  await DB.softDelete(store, id);
+  notificarCambioLocal();
+  if (despues) await despues();
+  toastUndo(msg, async () => {
+    await DB.put(store, { ...obj, deleted: false });  // gana el LWW (updated_at nuevo)
+    notificarCambioLocal();
+    if (despues) await despues();
+    toast('Restaurado');
+  });
 }
 function escapeHtml(s='') {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -5936,14 +5982,9 @@ function _hdRenderItems() {
   list.querySelectorAll('[data-hd-del]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm('¿Eliminar este movimiento?')) return;
       const [tipo, id] = btn.dataset.hdDel.split(':');
-      await DB.softDelete(tipo === 'ingreso' ? 'ingresos' : 'gastos', id);
-      notificarCambioLocal();
-      toast('✓ Eliminado');
-      await reloadAll();
-      _hdRenderItems();
-      _hdRenderChart();
+      await eliminarConDeshacer(tipo === 'ingreso' ? 'ingresos' : 'gastos', id, '✓ Eliminado',
+        async () => { await reloadAll(); _hdRenderItems(); _hdRenderChart(); });
     });
   });
 }
@@ -7724,9 +7765,13 @@ function renderCatalogoSettings(tipo) {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.idx);
       const tp = btn.dataset.tipo;
-      if (!confirm('¿Eliminar esta categoría?')) return;
-      state.ajustes.catalogos[`categorias_${tp}`].splice(idx, 1);
+      const arr = state.ajustes.catalogos[`categorias_${tp}`];
+      const [removida] = arr.splice(idx, 1);
       renderCatalogoSettings(tp);
+      toastUndo('Categoría eliminada', () => {
+        arr.splice(idx, 0, removida);   // reinsertar en su posición original
+        renderCatalogoSettings(tp);
+      });
     };
   });
 
@@ -7989,12 +8034,8 @@ function renderCuentasSettings() {
   });
   cont.querySelectorAll('[data-action="edit"]').forEach(b => b.onclick = () => editarCuenta(b.dataset.id));
   cont.querySelectorAll('[data-action="del"]').forEach(b => b.onclick = async () => {
-    if (!confirm('¿Eliminar esta cuenta? Los movimientos asociados no se borran.')) return;
-    await DB.softDelete('cuentas', b.dataset.id);
-    notificarCambioLocal();
-    await reloadAll();
-    renderCuentasSettings();
-    toast('Cuenta eliminada');
+    await eliminarConDeshacer('cuentas', b.dataset.id, 'Cuenta eliminada',
+      async () => { await reloadAll(); renderCuentasSettings(); });
   });
 }
 
@@ -8043,12 +8084,8 @@ function renderTarjetasSettings() {
   });
   cont.querySelectorAll('[data-action="edit"]').forEach(b => b.onclick = () => editarTarjeta(b.dataset.id));
   cont.querySelectorAll('[data-action="del"]').forEach(b => b.onclick = async () => {
-    if (!confirm('¿Eliminar esta tarjeta? Los gastos asociados no se borran pero quedarán huérfanos.')) return;
-    await DB.softDelete('tarjetas', b.dataset.id);
-    notificarCambioLocal();
-    await reloadAll();
-    renderTarjetasSettings();
-    toast('Tarjeta eliminada');
+    await eliminarConDeshacer('tarjetas', b.dataset.id, 'Tarjeta eliminada',
+      async () => { await reloadAll(); renderTarjetasSettings(); });
   });
 }
 
