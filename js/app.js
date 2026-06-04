@@ -7095,39 +7095,21 @@ async function init() {
   await loadAjustes();
   aplicarTema();
 
+  // ── RENDER INMEDIATO desde IndexedDB local ─────────────────────────────
+  // Los datos locales se muestran al instante (sin esperar red ni SW).
+  // La sincronización con GitHub ocurre después, en background.
+  await reloadAll();
+
   // Cargar version.json (no bloqueante: si falla, seguimos)
   cargarVersion();
 
-  // Service Worker + auto-update
+  // ── Calculadora, boleta, orientación (síncronos, 0 costo perceptible) ──
+  initCalculadora();
+  initRevisionTicket();
+  bloquearOrientacion();
+
+  // ── Service Worker: no-bloqueante (se registra en background) ───────────
   if ('serviceWorker' in navigator) {
-    try {
-      // updateViaCache:'none' → el navegador NO cachea sw.js, así detecta cada
-      // deploy nuevo (la VERSION del SW se bumpea en cada push).
-      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-      _swReg = reg;
-      if ('sync' in reg) {
-        try { await reg.sync.register('sync-data'); } catch {}
-      }
-      // Cuando un SW nuevo termina de instalarse y queda esperando, lo aplicamos
-      // según la preferencia de auto-update del usuario.
-      reg.addEventListener('updatefound', () => {
-        const nuevo = reg.installing;
-        if (!nuevo) return;
-        nuevo.addEventListener('statechange', () => {
-          if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
-            // Versión nueva DETECTADA → el botón "✨ Actualizar" aparece PRIMERO
-            // (con o sin auto-update); si hay auto-update, recién después aplica.
-            _onUpdateDetectado();
-          }
-        });
-      });
-      // Si al registrar ya había un SW esperando (update detectado en sesión previa).
-      if (reg.waiting && navigator.serviceWorker.controller) {
-        _onUpdateDetectado();
-      }
-    } catch (e) {
-      console.warn('SW register failed', e);
-    }
     // Recargar una sola vez cuando el SW nuevo toma control
     let _recargando = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -7135,53 +7117,45 @@ async function init() {
       _recargando = true;
       location.reload();
     });
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then(reg => {
+        _swReg = reg;
+        if ('sync' in reg) {
+          try { reg.sync.register('sync-data'); } catch {}
+        }
+        reg.addEventListener('updatefound', () => {
+          const nuevo = reg.installing;
+          if (!nuevo) return;
+          nuevo.addEventListener('statechange', () => {
+            if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+              _onUpdateDetectado();
+            }
+          });
+        });
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          _onUpdateDetectado();
+        }
+      })
+      .catch(e => console.warn('SW register failed', e));
   }
 
-  // Chequeo periódico de actualizaciones (cada 10 min si la app está visible)
+  // ── Actualizaciones + cotizaciones: no bloqueantes ──────────────────────
   iniciarChequeoActualizaciones();
-
-  // Calculadora emergente en los campos de monto (input[data-calc])
-  initCalculadora();
-
-  // Carga de boleta/ticket (PDF o imagen con OCR) + revisión por ítem
-  initRevisionTicket();
-
-  // Bloqueo de orientación tipo SCREEN_ORIENTATION_LOCKED: congela la
-  // orientación de carga (lock nativo en Android + compensación en iOS).
-  bloquearOrientacion();
-
-  // Si venimos de un reset, NO hacer pull inicial: evita que el merge LWW
-  // restaure datos del repo antes de que el usuario lo decida.
-  const _vieneDeReset = new URLSearchParams(location.search).has('reset');
-
-  // Pull inicial + arrancar auto-sync si hay config GitHub
-  const cfg = state.ajustes?.github;
-  if (cfg?.pat && !_vieneDeReset) {
-    try { await pullAll(cfg); } catch (e) { console.warn('Pull inicial falló', e); }
-  }
-
-  await reloadAll();
-
-  // Auto-fetch de cotizaciones live (cache 5min, silencioso si falla)
   actualizarCotizacionesAuto(false).then(fresh => {
     if (fresh) {
-      // Re-render del widget si está visible (sin recargar todo)
       const w = document.querySelector('[data-widget="tipo_cambio"]');
       if (w && typeof renderTipoCambio === 'function') renderTipoCambio(w);
     }
   }).catch(() => {});
-
-  // Refresh periódico cada 15 min (solo si la app está visible)
   setInterval(() => {
     if (document.visibilityState === 'visible') {
       actualizarCotizacionesAuto(false).then(fresh => {
-        if (fresh) {
-          const w = document.querySelector('[data-widget="tipo_cambio"]');
-          if (w) renderTipoCambio(w);
-        }
+        if (fresh) { const w=document.querySelector('[data-widget="tipo_cambio"]'); if(w) renderTipoCambio(w); }
       }).catch(() => {});
     }
   }, 15 * 60 * 1000);
+
+  const _vieneDeReset = new URLSearchParams(location.search).has('reset');
 
   // Iniciar auto-sync (cada 5min + al volver online + al ocultar pestaña).
   // Si venimos de un reset, NO arrancamos auto-sync automáticamente para no
