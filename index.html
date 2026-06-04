@@ -1230,8 +1230,9 @@
           <div class="chip-row chip-row-big" id="chips-concepto-ingreso">
             <!-- Se renderiza desde las categorías de ingreso del usuario -->
           </div>
-          <input name="descripcion" id="inp-concepto-ingreso" placeholder="Otro concepto…" class="input mt-3"
-                 autocomplete="off" style="font-size:.9rem" />
+          <!-- El concepto se elige SOLO con los chips de arriba; este campo guarda
+               el valor (sin casilla visible de "otro concepto"). -->
+          <input type="hidden" name="descripcion" id="inp-concepto-ingreso" />
           <button type="button" id="ingreso-next-1" class="btn-primary w-full mt-4">Siguiente →</button>
         </div>
 
