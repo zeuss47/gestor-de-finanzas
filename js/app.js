@@ -222,7 +222,7 @@ function _calcTecla(k) {
 
 function _calcAplicar() { _calcCerrar(true); }
 
-function _calcAbrir(input) {
+function _calcAbrir(input, opts = {}) {
   if (_calc.input && _calc.input !== input) _calcCerrar(true); // confirmar el anterior
   _calcCrearPop();
   // Insertar el teclado INLINE, después de la FILA del campo. Si el monto está
@@ -241,8 +241,11 @@ function _calcAbrir(input) {
   input.blur();
   _calc.pop.hidden = false;
   _calcRender();
-  // Asegurar que el teclado quede a la vista dentro del diálogo
-  setTimeout(() => { try { _calc.pop.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {} }, 60);
+  // Asegurar que el teclado quede a la vista (salvo auto-apertura: opts.scroll=false,
+  // para no saltar lejos de las categorías cuando se abre sola al cargar el form).
+  if (opts.scroll !== false) {
+    setTimeout(() => { try { _calc.pop.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {} }, 60);
+  }
 }
 
 /** Vuelca el valor calculado al campo, sin cerrar la calculadora. */
@@ -3337,8 +3340,9 @@ function prepararDialogoIngreso(form) {
   // ── Navegación del wizard ────────────────────────────────────
   let pasoActual = 1;
   const backBtn = form.querySelector('#ingreso-btn-back');
+  const flat = form.classList.contains('flat');   // una sola pantalla
   const irAPaso = (paso) => {
-    if (_calc.input) _calcCerrar(true);   // cerrar la calc al cambiar de sección
+    if (!flat && _calc.input) _calcCerrar(true);   // en flat NO cerramos la calc
     pasoActual = paso;
     if (slides) slides.dataset.current = String(paso);
     form.querySelectorAll('.gasto-step-dot').forEach(d => {
@@ -3348,10 +3352,17 @@ function prepararDialogoIngreso(form) {
     });
     form.querySelectorAll('.gasto-step-line').forEach((l, i) => l.classList.toggle('done', i < paso - 1));
     if (backBtn) backBtn.hidden = paso === 1;
-    setTimeout(() => _autoFocusSlide(form.querySelector(`.gasto-slide[data-slide="${paso}"]`)), 380);
+    if (!flat) setTimeout(() => _autoFocusSlide(form.querySelector(`.gasto-slide[data-slide="${paso}"]`)), 380);
   };
   if (backBtn) backBtn.onclick = () => irAPaso(Math.max(1, pasoActual - 1));
   irAPaso(1);
+
+  // En una sola pantalla: la calculadora aparece ACTIVA sobre el monto al abrir
+  // (sin tocar el campo). No scrollea para que se vean los conceptos primero.
+  if (flat) setTimeout(() => {
+    const m = form.querySelector('input[data-calc]');
+    if (m && _calc.input !== m) _calcAbrir(m, { scroll: false });
+  }, 350);
 
   // ── PASO 1: elegir concepto y avanzar ────────────────────────
   const conceptoInput = form.querySelector('#inp-concepto-ingreso');
@@ -3364,7 +3375,7 @@ function prepararDialogoIngreso(form) {
     r.addEventListener('change', () => {
       const cat = cats.find(c => c.nombre === r.value);
       setConcepto(r.value, cat?.icono || '💰');
-      setTimeout(() => irAPaso(2), 260);
+      if (!flat) setTimeout(() => irAPaso(2), 260);   // en flat no avanzo ni cierro la calc
     });
   });
   if (conceptoInput) conceptoInput.oninput = e => setConcepto(e.target.value, '💰');
@@ -3456,9 +3467,10 @@ function prepararDialogoGasto(form) {
   // ── Funciones del wizard ─────────────────────────────────────
   let pasoActual = 1;
   const backBtn = form.querySelector('#gasto-btn-back');
+  const flat = form.classList.contains('flat');   // una sola pantalla
 
   const irAPaso = (paso, dir = 1) => {
-    if (_calc.input) _calcCerrar(true);   // cerrar la calc al cambiar de sección
+    if (!flat && _calc.input) _calcCerrar(true);   // en flat NO cerramos la calc
     pasoActual = paso;
     if (slides) slides.dataset.current = String(paso);
     // Stepper dots
@@ -3471,8 +3483,8 @@ function prepararDialogoGasto(form) {
       l.classList.toggle('done', i < paso - 1);
     });
     if (backBtn) backBtn.hidden = paso === 1;
-    // Foco en el primer campo del nuevo paso
-    setTimeout(() => {
+    // Foco en el primer campo del nuevo paso (en flat no robamos foco).
+    if (!flat) setTimeout(() => {
       const slide = form.querySelector(`.gasto-slide[data-slide="${paso}"]`);
       slide?.querySelector('input:not([type=hidden])')?.focus?.();
     }, 380);
@@ -3480,6 +3492,13 @@ function prepararDialogoGasto(form) {
 
   if (backBtn) backBtn.onclick = () => irAPaso(Math.max(1, pasoActual - 1), -1);
   irAPaso(1);
+
+  // En una sola pantalla: la calculadora aparece ACTIVA sobre el monto al abrir
+  // (sin tener que tocar el campo). No scrollea para que se vean las categorías.
+  if (flat) setTimeout(() => {
+    const m = form.querySelector('input[data-calc]');
+    if (m && _calc.input !== m) _calcAbrir(m, { scroll: false });
+  }, 350);
 
   // ── PASO 1: elegir categoría y avanzar ────────────────────────
   const actualizarCategoria = (catId, nombreMostrar, icono) => {
@@ -3497,8 +3516,8 @@ function prepararDialogoGasto(form) {
       const cat = cats.find(c => (c.id||c.nombre) === r.value);
       actualizarCategoria(r.value, cat?.nombre || r.value, cat?.icono || '');
       const subcats = cat?.subcategorias || [];
-      // Si tiene subcategorías, no autoavanzo: espero que elija subcategoría
-      if (!subcats.length) setTimeout(() => irAPaso(2), 280);
+      // En flat no auto-avanzo (no hay pasos) ni cierro la calc: solo seteo cat.
+      if (!flat && !subcats.length) setTimeout(() => irAPaso(2), 280);
     });
   });
 
