@@ -216,7 +216,27 @@ function _calcTecla(k) {
   _calcRender();
 }
 
-function _calcAplicar() { _calcCerrar(true); }
+function _calcAplicar() {
+  const input = _calc.input;
+  const form = input?.closest?.('.gasto-wizard.flat');
+  // En forms normales (no flat) sólo confirma el valor y cierra.
+  if (!form) { _calcCerrar(true); return; }
+
+  // En el form flat de gasto/ingreso, "✓ Guardar" del teclado REGISTRA directo.
+  _calcCommit();                                   // vuelca el resultado al monto
+  const dlg = form.closest('dialog');
+  const monto = parseFloat(String(input?.value || '').replace(',', '.')) || 0;
+  if (!monto) { toast('Ingresá un monto', 1800); return; }   // dejar la calc abierta
+  if (dlg?.id === 'dlg-gasto' && !form.querySelector('[name="categoria"]')?.value) {
+    toast('Elegí una categoría', 1800); return;
+  }
+  if (dlg?.id === 'dlg-ingreso' && !form.querySelector('[name="descripcion"]')?.value) {
+    toast('Elegí un concepto', 1800); return;
+  }
+  // Todo OK → cerrar la calc y disparar el guardado existente (close → handleSubmit*).
+  _calcCerrar(true);
+  dlg?.close('save');
+}
 
 function _calcAbrir(input, opts = {}) {
   if (_calc.input && _calc.input !== input) _calcCerrar(true); // confirmar el anterior
@@ -225,6 +245,10 @@ function _calcAbrir(input, opts = {}) {
   // un panel flotante anclado al fondo del diálogo (bottom-sheet). Así el form se
   // ve completo y el teclado se superpone abajo, con "✓ Aplicar" para cerrarlo.
   const flatForm = input.closest('.gasto-wizard.flat');
+  // En el form flat el botón del teclado REGISTRA el movimiento ("✓ Guardar");
+  // en cualquier otro campo sólo aplica el cálculo ("✓ Aplicar").
+  const applyBtn = _calc.pop.querySelector('.calc-apply');
+  if (applyBtn) applyBtn.textContent = flatForm ? '✓ Guardar' : '✓ Aplicar';
   if (flatForm) {
     _calc.pop.classList.add('calc-sheet');
     if (_calc.pop.parentElement !== flatForm) flatForm.appendChild(_calc.pop);
@@ -3320,6 +3344,9 @@ function _renderFiltrosCategoria(mes) {
 function openDialog(id, prefill = {}) {
   const dlg = document.getElementById(id);
   if (!dlg) return;
+  // Resetear returnValue: dialog.close() sin argumento NO lo limpia, así que un
+  // 'save' previo podría re-disparar el guardado al cerrar (p.ej. al togglear).
+  dlg.returnValue = '';
   const form = dlg.querySelector('form');
   form.reset();
   for (const [k,v] of Object.entries(prefill)) {

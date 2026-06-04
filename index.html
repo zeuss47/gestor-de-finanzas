@@ -1180,12 +1180,10 @@
             </select>
           </div>
 
-          <!-- Guardar -->
-          <button value="save" class="btn-primary w-full mt-4" style="font-size:1rem;padding:.8rem">
-            ✓ Guardar gasto
-          </button>
+          <!-- El gasto se registra al tocar "✓ Guardar" en el teclado de la calculadora. -->
+          <p class="gasto-guardar-hint">Elegí la cuenta y tocá <b>✓ Guardar</b> en el teclado.</p>
           <button value="cancel" type="button" formnovalidate
-                  style="display:block;width:100%;margin-top:.5rem;background:none;border:none;color:var(--ink-muted);font-size:.8rem;cursor:pointer;padding:.3rem"
+                  style="display:block;width:100%;margin-top:.4rem;background:none;border:none;color:var(--ink-muted);font-size:.8rem;cursor:pointer;padding:.3rem"
                   onclick="this.closest('dialog').close()">Cancelar</button>
         </div>
 
@@ -1274,30 +1272,10 @@
             </select>
           </div>
 
-          <details class="form-collapse">
-            <summary>Desglose (bruto / descuentos / bonos)</summary>
-            <div class="grid grid-cols-3 gap-2 mt-3">
-              <div>
-                <label class="form-label">Bruto</label>
-                <input name="sueldo_bruto" type="text" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
-              </div>
-              <div>
-                <label class="form-label">Descuentos</label>
-                <input name="descuentos" type="text" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
-              </div>
-              <div>
-                <label class="form-label">Bonos</label>
-                <input name="bonos" type="text" step="0.01" placeholder="0" class="input" data-calc inputmode="decimal" />
-              </div>
-            </div>
-          </details>
-
-          <!-- Guardar -->
-          <button value="save" class="btn-primary w-full mt-4" style="font-size:1rem;padding:.8rem">
-            ✓ Guardar ingreso
-          </button>
+          <!-- El ingreso se registra al tocar "✓ Guardar" en el teclado de la calculadora. -->
+          <p class="gasto-guardar-hint">Elegí la cuenta y tocá <b>✓ Guardar</b> en el teclado.</p>
           <button value="cancel" type="button" formnovalidate
-                  style="display:block;width:100%;margin-top:.5rem;background:none;border:none;color:var(--ink-muted);font-size:.8rem;cursor:pointer;padding:.3rem"
+                  style="display:block;width:100%;margin-top:.4rem;background:none;border:none;color:var(--ink-muted);font-size:.8rem;cursor:pointer;padding:.3rem"
                   onclick="this.closest('dialog').close()">Cancelar</button>
         </div>
 

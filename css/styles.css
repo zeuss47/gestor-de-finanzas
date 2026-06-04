@@ -4646,8 +4646,12 @@ body.view-analisis #main-widgets::before {
 .gasto-wizard.flat .pago-chips { gap: .3rem; }
 .gasto-wizard.flat .pago-chip { padding: .4rem .65rem; font-size: .82rem; }
 .gasto-wizard.flat .grid.calc-row { gap: .55rem; }
-/* El botón Guardar pegado al final, sin margen grande que empuje el scroll. */
-.gasto-wizard.flat [value="save"] { margin-top: .6rem !important; }
+/* Texto-guía: el registro se hace desde "✓ Guardar" del teclado de la calc. */
+.gasto-guardar-hint {
+  font-size: .72rem; color: var(--ink-muted); text-align: center;
+  margin: .5rem 0 .1rem; line-height: 1.35;
+}
+.gasto-guardar-hint b { color: var(--brand); }
 /* Toggle Gasto/Ingreso en el header */
 .mov-toggle { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: .7rem; padding: .15rem; gap: .15rem; }
 .mov-toggle button {
