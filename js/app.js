@@ -4100,6 +4100,11 @@ const syncCallbacks = {
   },
   onProgress: () => {},
   onSuccess: async (result, motivo) => {
+    // Si el sync trajo config remota más nueva (categorías/habituales/UI…),
+    // refrescar ajustes en memoria + tema antes de re-renderizar.
+    if (result?.config?.aplicado) {
+      try { await loadAjustes(); aplicarTema(); } catch (e) { console.warn('refrescar config', e); }
+    }
     await reloadAll();
     setSyncIndicator('ok');
     actualizarTimestampSync();

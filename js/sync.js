@@ -26,7 +26,19 @@ const ARCHIVOS = {
   cuentas:  'cuentas.json',
   metas:    'metas.json',
 };
-// "ajustes" NO se sincroniza con GitHub: contiene el PAT y otros datos locales.
+// El store "ajustes" NO se sube tal cual (contiene el PAT). Pero SÍ respaldamos
+// una versión SANITIZADA en config.json (categorías, habituales, estrategia, UI…)
+// para no perder esa data al reinstalar / cambiar de dispositivo.
+const CONFIG_FILE = 'config.json';
+// Claves de "ajustes" que NUNCA salen del dispositivo (PAT y estado local de sync).
+const AJUSTES_NO_SYNC = ['github', '_sync_state'];
+
+/** Copia de ajustes SIN datos sensibles/locales (apta para subir al repo). */
+function sanitizarAjustes(aj) {
+  const copia = { ...(aj || {}) };
+  for (const k of AJUSTES_NO_SYNC) delete copia[k];
+  return copia;
+}
 
 /* ---------- Base64 UTF-8 safe ---------- */
 function toB64(str) {
@@ -236,6 +248,12 @@ export async function syncAll(cfg, { onProgress } = {}) {
       );
       resultados[archivo] = { count: merged.length, sha: nuevoSha };
     }
+
+    // Config (ajustes SIN PAT): categorías, habituales, estrategia, UI…
+    onProgress?.('Sync config…');
+    const configAplicado = await _syncConfig(cfg);
+    resultados.config = { aplicado: configAplicado };
+
     exito = true;
   } finally {
     // Actualizar last_pull_ts SI Y SOLO SI completamos todos los archivos.
@@ -249,6 +267,74 @@ export async function syncAll(cfg, { onProgress } = {}) {
     }
   }
   return resultados;
+}
+
+/* ---------- Sync de CONFIG (ajustes sin PAT) ---------- */
+async function pullConfig(cfg) {
+  const url = `${urlArchivo(cfg, CONFIG_FILE)}?ref=${encodeURIComponent(cfg.branch || 'main')}&_=${Date.now()}`;
+  const data = await gh('GET', url, cfg);
+  if (!data) return { config: null, sha: null };
+  try {
+    const json = JSON.parse(fromB64(data.content));
+    return { config: json.config || null, sha: data.sha };
+  } catch { return { config: null, sha: data.sha }; }
+}
+
+/** PUT raw (objeto, no array) idempotente contra 409/422, espejo de _pushIdempotente. */
+async function _pushIdempotenteRaw(cfg, archivo, contenidoStr, mensaje, maxRetries = 5, shaInicial = undefined) {
+  let sha = (shaInicial !== undefined) ? shaInicial : await _getShaActual(cfg, archivo);
+  let lastErr = null;
+  for (let intento = 0; intento < maxRetries; intento++) {
+    try { return await _pushRaw(cfg, archivo, contenidoStr, mensaje, sha); }
+    catch (e) {
+      lastErr = e;
+      const msg = String(e?.message || '');
+      console.warn(`[sync] config intento ${intento + 1}/${maxRetries}:`, msg.slice(0, 160));
+      if (msg.includes('"sha"') && msg.includes("wasn't supplied")) { await new Promise(r=>setTimeout(r,200)); sha = await _getShaActual(cfg, archivo); continue; }
+      if (msg.includes("doesn't exist") || msg.includes('does not exist')) { sha = null; continue; }
+      if (msg.includes(' 409') || msg.includes('"status": "409"') || msg.includes('does not match')) {
+        await new Promise(r => setTimeout(r, 600 * (intento + 1)));
+        sha = await _getShaActual(cfg, archivo);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr || new Error(`No se pudo escribir ${archivo}`);
+}
+
+/**
+ * Sincroniza la config (ajustes SIN PAT): categorías, habituales, estrategia,
+ * UI, tipos de cambio, etc. Merge LWW por `updated_at` del objeto entero.
+ * NUNCA sube ni pisa el `github`/PAT ni el `_sync_state` locales.
+ * @returns {boolean} true si se aplicó config remota más nueva.
+ */
+async function _syncConfig(cfg) {
+  const { config: remoto, sha } = await pullConfig(cfg);
+  const local = await DB.get('ajustes', 'ajustes_globales');
+  if (!local) return false;
+
+  let aplicado = false;
+  let aSubir = sanitizarAjustes(local);
+
+  if (remoto && (remoto.updated_at || 0) > (local.updated_at || 0)) {
+    // Remoto más nuevo → aplicar PRESERVANDO PAT/config y sync_state LOCALES.
+    const merged = {
+      ...remoto,
+      id: 'ajustes_globales',
+      github: local.github,           // ← jamás se pisa el PAT local
+      _sync_state: local._sync_state, // ← estado de sync es por-dispositivo
+    };
+    await DB.bulkPut('ajustes', [merged]); // bulkPut NO toca updated_at (conserva el remoto)
+    aSubir = sanitizarAjustes(merged);
+    aplicado = true;
+  }
+
+  // Backup SIEMPRE (idempotente). Garantiza que la config quede copiada al repo.
+  const cuerpo = JSON.stringify(
+    { schema_version: 1, exported_at: Math.floor(Date.now() / 1000), config: aSubir }, null, 2);
+  await _pushIdempotenteRaw(cfg, CONFIG_FILE, cuerpo, 'sync(config) ajustes', 5, sha);
+  return aplicado;
 }
 
 /* ---------- Wipe remoto: subir archivos vacíos al repo ----------
@@ -377,6 +463,8 @@ export async function pullAll(cfg) {
     await DB.clear(store);
     if (merged.length) await DB.bulkPut(store, merged);
   }
+  // Config (ajustes sin PAT): aplica remota si es más nueva + backup.
+  try { await _syncConfig(cfg); } catch (e) { console.warn('[pullAll] config', e?.message); }
   await setState({ last_pull_ts: Math.floor(Date.now() / 1000) });
 }
 
