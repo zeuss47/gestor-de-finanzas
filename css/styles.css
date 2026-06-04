@@ -985,20 +985,8 @@ html.light #bottom-nav::before { background: #eef2ff; }
 .hab-edit-field-cuenta { flex-basis: 100%; }
 
 /* ── Banner de actualización disponible ───────────────────────── */
-.update-banner {
-  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
-  z-index: 9998; display: flex; align-items: center; gap: .6rem;
-  padding: .6rem .9rem; border-radius: 999px;
-  background: rgba(0,240,255,.12); border: 1px solid var(--brand);
-  backdrop-filter: blur(16px); color: var(--ink);
-  font-size: .8rem; box-shadow: 0 8px 28px rgba(0,0,0,.35);
-  animation: dlg-in .3s ease;
-}
-.update-banner button {
-  border: none; cursor: pointer; font-size: .78rem; padding: .25rem .6rem;
-  border-radius: 999px; background: var(--brand); color: #04121a; font-weight: 700;
-}
-.update-banner button#update-banner-x { background: transparent; color: var(--ink-muted); padding: .25rem .4rem; }
+/* (El banner de actualización inferior se reemplazó por el aviso "Actualizar"
+   junto a la versión — ver .ver-update más abajo.) */
 
 /* ── Dialog ──────────────────────────────────────────────────── */
 dialog {
@@ -3581,6 +3569,33 @@ body.view-analisis #main-widgets::before {
   padding: 2px 6px;
   border-radius: 999px;
   text-shadow: 0 0 4px var(--brand-glow);
+}
+
+/* ── Aviso "Actualizar" AL LADO de la versión (reemplaza el banner inferior) ─ */
+.sidebar-version.tiene-update,
+.header-version-badge.tiene-update {
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+/* En el header mobile, al haber update el contenedor deja de ser "pill" para
+   que el aviso resalte (no se ven dos pills encimadas). */
+.header-version-badge.tiene-update {
+  background: transparent; border-color: transparent; padding: 0; text-shadow: none;
+}
+.header-version-badge .hd-ver-num { color: var(--brand); }
+.ver-update {
+  border: none; cursor: pointer;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-weight: 800; font-size: .58rem; letter-spacing: .02em;
+  color: #04121a; line-height: 1.5; white-space: nowrap;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  padding: 2px 8px; border-radius: 999px;
+  animation: ver-update-pulse 1.8s ease-in-out infinite;
+}
+.ver-update:hover { filter: brightness(1.1); }
+.ver-update:active { transform: scale(.94); }
+@keyframes ver-update-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--brand-soft); }
+  50%      { box-shadow: 0 0 0 6px transparent; }
 }
 
 /* ── Visualizador del ciclo de facturación (dlg-tarjeta) ─────── */

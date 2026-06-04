@@ -46,6 +46,7 @@ const state = {
 let _swReg = null;
 let _hayActualizacionSW = false;
 let _chequeoActIniciado = false;
+let _updateDisponible = null;   // info de version.json cuando hay update sin aplicar
 
 /**
  * Chequea version.json y, si hay un build más nuevo que el cargado, dispara la
@@ -69,7 +70,9 @@ async function chequearActualizacion(manual = false) {
         // Si no hay SW (o ya estaba en control), forzamos una recarga suave.
         if (!_hayActualizacionSW) setTimeout(() => location.reload(), 800);
       } else {
-        mostrarBannerActualizacion(v);
+        // Sin auto-update: mostramos el aviso AL LADO de la versión (no un banner).
+        _updateDisponible = v;
+        actualizarVersionUI();
       }
     } else if (manual) {
       toast('✓ Ya tenés la última versión', 2000);
@@ -90,24 +93,17 @@ function aplicarActualizacionSiCorresponde() {
   if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
 }
 
-/** Banner no intrusivo cuando hay update y auto-update está apagado. */
-function mostrarBannerActualizacion(v) {
-  if (document.getElementById('update-banner')) return;
-  const banner = document.createElement('div');
-  banner.id = 'update-banner';
-  banner.className = 'update-banner';
-  banner.innerHTML = `
-    <span>✨ Nueva versión v${escapeHtml(String(v.version))} disponible</span>
-    <button id="update-banner-btn">Actualizar</button>
-    <button id="update-banner-x" aria-label="Cerrar">✕</button>`;
-  document.body.appendChild(banner);
-  banner.querySelector('#update-banner-btn').onclick = () => {
-    _hayActualizacionSW = true;
-    const waiting = _swReg?.waiting;
-    if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
-    else location.reload();
-  };
-  banner.querySelector('#update-banner-x').onclick = () => banner.remove();
+/** Aplica la actualización pendiente (al tocar el aviso junto a la versión). */
+function aplicarUpdateManual() {
+  _hayActualizacionSW = true;
+  const waiting = _swReg?.waiting;
+  if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
+  else location.reload();
+}
+
+/** Engancha el botón "Actualizar" inline dentro de un contenedor de versión. */
+function _wireUpdateBadge(scope) {
+  scope?.querySelectorAll('.ver-update').forEach(b => { b.onclick = aplicarUpdateManual; });
 }
 
 /* ============ Calculadora en campos de monto ============
@@ -415,18 +411,28 @@ function actualizarVersionUI() {
   // Soporta formatos: "1" → "1", "1.2" → "1.2", "1.2.3" → "1.2".
   const corto = String(v.version || '').split('.').slice(0, 2).join('.') || '0';
 
+  // Aviso de actualización AL LADO de la versión (solo si hay update pendiente).
+  const upd = _updateDisponible;
+  const updHtml = upd
+    ? `<button type="button" class="ver-update" title="Nueva versión v${escapeHtml(String(upd.version))} disponible — tocá para actualizar">✨ Actualizar</button>`
+    : '';
+
   // Sidebar
   const sbVer = document.getElementById('sb-version');
   if (sbVer) {
     const dt = new Date(v.modified);
-    sbVer.innerHTML = `<span class="version-tag">v${corto}</span>`;
+    sbVer.classList.toggle('tiene-update', !!upd);
+    sbVer.innerHTML = `<span class="version-tag">v${corto}</span>${updHtml}`;
     sbVer.title = `Versión ${v.version} · Build #${v.build}\nÚltima actualización: ${dt.toLocaleString('es-AR')}\nCommit: ${v.commit}`;
+    _wireUpdateBadge(sbVer);
   }
 
   // Mini badge mobile en header
   const hdVer = document.getElementById('hd-version');
   if (hdVer) {
-    hdVer.textContent = `v${corto}`;
+    hdVer.classList.toggle('tiene-update', !!upd);
+    hdVer.innerHTML = `<span class="hd-ver-num">v${corto}</span>${updHtml}`;
+    _wireUpdateBadge(hdVer);
   }
 
   // Toast al detectar versión nueva (comparado con la guardada en localStorage)
