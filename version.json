@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.85",
-    "build":  102,
-    "modified":  "2026-06-04T07:01:27Z",
-    "commit":  "M js/ai-predict.js, M js/app.js, M js/credito.js",
-    "notes":  "Auto-update 2026-06-04 04:01"
+    "version":  "1.86",
+    "build":  103,
+    "modified":  "2026-06-04T07:24:01Z",
+    "commit":  "M js/ai-predict.js, M js/credito.js",
+    "notes":  "Auto-update 2026-06-04 04:24"
 }

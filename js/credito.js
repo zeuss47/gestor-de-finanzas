@@ -128,8 +128,12 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
     }, 0);
   const gastosHabituales = sumaHabituales / 3;
 
-  // 3. Compromisos de tarjetas: suma de resumenes activos
+  // 3. Compromisos de tarjetas: suma de resumenes activos.
   const compromisoTarjetas = (resumenes || []).reduce((a, r) => a + (r.total_resumen || 0), 0);
+  // Parte del resumen que NO es cuotas (un pago + recurrentes). Las cuotas se
+  // cuentan UNA sola vez vía cuotasMensualesProyectadas; sumar total_resumen
+  // (que ya incluye la cuota del mes) + cuotasMensualesProyectadas las duplicaba.
+  const compromisoNoCuotas = (resumenes || []).reduce((a, r) => a + ((r.total_resumen || 0) - (r.total_cuotas || 0)), 0);
 
   // 4. Cuotas mensuales pendientes (ya comprometidas para meses futuros)
   const pendientes = cuotasPendientes(gastos, tarjetas, hoy);
@@ -145,14 +149,16 @@ export function calcularCapacidad({ gastos, ingresos, tarjetas, resumenes, hoy =
   const limiteFinanciero = Math.max(0, Math.min(cuotaSegura30, disponibleTrasHabituales));
 
   // 6. Capacidad libre real = límite financiero - compromisos ya existentes
-  const capacidadLibre = Math.max(0, limiteFinanciero - cuotasMensualesProyectadas - compromisoTarjetas);
+  //    (cuotas contadas una sola vez; el resto del resumen vía compromisoNoCuotas).
+  const capacidadLibre = Math.max(0, limiteFinanciero - cuotasMensualesProyectadas - compromisoNoCuotas);
 
   // 7. Saldo líquido proyectado (lo que te queda en mano este mes)
   const saldoLiquidoProyectado = ingresoMes - gastosFijosMes - compromisoTarjetas;
 
-  // 8. Ratio de uso del ingreso (basado en gastos habituales para ser estable)
+  // 8. Ratio de uso del ingreso (basado en gastos habituales para ser estable).
+  //    Cuotas una sola vez (cuotasMensualesProyectadas) + el resto del resumen.
   const ratioUsoIngreso = ingresoMes > 0
-    ? (gastosHabituales + compromisoTarjetas + cuotasMensualesProyectadas) / ingresoMes
+    ? (gastosHabituales + compromisoNoCuotas + cuotasMensualesProyectadas) / ingresoMes
     : 0;
 
   // 9. Estado del semáforo

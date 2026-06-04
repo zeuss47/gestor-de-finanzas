@@ -389,6 +389,9 @@ export function predecirSaturacionTarjetas({ gastos = [], tarjetas = [], resumen
   for (const g of gastos) {
     if (g.deleted || !g.tarjeta_id || !g.fecha) continue;
     if (g.fecha > hoy) continue;
+    // Las compras EN CUOTAS NO entran al ritmo: se contarían al monto FULL
+    // (inflando la tasa) y además ya se suman aparte como cuotaMensual/30.
+    if (g.tipo === 'cuotas') continue;
     const m = montoEfectivo(g);
     if (g.fecha >= hace90) sum90.set(g.tarjeta_id, (sum90.get(g.tarjeta_id) || 0) + m);
     if (g.fecha >= hace30) sum30.set(g.tarjeta_id, (sum30.get(g.tarjeta_id) || 0) + m);
