@@ -460,32 +460,24 @@ function actualizarVersionUI() {
   if (!v) return;
 
   // Versión corta: tomamos como mucho 2 segmentos (mayor.menor).
-  // Soporta formatos: "1" → "1", "1.2" → "1.2", "1.2.3" → "1.2".
   const corto = String(v.version || '').split('.').slice(0, 2).join('.') || '0';
 
-  // Aviso de actualización AL LADO de la versión (solo si hay update pendiente).
+  // Aviso de actualización (con o sin update pendiente).
   const upd = _updateDisponible;
   const updHtml = upd
     ? `<button type="button" class="ver-update" title="Nueva versión v${escapeHtml(String(upd.version))} disponible — tocá para actualizar">✨ Actualizar</button>`
     : '';
 
-  // Sidebar
-  const sbVer = document.getElementById('sb-version');
-  if (sbVer) {
+  // Card de versión en Ajustes (reemplaza los badges de sidebar/header eliminados).
+  const numEl  = document.getElementById('settings-ver-num');
+  const subEl  = document.getElementById('settings-ver-fecha');
+  const cardEl = document.getElementById('btn-ver-changelog');
+  if (numEl) numEl.innerHTML = `v${corto}${updHtml}`;
+  if (subEl) {
     const dt = new Date(v.modified);
-    sbVer.classList.toggle('tiene-update', !!upd);
-    sbVer.innerHTML = `<span class="version-tag">v${corto}</span>${updHtml}`;
-    sbVer.title = `Versión ${v.version} · Build #${v.build}\nÚltima actualización: ${dt.toLocaleString('es-AR')}\nCommit: ${v.commit}`;
-    _wireUpdateBadge(sbVer);
+    subEl.textContent = `Build #${v.build} · ${dt.toLocaleDateString('es-AR', {day:'2-digit',month:'short',year:'2-digit'})}`;
   }
-
-  // Mini badge mobile en header
-  const hdVer = document.getElementById('hd-version');
-  if (hdVer) {
-    hdVer.classList.toggle('tiene-update', !!upd);
-    hdVer.innerHTML = `<span class="hd-ver-num">v${corto}</span>${updHtml}`;
-    _wireUpdateBadge(hdVer);
-  }
+  if (cardEl) _wireUpdateBadge(cardEl);
 
   // Toast al detectar versión nueva (comparado con la guardada en localStorage)
   try {
@@ -7116,6 +7108,122 @@ function _restaurarActivoHome() {
     b.classList.toggle('active', b.dataset.tab === 'home'));
 }
 
+/* ============ CHANGELOG — historial de cambios embebido ============
+ * Cada entrada tiene: version, fecha, items[] con texto breve.
+ * Se actualiza manualmente al cerrar cada sesión de mejoras.
+ * Al tocar el card de versión en Ajustes se abre el drawer con este listado.
+ */
+const CHANGELOG = [
+  {
+    version: '1.87', fecha: '2026-06-04',
+    items: [
+      'Botón de pago directo en cada tarjeta del dashboard',
+      'Contabilidad unificada: moneda extranjera, cuotas y saldo real corregidos',
+      'Saldo líquido = plata acumulada real (incluye saldo inicial de cuentas)',
+      'Historial agrupado por fecha funciona igual en celular y navegador',
+      'Detección de actualizaciones mejorada: el botón aparece antes de actualizar',
+      'Filtro de historial como bottom-sheet (no se corta en pantallas chicas)',
+    ],
+  },
+  {
+    version: '1.81', fecha: '2026-06-03',
+    items: [
+      'Calculadora activa automáticamente al abrir la carga de gasto/ingreso',
+      'Formulario de carga sin deslizar: todo entra en una pantalla',
+      'Guardar gasto/ingreso directo desde el botón "✓ Guardar" del teclado',
+      'Se quitaron las casillas de texto libre de categoría y descripción',
+      'Histórico de gasto agrupado por fecha con encabezados sticky',
+      'Animación de sincronización mejorada (solo al finalizar)',
+    ],
+  },
+  {
+    version: '1.78', fecha: '2026-06-03',
+    items: [
+      'Sincronización de config (categorías, habituales) entre dispositivos',
+      'Todos los datos se respaldan al repo de GitHub en cada sync',
+      'Proyección IA: ingresos ya se calculan correctamente (bug crítico corregido)',
+      'Scroll del celular restaurado (overflow-x clip sin romper scroll vertical)',
+    ],
+  },
+  {
+    version: '1.70', fecha: '2026-06-02',
+    items: [
+      'Carga unificada gasto/ingreso en una pantalla con toggle',
+      'Filtros de historial en dos casillas en la misma línea',
+      'OCR de boletas/tickets con Tesseract.js (PDF e imágenes)',
+      'Aprobar gastos habituales descuenta del saldo general',
+      'Proyección IA con mediana y cuotas futuras inyectadas mes a mes',
+      'Eliminada la función "ciclo activo" (contorno luminoso)',
+    ],
+  },
+  {
+    version: '1.60', fecha: '2026-05-30',
+    items: [
+      'Auditoría exhaustiva de saldos y contabilidad',
+      'Gastos habituales con cuenta configurable por ítem',
+      'Estrategia inversora (All Weather) en el panel de IA',
+      'Parser de resúmenes bancarios Macro y BBVA mejorado',
+      'Bloqueo de orientación vertical nativo (Android)',
+    ],
+  },
+  {
+    version: '1.50', fecha: '2026-05-20',
+    items: [
+      'Tarjetas de crédito con ciclos de facturación y editor masivo',
+      'Capacidad crediticia con regla 30% y simulador de compras',
+      'Multi-moneda: USD/EUR/BRL en gastos y resúmenes',
+      'Widgets redimensionables con drag desde la esquina',
+      'Sincronización GitHub: reset propagable con _meta.json',
+    ],
+  },
+];
+
+function abrirChangelog() {
+  // El changelog se muestra dentro del dialog de Settings (top-layer):
+  // inyectamos un panel superpuesto dentro de #dlg-settings para no
+  // luchar contra el stacking context nativo del <dialog>.
+  const settingsForm = document.querySelector('#dlg-settings > form');
+  if (!settingsForm) return;
+
+  const verActual = state.version?.version || '';
+  const html = CHANGELOG.map(entry => {
+    const esActual = entry.version === verActual;
+    return `<div class="cl-entry">
+      <div class="cl-entry-head">
+        <span class="cl-ver">v${escapeHtml(entry.version)}</span>
+        <span class="cl-fecha">${escapeHtml(entry.fecha)}</span>
+        ${esActual ? '<span class="cl-actual">Instalada</span>' : ''}
+      </div>
+      <ul class="cl-items">
+        ${entry.items.map(it => `<li class="cl-item">${escapeHtml(it)}</li>`).join('')}
+      </ul>
+    </div>`;
+  }).join('');
+
+  // Crear panel overlay dentro del form
+  const prev = settingsForm.querySelector('.cl-overlay');
+  if (prev) prev.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'cl-overlay';
+  overlay.innerHTML = `
+    <div class="cl-overlay-head">
+      <button type="button" class="cl-back-btn">‹</button>
+      <span class="changelog-title">Historial de cambios</span>
+    </div>
+    <div class="changelog-body" style="flex:1;overflow-y:auto">${html}</div>`;
+  overlay.querySelector('.cl-back-btn').onclick = cerrarChangelog;
+  settingsForm.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+}
+
+function cerrarChangelog() {
+  const overlay = document.querySelector('#dlg-settings .cl-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.classList.add('hiding');
+  setTimeout(() => overlay.remove(), 240);
+}
+
 /* ============ INIT ============ */
 async function init() {
   await loadAjustes();
@@ -7752,6 +7860,13 @@ async function init() {
   });
   // Buscar actualizaciones manualmente
   document.getElementById('btn-check-update')?.addEventListener('click', () => chequearActualizacion(true));
+
+  // Card de versión → abre el panel de changelog dentro de Settings.
+  // Ignora clicks en el botón "✨ Actualizar" (ese aplica el update).
+  document.getElementById('btn-ver-changelog')?.addEventListener('click', (e) => {
+    if (e.target.closest('.ver-update')) return;
+    abrirChangelog();
+  });
 }
 
 /* ============ Editor de gastos habituales en Settings ============ */

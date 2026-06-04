@@ -350,10 +350,6 @@
       Ajustes
     </button>
 
-    <!-- Badge de versión -->
-    <div id="sb-version" class="sidebar-version" title="Cargando versión…">
-      <span class="version-tag">v—</span>
-    </div>
   </div>
 </aside>
 
@@ -364,7 +360,7 @@
   <header id="app-header">
     <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <span id="hd-version" class="header-version-badge" title="Versión"></span>
+        <!-- versión movida a Ajustes -->
       </div>
       <div class="flex items-center gap-2">
         <button id="btn-sync"
@@ -2657,6 +2653,18 @@
           <button type="button" id="btn-check-update" class="btn-secondary w-full text-xs mt-1">
             🔄 Buscar actualizaciones ahora
           </button>
+
+          <!-- Card de versión instalada (div clickeable: puede contener el botón ✨ Actualizar) -->
+          <div id="btn-ver-changelog" class="ver-card" role="button" tabindex="0" title="Ver historial de cambios">
+            <div class="ver-card-left">
+              <span class="ver-card-icon">📦</span>
+              <div>
+                <p class="ver-card-num" id="settings-ver-num">v—</p>
+                <p class="ver-card-sub" id="settings-ver-fecha">Cargando…</p>
+              </div>
+            </div>
+            <span class="ver-card-arrow">›</span>
+          </div>
         </fieldset>
 
       </div>

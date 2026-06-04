@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.89",
-    "build":  106,
-    "modified":  "2026-06-04T14:51:09Z",
-    "commit":  "M js/app.js, _pp3/",
-    "notes":  "Auto-update 2026-06-04 11:51"
+    "version":  "1.90",
+    "build":  107,
+    "modified":  "2026-06-04T15:12:47Z",
+    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js",
+    "notes":  "Auto-update 2026-06-04 12:12"
 }
