@@ -3519,6 +3519,7 @@ function prepararDialogoIngreso(form) {
     if (conceptoInput) conceptoInput.value = nombre;
     const badge = form.querySelector('#ingreso-badge-concepto');
     if (badge) badge.textContent = `${icono || '💰'} ${nombre}`.trim();
+    _actualizarSubcategoriasIngreso(form, nombre);
   };
   form.querySelectorAll('input[name="concepto_quick"]').forEach(r => {
     r.addEventListener('change', () => {
@@ -3804,14 +3805,18 @@ function _actualizarSubcategoriasGasto(form, catId) {
   const cat = _allCats.find(c => c.id === catId || c.nombre?.toLowerCase() === catId?.toLowerCase());
   const subcats = cat?.subcategorias || [];
   if (!subcats.length) { row.hidden = true; if (inp) inp.value = ''; return; }
+  const flat = form.classList.contains('flat');   // una sola pantalla
   row.hidden = false;
+  if (inp) inp.value = '';   // resetear al cambiar de categoría
   chipsWrap.innerHTML = subcats.map(s => `
     <label class="cat-chip chip-row-sub"><input type="radio" name="subcat_quick" value="${escapeHtml(s)}"><span>${escapeHtml(s)}</span></label>
   `).join('');
   chipsWrap.querySelectorAll('input[name="subcat_quick"]').forEach(r => {
     r.addEventListener('change', () => {
       if (inp) inp.value = r.value;
-      // Tras elegir subcategoría, avanzar al paso 2
+      // En flat (una pantalla) NO avanzamos de paso: la subcat queda elegida y listo.
+      if (flat) return;
+      // En el wizard multi-paso: tras elegir subcategoría, avanzar al paso 2.
       setTimeout(() => {
         const slides = form.querySelector('#gasto-slides');
         if (slides) slides.dataset.current = '2';
@@ -3824,6 +3829,28 @@ function _actualizarSubcategoriasGasto(form, catId) {
         const btn = form.querySelector('#gasto-btn-back'); if (btn) btn.hidden = false;
       }, 280);
     });
+  });
+}
+
+/** Carga los chips de subcategoría cuando se elige un concepto en el form de ingreso. */
+function _actualizarSubcategoriasIngreso(form, conceptoNombre) {
+  const row = form.querySelector('#row-subcategoria-ingreso');
+  const chipsWrap = form.querySelector('#chips-subcategoria-ingreso');
+  const inp = form.querySelector('#inp-subcategoria-ingreso');
+  if (!row || !chipsWrap) return;
+  const cats = state.ajustes?.catalogos?.categorias_ingreso?.length
+    ? state.ajustes.catalogos.categorias_ingreso
+    : (AJUSTES_DEFAULT.catalogos.categorias_ingreso);
+  const cat = cats.find(c => c.nombre === conceptoNombre || (c.id || c.nombre) === conceptoNombre);
+  const subcats = cat?.subcategorias || [];
+  if (!subcats.length) { row.hidden = true; if (inp) inp.value = ''; return; }
+  row.hidden = false;
+  if (inp) inp.value = '';
+  chipsWrap.innerHTML = subcats.map(s => `
+    <label class="cat-chip chip-row-sub"><input type="radio" name="subcat_ingreso_quick" value="${escapeHtml(s)}"><span>${escapeHtml(s)}</span></label>
+  `).join('');
+  chipsWrap.querySelectorAll('input[name="subcat_ingreso_quick"]').forEach(r => {
+    r.addEventListener('change', () => { if (inp) inp.value = r.value; });
   });
 }
 
@@ -3897,6 +3924,7 @@ async function handleSubmitIngreso(form) {
     fecha: fd.get('fecha'),
     periodo_aplicacion: fd.get('periodo_aplicacion'),
     descripcion: fd.get('descripcion') || 'Sueldo',
+    subcategoria: fd.get('subcategoria') || null,
     sueldo_bruto: parseFloat(fd.get('sueldo_bruto')||0),
     descuentos:   parseFloat(fd.get('descuentos')||0),
     bonos:        parseFloat(fd.get('bonos')||0),
@@ -5792,6 +5820,7 @@ const _hdState = {
   chartMode: 'lineas',
   tipo: 'todos',           // 'todos' | 'ingresos' | 'gastos'
   categorias: new Set(),   // Set vacío = todas; si tiene items = solo esas
+  subcategorias: new Set(),// solo aplica cuando hay 1 categoría activa
   calYear:  new Date().getFullYear(),
   calMonth: new Date().getMonth(),  // 0-11
 };
@@ -5851,11 +5880,13 @@ function _hdFiltrarMovimientos(widget, from, to) {
 
   // Gastos
   if (!soloIngresos && tipo !== 'ingresos') {
+    const subcats = _hdState.subcategorias;
     gastos = state.gastos.filter(g => {
       if (g.deleted) return false;
       if (!_hdInRange(g.fecha, from, to)) return false;
       if (soloGastos && widget === 'tarjetas' && !g.tarjeta_id) return false;
       if (cats.size > 0 && !cats.has(g.categoria || 'general')) return false;
+      if (subcats && subcats.size > 0 && !subcats.has(g.subcategoria || '')) return false;
       return true;
     });
   }
@@ -6006,6 +6037,7 @@ function _hdRenderCatChips() {
   allChip.textContent = '✦ Todas';
   allChip.addEventListener('click', () => {
     _hdState.categorias.clear();
+    _hdState.subcategorias.clear();
     _hdRenderCatChips();
     _hdRenderItems();
     _hdRenderChart();
@@ -6028,9 +6060,50 @@ function _hdRenderCatChips() {
       } else {
         _hdState.categorias.add(cat);
       }
+      _hdState.subcategorias.clear();   // las subcats dependen de la categoría
       _hdRenderCatChips();
       _hdRenderItems();
       _hdRenderChart();
+    });
+    box.appendChild(chip);
+  }
+
+  // ── Subcategorías: solo si hay EXACTAMENTE una categoría activa con subcats ──
+  if (_hdState.categorias.size !== 1) { _hdState.subcategorias.clear(); return; }
+  const catUnica = [..._hdState.categorias][0];
+  const subcatsPresentes = new Set();
+  for (const g of state.gastos) {
+    if (g.deleted || !_hdInRange(g.fecha, from, to)) continue;
+    if ((g.categoria || 'general') !== catUnica) continue;
+    if (g.subcategoria) subcatsPresentes.add(g.subcategoria);
+  }
+  if (!subcatsPresentes.size) { _hdState.subcategorias.clear(); return; }
+
+  const sep = document.createElement('div');
+  sep.className = 'hd-subcat-sep';
+  sep.textContent = 'Subcategoría';
+  box.appendChild(sep);
+
+  const allSub = document.createElement('button');
+  allSub.type = 'button';
+  allSub.className = 'hd-cat-chip' + (_hdState.subcategorias.size === 0 ? ' active' : '');
+  allSub.textContent = '✦ Todas';
+  allSub.addEventListener('click', () => {
+    _hdState.subcategorias.clear();
+    _hdRenderCatChips(); _hdRenderItems(); _hdRenderChart();
+  });
+  box.appendChild(allSub);
+
+  for (const sub of [...subcatsPresentes].sort((a,b)=>a.localeCompare(b))) {
+    const activa = _hdState.subcategorias.has(sub);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'hd-cat-chip hd-subcat-chip' + (activa ? ' active' : '');
+    chip.textContent = sub;
+    chip.addEventListener('click', () => {
+      if (_hdState.subcategorias.has(sub)) _hdState.subcategorias.delete(sub);
+      else _hdState.subcategorias.add(sub);
+      _hdRenderCatChips(); _hdRenderItems(); _hdRenderChart();
     });
     box.appendChild(chip);
   }
@@ -7043,6 +7116,7 @@ function abrirHistorialWidget(widgetId) {
   _hdState.sort   = 'fecha-desc';
   _hdState.tipo = 'todos';
   _hdState.categorias = new Set();
+  _hdState.subcategorias = new Set();
   _hdState.calYear  = new Date().getFullYear();
   _hdState.calMonth = new Date().getMonth();
   _hdState.custom = { from: null, to: null };
@@ -7746,6 +7820,7 @@ async function init() {
     _hdState.custom = { from: null, to: null };
     _hdState.tipo = 'todos';
     _hdState.categorias.clear();
+    _hdState.subcategorias.clear();
     document.querySelectorAll('.hd-quick-btn').forEach(b => b.classList.toggle('active', b.dataset.range === 'mes_actual'));
     document.querySelectorAll('.hd-type-btn').forEach(b => b.classList.toggle('active', b.dataset.htype === 'todos'));
     const calWrap = document.getElementById('hd-calendar-wrap'); if (calWrap) calWrap.hidden = true;
@@ -7812,6 +7887,7 @@ async function init() {
       btn.classList.add('active');
       _hdState.tipo = btn.dataset.htype;
       _hdState.categorias.clear(); // resetear categorías al cambiar tipo
+      _hdState.subcategorias.clear();
       _hdRenderCatChips();
       _hdRenderItems();
       _hdRenderChart();

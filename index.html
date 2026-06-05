@@ -1106,12 +1106,11 @@
           <!-- La categoría se elige SOLO con los chips de arriba; este campo guarda
                el valor seleccionado (sin casilla visible de "otra categoría"). -->
           <input type="hidden" name="categoria" id="inp-categoria-gasto" />
-          <!-- Subcategoría: aparece si la categoría elegida las tiene -->
+          <!-- Subcategoría: aparece si la categoría elegida las tiene (solo chips) -->
           <div id="row-subcategoria-gasto" hidden style="margin-top:.9rem">
             <p class="gasto-slide-sublabel">Subcategoría</p>
             <div class="chip-row chip-row-sub" id="chips-subcategoria-gasto"></div>
-            <input name="subcategoria" id="inp-subcategoria-gasto" placeholder="Otra subcategoría…"
-                   class="input mt-2" autocomplete="off" style="font-size:.85rem" />
+            <input type="hidden" name="subcategoria" id="inp-subcategoria-gasto" />
           </div>
           <!-- Botón solo si no hay autoavance (escribió una cat manualmente) -->
           <button type="button" id="gasto-next-1" class="btn-primary w-full mt-4">
@@ -1227,6 +1226,12 @@
           <!-- El concepto se elige SOLO con los chips de arriba; este campo guarda
                el valor (sin casilla visible de "otro concepto"). -->
           <input type="hidden" name="descripcion" id="inp-concepto-ingreso" />
+          <!-- Subcategoría: aparece si el concepto elegido tiene (solo chips) -->
+          <div id="row-subcategoria-ingreso" hidden style="margin-top:.9rem">
+            <p class="gasto-slide-sublabel">Subcategoría</p>
+            <div class="chip-row chip-row-sub" id="chips-subcategoria-ingreso"></div>
+            <input type="hidden" name="subcategoria" id="inp-subcategoria-ingreso" />
+          </div>
           <button type="button" id="ingreso-next-1" class="btn-primary w-full mt-4">Siguiente →</button>
         </div>
 

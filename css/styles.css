@@ -2217,6 +2217,14 @@ html.light select.input { color-scheme: light; }
   border-color: var(--brand);
   text-shadow: 0 0 6px rgba(0,240,255,.4);
 }
+/* Separador "Subcategoría" dentro de los chips del filtro detallado */
+.hd-subcat-sep {
+  flex-basis: 100%; width: 100%; margin: .35rem 0 .1rem;
+  font-size: .58rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--ink-muted);
+}
+.hd-subcat-chip { border-style: dashed; }
+.hd-subcat-chip.active { border-style: solid; background: rgba(255,0,234,.1); color: var(--brand-2); border-color: var(--brand-2); text-shadow: 0 0 6px rgba(255,0,234,.4); }
 
 /* ── Form Modern (rediseño dlg-gasto/tarjeta/meta) ───────────── */
 .form-modern {
@@ -4734,9 +4742,13 @@ body.view-analisis #main-widgets::before {
 .gasto-wizard.flat #ingreso-next-1, .gasto-wizard.flat #ingreso-next-2 { display: none !important; }
 .gasto-wizard.flat .gasto-slide-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); margin: .25rem 0 .35rem; }
 /* ── Una sola pantalla COMPLETA, sin deslizar ───────────────────────────
-   - Se quita la subcategoría (chips + "otra subcategoría").
+   - La subcategoría aparece (compacta) si la categoría elegida tiene; el control
+     de visibilidad lo hace `row.hidden` desde _actualizarSubcategoriasGasto.
    - Se agrupan/compactan las secciones para que entre todo de una. */
-.gasto-wizard.flat #row-subcategoria-gasto { display: none !important; }
+.gasto-wizard.flat #row-subcategoria-gasto,
+.gasto-wizard.flat #row-subcategoria-ingreso { margin-top: .4rem !important; }
+.gasto-wizard.flat #row-subcategoria-gasto .gasto-slide-sublabel,
+.gasto-wizard.flat #row-subcategoria-ingreso .gasto-slide-sublabel { font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); margin: 0 0 .25rem; }
 .gasto-wizard.flat .gasto-slide { padding-top: .12rem; padding-bottom: .12rem; }
 .gasto-wizard.flat .gasto-slide:first-of-type { padding-top: .5rem; }
 .gasto-wizard.flat .form-section { margin-bottom: 0; }
