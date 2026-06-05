@@ -3276,16 +3276,19 @@ function renderMovimientos() {
       </div>`;
   };
   const gastoHTML = (g) => {
-    const esAporte = !!g.es_aporte_meta;   // aporte a meta
+    const esDevol = !!g.es_devolucion_meta;   // devolución de meta a una cuenta (monto negativo)
+    const esAporte = !!g.es_aporte_meta;   // aporte a meta (incluye devoluciones)
     const esPago  = !!g.es_pago_tarjeta || esAporte;   // movimientos especiales: solo lectura
     const catObj  = esPago ? null : allCats.find(c => c.id === g.categoria || c.nombre?.toLowerCase() === (g.categoria||'').toLowerCase());
-    const icon    = esAporte ? '🎯' : (g.es_pago_tarjeta ? '💳' : (catObj?.icono || CAT_ICON[g.categoria] || '📌'));
+    const icon    = esDevol ? '↩️' : (esAporte ? '🎯' : (g.es_pago_tarjeta ? '💳' : (catObj?.icono || CAT_ICON[g.categoria] || '📌')));
     const catColor= esAporte ? '#10b981' : (g.es_pago_tarjeta ? '#a78bfa' : (catObj?.color || '#94a3b8'));
     const monto   = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
     const cuotas  = g.tipo === 'cuotas' ? `cuota ${g.cuota_numero}/${g.cuotas_total}` : '';
     const tarjeta = g.tarjeta_id ? state.tarjetas.find(t=>t.id===g.tarjeta_id) : null;
     const metodo  = tarjeta ? `💳 ${escapeHtml(tarjeta.nombre)}` : (METODO_LABEL[g.metodo_pago] || g.metodo_pago || 'efectivo');
-    const monedaFmt = (g.moneda && g.moneda !== 'ARS')
+    const monedaFmt = esDevol
+      ? `<span style="color:#10b981">+${FMT.format(Math.abs(monto))}</span>`
+      : (g.moneda && g.moneda !== 'ARS')
       ? `${g.moneda} ${(g.monto||0).toLocaleString('es-AR',{minimumFractionDigits:2})}`
       : FMT.format(monto);
     return `
@@ -3300,7 +3303,7 @@ function renderMovimientos() {
           </div>
           <div class="mov-row-meta" style="margin-top:.2rem">
             <span class="mov-cat-badge" style="background:${catColor}14;color:${catColor};border-color:${catColor}33">
-              ${icon} ${escapeHtml(esAporte ? 'Aporte a meta' : (g.es_pago_tarjeta ? 'Pago tarjeta' : (catObj?.nombre || g.categoria || 'general')))}
+              ${icon} ${escapeHtml(esDevol ? 'Devolución de meta' : (esAporte ? 'Aporte a meta' : (g.es_pago_tarjeta ? 'Pago tarjeta' : (catObj?.nombre || g.categoria || 'general'))))}
             </span>
             ${g.subcategoria ? `<span class="mov-subcat-badge">${escapeHtml(g.subcategoria)}</span>` : ''}
           </div>
@@ -3309,7 +3312,9 @@ function renderMovimientos() {
           <span class="mov-row-monto">${monedaFmt}</span>
           ${g.compartido ? `<span style="font-size:.68rem;color:var(--ink-muted)">total ${FMT.format(g.monto)}</span>` : ''}
           <div class="mov-row-actions">
-            ${esAporte
+            ${esDevol
+              ? `<span class="mov-pago-hint" title="Saldo devuelto a tu cuenta al eliminar la meta">↩ a cuenta</span>`
+              : esAporte
               ? `<span class="mov-pago-hint" title="Aporte registrado a tu meta de ahorro">🎯 ahorro</span>`
               : g.es_pago_tarjeta
               ? `<span class="mov-pago-hint" title="Revertí el pago desde la tarjeta (Tarjetas → ↺ Pendiente)">↩ desde tarjeta</span>`
@@ -3482,6 +3487,17 @@ function openDialog(id, prefill = {}) {
   if (id === 'dlg-gasto') prepararDialogoGasto(form);
   // Diálogo de ingreso: auto-fill fecha y período actual
   if (id === 'dlg-ingreso') prepararDialogoIngreso(form);
+  // Diálogo de meta: el botón eliminar solo aparece al editar una meta existente
+  if (id === 'dlg-meta') {
+    const btnDel = document.getElementById('btn-del-meta');
+    const editId = prefill._editing_id || '';
+    if (btnDel) {
+      btnDel.style.display = editId ? '' : 'none';
+      btnDel.onclick = () => { dlg.close(); eliminarMeta(editId); };
+    }
+    const btnSave = dlg.querySelector('button[value="save"]');
+    if (btnSave) btnSave.lastChild.textContent = editId ? ' Guardar meta' : ' Crear meta';
+  }
   dlg.showModal();
 }
 
@@ -4109,6 +4125,112 @@ async function confirmarAporteMeta() {
   document.getElementById('dlg-aporte-meta')?.close();
   const completa = m.monto_actual >= (m.monto_objetivo || 0);
   toast(`✓ Aportaste ${FMT.format(monto)} a "${m.nombre}"${cuentaId ? ' (descontado de la cuenta)' : ''}${completa ? ' · 🎉 ¡Meta completa!' : ''}`, 3000);
+  await reloadAll();
+}
+
+/* ============ Eliminar meta (con manejo del saldo ahorrado) ============ */
+let _metaDelCtx = null;
+
+/** Punto de entrada: si la meta tiene saldo, ofrece opciones; si no, borra directo. */
+function eliminarMeta(metaId) {
+  const m = state.metas.find(x => x.id === metaId);
+  if (!m) return;
+  const saldo = Math.max(0, m.monto_actual || 0);
+
+  // Sin saldo ahorrado → borrado directo con Deshacer.
+  if (saldo <= 0) {
+    eliminarConDeshacer('metas', metaId, '🎯 Meta eliminada', async () => { await reloadAll(); });
+    return;
+  }
+
+  // Con saldo → diálogo con opciones (ignorar / devolver a cuenta / transferir a meta).
+  _metaDelCtx = { metaId, saldo, accion: null };
+  document.getElementById('md-subtitulo').textContent =
+    `"${m.nombre}" tiene ${FMT.format(saldo)} ahorrados`;
+  // Reset de la selección
+  document.querySelectorAll('#dlg-meta-del .md-opt').forEach(b => b.classList.remove('active'));
+  document.getElementById('md-destino').style.display = 'none';
+  document.getElementById('md-confirmar').style.display = 'none';
+  document.getElementById('dlg-meta-del')?.showModal();
+}
+
+/** El usuario eligió una de las 3 acciones: prepara la sub-selección si aplica. */
+function _metaDelElegir(accion) {
+  if (!_metaDelCtx) return;
+  _metaDelCtx.accion = accion;
+  document.querySelectorAll('#dlg-meta-del .md-opt').forEach(b =>
+    b.classList.toggle('active', b.dataset.mdAccion === accion));
+  const destino = document.getElementById('md-destino');
+  const lbl     = document.getElementById('md-destino-lbl');
+  const sel     = document.getElementById('md-destino-sel');
+  const btnOk   = document.getElementById('md-confirmar');
+
+  if (accion === 'cuenta') {
+    const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+    lbl.textContent = '¿A qué cuenta lo devolvés?';
+    sel.innerHTML = cuentas.length
+      ? cuentas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)} · saldo ${FMT.format(calcularSaldoCuenta(c))}</option>`).join('')
+      : `<option value="">No tenés cuentas</option>`;
+    destino.style.display = '';
+  } else if (accion === 'meta') {
+    const otras = (state.metas || []).filter(x => !x.deleted && x.id !== _metaDelCtx.metaId);
+    lbl.textContent = '¿A qué meta lo transferís?';
+    sel.innerHTML = otras.length
+      ? otras.map(x => `<option value="${x.id}">${escapeHtml(x.nombre)} · ${FMT.format(x.monto_actual||0)} / ${FMT.format(x.monto_objetivo||0)}</option>`).join('')
+      : `<option value="">No tenés otra meta</option>`;
+    destino.style.display = '';
+  } else {
+    destino.style.display = 'none';   // "solo eliminar" no necesita destino
+  }
+  btnOk.style.display = '';
+  btnOk.textContent = accion === 'solo' ? 'Eliminar' : 'Confirmar';
+}
+
+/** Ejecuta la acción elegida y borra la meta. */
+async function _metaDelConfirmar() {
+  if (!_metaDelCtx || !_metaDelCtx.accion) return;
+  const { metaId, saldo, accion } = _metaDelCtx;
+  const m = state.metas.find(x => x.id === metaId);
+  if (!m) return;
+  const destinoId = document.getElementById('md-destino-sel')?.value || '';
+
+  if (accion === 'cuenta') {
+    if (!destinoId) { toast('Elegí una cuenta', 1800); return; }
+    // Movimiento inverso al aporte: es_aporte_meta con monto NEGATIVO (devolución).
+    // Sube el saldo líquido de la cuenta y queda excluido del análisis de consumo.
+    await DB.put('gastos', {
+      id: uuid(),
+      fecha: new Date().toISOString().slice(0, 10),
+      monto: -saldo, moneda: 'ARS',
+      descripcion: `Devolución de meta · ${m.nombre}`,
+      categoria: 'Ahorro',
+      metodo_pago: 'transferencia',
+      tipo: 'unico',
+      cuenta_id: destinoId,
+      tarjeta_id: null,
+      es_aporte_meta: true,
+      es_devolucion_meta: true,
+      meta_id: m.id,
+      updated_at: nowTs(),
+    });
+  } else if (accion === 'meta') {
+    if (!destinoId) { toast('Elegí una meta destino', 1800); return; }
+    const dest = await DB.get('metas', destinoId);
+    if (!dest) { toast('No se encontró la meta destino', 1800); return; }
+    dest.monto_actual = (dest.monto_actual || 0) + saldo;
+    dest.updated_at = nowTs();
+    await DB.put('metas', dest);
+  }
+  // accion === 'solo' → no se hace nada con el saldo, se descarta.
+
+  await DB.softDelete('metas', metaId);
+  notificarCambioLocal();
+  document.getElementById('dlg-meta-del')?.close();
+  _metaDelCtx = null;
+  const msg = accion === 'cuenta' ? `🎯 Meta eliminada · ${FMT.format(saldo)} devueltos a la cuenta`
+            : accion === 'meta'   ? `🎯 Meta eliminada · ${FMT.format(saldo)} transferidos`
+            : '🎯 Meta eliminada';
+  toast(msg, 3000);
   await reloadAll();
 }
 
@@ -7614,6 +7736,12 @@ async function init() {
   document.getElementById('am-confirmar')?.addEventListener('click', () => confirmarAporteMeta());
   document.getElementById('am-cancelar')?.addEventListener('click', () => document.getElementById('dlg-aporte-meta')?.close());
   document.getElementById('am-close-x')?.addEventListener('click', () => document.getElementById('dlg-aporte-meta')?.close());
+
+  // Eliminar meta con saldo: opciones (solo eliminar / devolver a cuenta / transferir)
+  document.querySelectorAll('#dlg-meta-del .md-opt').forEach(b =>
+    b.addEventListener('click', () => _metaDelElegir(b.dataset.mdAccion)));
+  document.getElementById('md-confirmar')?.addEventListener('click', () => _metaDelConfirmar());
+  document.getElementById('md-cancelar')?.addEventListener('click', () => { document.getElementById('dlg-meta-del')?.close(); _metaDelCtx = null; });
 
   // Consulta de actualización
   document.getElementById('upd-aplicar')?.addEventListener('click', () => { document.getElementById('dlg-update')?.close(); _aplicarUpdateAhora(); });

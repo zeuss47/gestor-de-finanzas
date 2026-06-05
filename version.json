@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.94",
-    "build":  111,
-    "modified":  "2026-06-05T16:42:29Z",
-    "commit":  "M changelog.json, M css/styles.css, M index.html, M js/ai-predict.js, M js/app.js",
-    "notes":  "Auto-update 2026-06-05 13:42"
+    "version":  "1.95",
+    "build":  112,
+    "modified":  "2026-06-05T16:59:57Z",
+    "commit":  "M changelog.json, M css/styles.css, M index.html, M js/app.js",
+    "notes":  "Auto-update 2026-06-05 13:59"
 }

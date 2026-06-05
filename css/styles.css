@@ -3723,6 +3723,30 @@ body.view-analisis #main-widgets::before {
 }
 .am-quick-btn:hover { border-color: var(--brand); color: var(--brand); }
 
+/* Botón eliminar (fantasma rojo) en el footer del diálogo de meta */
+.btn-danger-ghost {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 2.7rem; border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, transparent); color: var(--danger);
+  border-radius: .8rem; cursor: pointer; transition: all .15s ease;
+}
+.btn-danger-ghost:hover { background: color-mix(in srgb, var(--danger) 16%, transparent); }
+.btn-danger-ghost:active { transform: scale(.94); }
+
+/* Opciones del diálogo de eliminar meta con saldo */
+.md-opts { display: flex; flex-direction: column; gap: .55rem; }
+.md-opt {
+  display: flex; align-items: center; gap: .75rem; width: 100%; text-align: left;
+  padding: .8rem .9rem; border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 1rem; cursor: pointer; font-family: inherit; transition: all .15s ease;
+}
+.md-opt:hover { border-color: var(--brand); }
+.md-opt.active { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 12%, var(--surface-2)); box-shadow: 0 0 0 1px var(--brand) inset; }
+.md-opt-ic { font-size: 1.3rem; flex-shrink: 0; }
+.md-opt-txt { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.md-opt-txt b { font-size: .85rem; color: var(--ink); }
+.md-opt-txt small { font-size: .72rem; color: var(--ink-muted); }
+
 /* Hint en el pago de tarjeta dentro del historial (solo lectura) */
 .mov-pago-hint {
   font-size: .6rem; color: var(--ink-muted); white-space: nowrap;

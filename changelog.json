@@ -1,6 +1,15 @@
 {
   "entradas": [
     {
+      "version": "1.92",
+      "fecha": "2026-06-05",
+      "items": [
+        "Metas: ahora podés eliminar cada meta desde su edición (botón 🗑)",
+        "Al eliminar una meta con saldo, elegís qué hacer: solo eliminar, devolver el saldo a una cuenta, o transferirlo a otra meta",
+        "La devolución de saldo aparece en el historial como ingreso a tu cuenta (↩️ verde)"
+      ]
+    },
+    {
       "version": "1.91",
       "fecha": "2026-06-05",
       "items": [
