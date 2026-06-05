@@ -4042,21 +4042,25 @@ function abrirAporteMeta(metaId) {
   const falta = Math.max(0, (m.monto_objetivo || 0) - (m.monto_actual || 0));
   document.getElementById('am-subtitulo').textContent = `${m.nombre} · faltan ${FMT.format(falta)}`;
 
-  // Sugerencia: el aporte mensual estimado por la IA (margen repartido por prioridad).
+  // Sugerencia: el aporte mensual del waterfall (ya acotado a la falta),
+  // recortado además a lo que realmente tenés disponible (saldo líquido).
+  const saldoDisp = Math.max(0, state.estado?.saldo_liquido || 0);
   const est = estimarMesesMeta(state.metas, _margenLibreReal()).get(metaId);
-  const sugerido = est?.aporteMensual ? Math.round(est.aporteMensual) : 0;
+  const aporteIA = est?.aporteMensual ? Math.round(est.aporteMensual) : 0;
+  const sugerido = Math.min(aporteIA || 0, Math.round(falta), saldoDisp || (aporteIA || 0));
   const montoInp = document.getElementById('am-monto');
   montoInp.value = sugerido || '';
-  document.getElementById('am-sugerido').textContent = est?.aporteMensual
-    ? `Sugerido por la IA: ${FMT.format(est.aporteMensual)}/mes${est.alcanzable ? ` · completás en ~${est.mesesRestantes} ${est.mesesRestantes===1?'mes':'meses'}` : ''}`
-    : 'Sin margen libre este mes para sugerir un aporte.';
+  document.getElementById('am-sugerido').textContent = aporteIA
+    ? `Sugerido: ${FMT.format(sugerido)}${aporteIA !== sugerido ? ` (de ${FMT.format(aporteIA)}/mes, limitado a tu saldo)` : '/mes'}${est?.alcanzable ? ` · meta en ~${est.mesesRestantes} ${est.mesesRestantes===1?'mes':'meses'}` : ''}`
+    : `Sin margen libre este mes. Tu saldo disponible es ${FMT.format(saldoDisp)}.`;
 
-  // Botones rápidos: aporte sugerido, lo que falta.
+  // Botones rápidos: aporte sugerido, lo que falta, todo el saldo disponible.
   const quick = document.getElementById('am-quick');
   if (quick) {
     const opts = [];
-    if (sugerido > 0) opts.push({ lbl: `Sugerido ${FMT.format(sugerido)}`, val: sugerido });
-    if (falta > 0)    opts.push({ lbl: `Completar ${FMT.format(falta)}`, val: Math.round(falta) });
+    if (sugerido > 0)               opts.push({ lbl: `Sugerido ${FMT.format(sugerido)}`, val: sugerido });
+    if (falta > 0)                  opts.push({ lbl: `Completar ${FMT.format(falta)}`, val: Math.round(falta) });
+    if (saldoDisp > 0 && saldoDisp < falta) opts.push({ lbl: `Todo el saldo ${FMT.format(saldoDisp)}`, val: saldoDisp });
     quick.innerHTML = opts.map(o => `<button type="button" class="am-quick-btn" data-val="${o.val}">${o.lbl}</button>`).join('');
     quick.querySelectorAll('.am-quick-btn').forEach(b => b.onclick = () => { montoInp.value = b.dataset.val; });
   }
@@ -5720,16 +5724,28 @@ function renderMetasMobile() {
   }
 
   const margen    = _margenLibreReal();
-  const pesos     = metas.map(m => (m.prioridad || 3));
-  const sumaPesos = pesos.reduce((a,b)=>a+b,0) || 1;
+  const saldoDisp = Math.max(0, state.estado?.saldo_liquido || 0);
   const estMeses  = estimarMesesMeta(metas, margen);
+
+  // Encabezado: deja claro sobre qué base se calculan los aportes.
+  const totalAporte = [...estMeses.values()].reduce((a, e) => a + (e.aporteMensual || 0), 0);
+  const headEl = document.getElementById('mm-resumen');
+  if (headEl) {
+    headEl.innerHTML = margen > 0
+      ? `<div class="mm-resumen-grid">
+           <div><span class="mm-r-lbl">Disponible / mes</span><b class="mm-r-val">${FMT.format(margen)}</b></div>
+           <div><span class="mm-r-lbl">Repartido en metas</span><b class="mm-r-val" style="color:var(--brand-3)">${FMT.format(totalAporte)}</b></div>
+           <div><span class="mm-r-lbl">Saldo disponible</span><b class="mm-r-val" style="color:${saldoDisp>=0?'var(--ink)':'var(--danger)'}">${FMT.format(saldoDisp)}</b></div>
+         </div>`
+      : `<div class="mm-resumen-warn">⚠️ Este mes no te sobra margen (ingresos − gastos). Podés aportar igual desde tu saldo disponible: <b>${FMT.format(saldoDisp)}</b>.</div>`;
+  }
 
   lista.innerHTML = metas.map((m, i) => {
     const pct      = Math.min(100, Math.round((100*(m.monto_actual||0))/(m.monto_objetivo||1)));
-    const sugerido = margen * (pesos[i] / sumaPesos);
     const icon     = m.es_emergencia ? '🛡️' : '🎯';
     const completa = pct >= 100;
     const est      = estMeses.get(m.id);
+    const sugerido = est?.aporteMensual || 0;   // aporte ya acotado por el waterfall
     const mesesTxt = (!completa && est)
       ? (est.alcanzable
           ? `<b style="color:var(--brand)">~${est.mesesRestantes} ${est.mesesRestantes === 1 ? 'mes' : 'meses'}</b>${est.fechaEstimada ? ` <span style="color:var(--ink-muted)">(${_fmtPeriodoMeta(est.fechaEstimada)})</span>` : ''}`
@@ -5751,7 +5767,9 @@ function renderMetasMobile() {
         </div>
         ${!completa ? `
           <div class="meta-plan">
-            <span class="meta-plan-line">💡 Aportá <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes · listo en ${mesesTxt || '—'}</span>
+            <span class="meta-plan-line">${sugerido > 0
+              ? `💡 Aportá <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes · listo en ${mesesTxt || '—'}`
+              : `<span style="color:var(--warning)">💡 Sin margen este mes para repartir aporte</span>`}</span>
             <button type="button" class="meta-aportar-btn" data-meta-aportar="${m.id}">＋ Aportar</button>
           </div>` : `
           <div class="meta-plan">

@@ -3686,6 +3686,23 @@ body.view-analisis #main-widgets::before {
 .cl-item::before { content: '·'; color: var(--brand); font-weight: 900; flex-shrink: 0; margin-top: .05rem; }
 
 /* ── Plan + botón de aporte en las metas ── */
+/* Resumen de la base de cálculo (arriba de la lista de metas) */
+.mm-resumen { margin-bottom: .75rem; }
+.mm-resumen-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 1rem; padding: .7rem .8rem;
+}
+.mm-resumen-grid > div { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.mm-r-lbl { font-size: .6rem; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .03em; }
+.mm-r-val { font-size: .82rem; font-weight: 700; font-family: var(--ff-display, inherit); }
+.mm-resumen-warn {
+  font-size: .72rem; line-height: 1.4; color: var(--ink-2);
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+  border-radius: 1rem; padding: .7rem .8rem;
+}
+
 .meta-plan { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .meta-plan-line { font-size: .68rem; color: var(--ink-2); line-height: 1.3; }
 .meta-aportar-btn {

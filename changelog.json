@@ -1,6 +1,17 @@
 {
   "entradas": [
     {
+      "version": "1.91",
+      "fecha": "2026-06-05",
+      "items": [
+        "Metas: el aporte sugerido ya no supera lo que falta (se acota a cada meta)",
+        "Metas: el margen mensual se reparte en cascada y el sobrante pasa a las demás metas",
+        "Metas: cuantas más metas tengas, se amplían los meses para completar cada una",
+        "Metas: resumen con tu disponible mensual y tu saldo disponible como base del cálculo",
+        "Metas: si no te sobra margen, podés aportar igual desde tu saldo disponible"
+      ]
+    },
+    {
       "version": "1.90",
       "fecha": "2026-06-04",
       "items": [

@@ -482,28 +482,54 @@ export function predecirSaturacionTarjetas({ gastos = [], tarjetas = [], resumen
  *   - Sumar score por categoria. Devolver la mejor.
  */
 /**
- * Estima, para cada meta activa, en cuántos MESES se completa según el flujo
- * real (margen libre repartido por prioridad). Determinista.
+ * Estima, para cada meta activa, el aporte mensual y en cuántos MESES se
+ * completa según el flujo real disponible. Determinista.
  * @param {Array}  metas       state.metas
- * @param {number} margenLibre margen mensual ya neto de cuotas (ver app.js)
+ * @param {number} margenLibre margen mensual disponible para metas (neto de cuotas)
  * @returns {Map} meta.id -> { aporteMensual, mesesRestantes, fechaEstimada, alcanzable }
  *
- * Fórmula: aporte = margenLibre · (prioridad / Σprioridades);
- *          meses  = ⌈(objetivo − actual) / aporte⌉.
- * Recalcular es automático: al agregar una meta o generarse una cuota nueva
- * (que baja el margen), reloadAll() vuelve a llamar a esta función.
+ * REPARTO TIPO "WATERFALL" (cascada):
+ *   - El margen mensual se reparte entre las metas activas en proporción a su
+ *     prioridad, PERO el aporte de cada meta se ACOTA a lo que le falta (nunca
+ *     se sugiere aportar más de lo necesario → no más "aporte super mayor").
+ *   - El sobrante de las metas que necesitan poco se REDISTRIBUYE a las demás.
+ *   - Más metas ⇒ cada una recibe menos del margen ⇒ más meses para cada una.
+ *     Metas más grandes (más valor) tardan más con el mismo aporte.
+ * Recalcular es automático: al agregar/editar una meta o cambiar el margen,
+ * reloadAll() vuelve a llamar a esta función.
  */
 export function estimarMesesMeta(metas = [], margenLibre = 0) {
   const activas = (metas || []).filter(m => !m.deleted && (m.monto_objetivo || 0) > (m.monto_actual || 0));
-  const pesos = activas.map(m => m.prioridad || 3);
-  const suma = pesos.reduce((a, b) => a + b, 0) || 1;
-  const margen = Math.max(0, margenLibre || 0);
-  const mesActual = hoyISO().slice(0, 7);
   const out = new Map();
+  if (!activas.length) return out;
+
+  const mesActual = hoyISO().slice(0, 7);
+  const faltas  = activas.map(m => Math.max(0, (m.monto_objetivo || 0) - (m.monto_actual || 0)));
+  const aportes = new Array(activas.length).fill(0);
+  let restante  = Math.max(0, margenLibre || 0);
+
+  // Cascada: repartir por prioridad, acotar a la falta, redistribuir el sobrante.
+  // (activas.length + 2 iteraciones bastan para vaciar el margen entre las metas)
+  for (let iter = 0; iter < activas.length + 2 && restante > 0.5; iter++) {
+    const abiertos = activas.map((_, i) => i).filter(i => aportes[i] < faltas[i] - 0.5);
+    if (!abiertos.length) break;
+    const sumaPrio = abiertos.reduce((a, i) => a + (activas[i].prioridad || 3), 0) || 1;
+    let usado = 0;
+    for (const i of abiertos) {
+      const cuota   = restante * ((activas[i].prioridad || 3) / sumaPrio);
+      const espacio = faltas[i] - aportes[i];
+      const dar     = Math.min(cuota, espacio);
+      aportes[i] += dar;
+      usado      += dar;
+    }
+    restante -= usado;
+    if (usado < 0.5) break;   // nadie pudo absorber más: evitar bucle
+  }
+
   activas.forEach((m, i) => {
-    const aporte = margen * (pesos[i] / suma);
-    const falta = (m.monto_objetivo || 0) - (m.monto_actual || 0);
-    const meses = aporte > 0 ? Math.ceil(falta / aporte) : Infinity;
+    const aporte = aportes[i];
+    const falta  = faltas[i];
+    const meses  = aporte > 0 ? Math.ceil(falta / aporte) : Infinity;
     out.set(m.id, {
       aporteMensual: aporte,
       mesesRestantes: meses,
