@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.95",
-    "build":  112,
-    "modified":  "2026-06-05T16:59:57Z",
+    "version":  "1.96",
+    "build":  113,
+    "modified":  "2026-06-05T23:05:38Z",
     "commit":  "M changelog.json, M css/styles.css, M index.html, M js/app.js",
-    "notes":  "Auto-update 2026-06-05 13:59"
+    "notes":  "Auto-update 2026-06-05 20:05"
 }

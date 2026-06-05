@@ -4,7 +4,8 @@
       "version": "1.92",
       "fecha": "2026-06-05",
       "items": [
-        "Metas: ahora podés eliminar cada meta desde su edición (botón 🗑)",
+        "Metas: cada meta muestra el aporte sugerido y el tiempo estimado en base a ese aporte",
+        "Metas: botones + (aportar) y 🗑 (eliminar) directos en cada tarjeta",
         "Al eliminar una meta con saldo, elegís qué hacer: solo eliminar, devolver el saldo a una cuenta, o transferirlo a otra meta",
         "La devolución de saldo aparece en el historial como ingreso a tu cuenta (↩️ verde)"
       ]

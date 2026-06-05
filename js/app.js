@@ -3487,14 +3487,9 @@ function openDialog(id, prefill = {}) {
   if (id === 'dlg-gasto') prepararDialogoGasto(form);
   // Diálogo de ingreso: auto-fill fecha y período actual
   if (id === 'dlg-ingreso') prepararDialogoIngreso(form);
-  // Diálogo de meta: el botón eliminar solo aparece al editar una meta existente
+  // Diálogo de meta: el texto del botón cambia según crear/editar (eliminar va en la card)
   if (id === 'dlg-meta') {
-    const btnDel = document.getElementById('btn-del-meta');
     const editId = prefill._editing_id || '';
-    if (btnDel) {
-      btnDel.style.display = editId ? '' : 'none';
-      btnDel.onclick = () => { dlg.close(); eliminarMeta(editId); };
-    }
     const btnSave = dlg.querySelector('button[value="save"]');
     if (btnSave) btnSave.lastChild.textContent = editId ? ' Guardar meta' : ' Crear meta';
   }
@@ -5887,23 +5882,29 @@ function renderMetasMobile() {
           <span>${FMT.format(m.monto_actual||0)} <span style="color:var(--ink-muted)">/ ${FMT.format(m.monto_objetivo||0)}</span></span>
           ${m.fecha_objetivo ? `<span style="color:var(--ink-muted)">📅 ${m.fecha_objetivo}</span>` : ''}
         </div>
-        ${!completa ? `
-          <div class="meta-plan">
-            <span class="meta-plan-line">${sugerido > 0
-              ? `💡 Aportá <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes · listo en ${mesesTxt || '—'}`
-              : `<span style="color:var(--warning)">💡 Sin margen este mes para repartir aporte</span>`}</span>
-            <button type="button" class="meta-aportar-btn" data-meta-aportar="${m.id}">＋ Aportar</button>
-          </div>` : `
-          <div class="meta-plan">
-            <span style="color:var(--success);font-weight:600">🎉 ¡Meta completada!</span>
-            <button type="button" class="meta-aportar-btn" data-meta-aportar="${m.id}">＋ Aportar</button>
-          </div>`}
+        <div class="meta-plan">
+          <span class="meta-plan-line">${completa
+            ? `<span style="color:var(--success);font-weight:600">🎉 ¡Meta completada!</span>`
+            : sugerido > 0
+            ? `💡 Aporte sugerido <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes · listo en ${mesesTxt || '—'}`
+            : `<span style="color:var(--warning)">💡 Sin margen este mes para repartir aporte</span>`}</span>
+          <div class="meta-actions">
+            <button type="button" class="meta-icon-btn meta-aportar-btn" data-meta-aportar="${m.id}" title="Aportar" aria-label="Aportar">＋</button>
+            <button type="button" class="meta-icon-btn meta-del-btn" data-meta-del="${m.id}" title="Eliminar meta" aria-label="Eliminar meta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>
+        </div>
       </div>`;
   }).join('');
 
   // Botón aportar (no abre la edición)
   lista.querySelectorAll('[data-meta-aportar]').forEach(btn => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); abrirAporteMeta(btn.dataset.metaAportar); });
+  });
+  // Botón eliminar (no abre la edición)
+  lista.querySelectorAll('[data-meta-del]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); eliminarMeta(btn.dataset.metaDel); });
   });
   // Click en el encabezado de la meta → editarla
   lista.querySelectorAll('[data-meta-edit]').forEach(head => {
