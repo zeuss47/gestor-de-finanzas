@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.92",
-    "build":  109,
-    "modified":  "2026-06-05T08:24:04Z",
-    "commit":  "M css/styles.css, M index.html, M js/app.js",
-    "notes":  "Auto-update 2026-06-05 05:24"
+    "version":  "1.93",
+    "build":  110,
+    "modified":  "2026-06-05T16:24:04Z",
+    "commit":  "M css/styles.css, M css/tailwind.css, M index.html, M js/app.js, M sw.js, changelog.json",
+    "notes":  "Auto-update 2026-06-05 13:24"
 }

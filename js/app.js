@@ -120,13 +120,48 @@ async function _onUpdateDetectado() {
   _autoUpdateTimer = setTimeout(() => aplicarActualizacionSiCorresponde(), 5000);
 }
 
-/** Aplica la actualización pendiente (al tocar el aviso junto a la versión). */
-function aplicarUpdateManual() {
+/** Aplica YA la actualización (recarga con la versión nueva). */
+function _aplicarUpdateAhora() {
   _hayActualizacionSW = true;
   if (_autoUpdateTimer) { clearTimeout(_autoUpdateTimer); _autoUpdateTimer = null; }
   const waiting = _swReg?.waiting;
   if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
   else location.reload();
+}
+
+/**
+ * Al tocar "✨ Actualizar": NO actualiza directo. Primero CONSULTA mostrando
+ * qué cambios trae la versión nueva (leídos fresco de changelog.json) y deja
+ * confirmar. Pausa el auto-update mientras el usuario decide.
+ */
+async function aplicarUpdateManual() {
+  if (_autoUpdateTimer) { clearTimeout(_autoUpdateTimer); _autoUpdateTimer = null; }
+  const dlg = document.getElementById('dlg-update');
+  if (!dlg) { _aplicarUpdateAhora(); return; }
+  // El botón vive en Ajustes (un <dialog>): lo cerramos para que el preview no
+  // quede atrapado debajo en el top-layer nativo.
+  const settings = document.getElementById('dlg-settings');
+  if (settings?.open) settings.close();
+
+  await cargarChangelog();   // fresco: trae los cambios de la versión nueva
+  const v = _updateDisponible || state.version || {};
+  const sub = document.getElementById('upd-subtitulo');
+  if (sub) {
+    const verTxt = v.version ? `v${v.version}` : 'nueva versión';
+    const fechaTxt = v.modified ? ` · ${new Date(v.modified).toLocaleDateString('es-AR', { day:'2-digit', month:'long' })}` : '';
+    sub.textContent = verTxt + fechaTxt;
+  }
+  // Los cambios de la versión a la que se va a actualizar = entrada más reciente del changelog.
+  const instalada = state.version?.version;
+  const nueva = CHANGELOG.find(e => e.version !== instalada) || CHANGELOG[0];
+  const ul = document.getElementById('upd-cambios');
+  if (ul) {
+    const items = (nueva?.items || []).slice(0, 8);
+    ul.innerHTML = items.length
+      ? items.map(it => `<li class="cl-item">${escapeHtml(it)}</li>`).join('')
+      : '<li class="cl-item">Mejoras y correcciones.</li>';
+  }
+  dlg.showModal();
 }
 
 /** Engancha el botón "Actualizar" inline dentro de un contenedor de versión. */
@@ -475,7 +510,7 @@ function actualizarVersionUI() {
   if (numEl) numEl.innerHTML = `v${corto}${updHtml}`;
   if (subEl) {
     const dt = new Date(v.modified);
-    subEl.textContent = `Build #${v.build} · ${dt.toLocaleDateString('es-AR', {day:'2-digit',month:'short',year:'2-digit'})}`;
+    subEl.textContent = dt.toLocaleDateString('es-AR', {day:'2-digit', month:'long', year:'numeric'});
   }
   if (cardEl) _wireUpdateBadge(cardEl);
 
@@ -947,7 +982,7 @@ function computarEstadoGlobal() {
   for (const g of state.gastos) {
     if (g.deleted || !g.fecha?.startsWith(mk)) continue;
     if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;  // contador puro
-    if (g.es_pago_tarjeta) continue;                              // el pago no es consumo nuevo (ya está en la deuda)
+    if (g.es_pago_tarjeta || g.es_aporte_meta) continue;                              // el pago no es consumo nuevo (ya está en la deuda)
     egresosMes += montoARS(g, { mensual: true });
   }
 
@@ -956,7 +991,7 @@ function computarEstadoGlobal() {
   for (const g of state.gastos) {
     if (g.deleted || !g.fecha) continue;
     if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;
-    if (g.es_pago_tarjeta) continue;
+    if (g.es_pago_tarjeta || g.es_aporte_meta) continue;
     const k = g.fecha.slice(0,7);
     if (k === mk) continue;
     buckets.set(k, (buckets.get(k)||0) + montoARS(g, { mensual: true }));
@@ -1916,7 +1951,7 @@ function renderBalance(el) {
     ingMap.set(k, (ingMap.get(k) || 0) + ((i.sueldo_neto || 0) + (i.bonos || 0)));
   }
   for (const g of state.gastos || []) {
-    if (g.deleted || g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado) || !enRango(g.fecha)) continue; // pago de tarjeta / habitual-contador no es consumo
+    if (g.deleted || g.es_pago_tarjeta || g.es_aporte_meta || (g.es_habitual && !g.cuenta_id && !g.aprobado) || !enRango(g.fecha)) continue; // pago de tarjeta / habitual-contador no es consumo
     const k = bucketKey(new Date(g.fecha + 'T12:00:00'));
     gasMap.set(k, (gasMap.get(k) || 0) + gastoEf(g));
   }
@@ -2149,7 +2184,7 @@ function renderResumenAnual(el) {
   const gastosPorMes = new Map();
   for (const g of state.gastos) {
     if (g.deleted || !g.fecha?.startsWith(pfx)) continue;
-    if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
+    if (g.es_pago_tarjeta || g.es_aporte_meta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
     const mk = g.fecha.slice(0,7);
     gastosPorMes.set(mk, (gastosPorMes.get(mk)||0) + montoARS(g, { mensual: true }));
   }
@@ -2190,7 +2225,7 @@ function renderFlujoMensual(el) {
   const buckets = new Map(), ingrMap = new Map();
   for (const g of state.gastos) {
     if (g.deleted || !g.fecha) continue;
-    if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
+    if (g.es_pago_tarjeta || g.es_aporte_meta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
     const k = g.fecha.slice(0,7);
     buckets.set(k, (buckets.get(k)||0) + montoARS(g, { mensual: true }));
   }
@@ -2244,7 +2279,7 @@ function renderCategorias(el) {
   const catMap = new Map();
   for (const g of state.gastos) {
     if (g.deleted) continue;
-    if (g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // pago tarjeta / habitual-contador no es consumo
+    if (g.es_pago_tarjeta || g.es_aporte_meta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // pago tarjeta / habitual-contador no es consumo
     if (!g.fecha?.startsWith(mk)) continue;
     const cat = g.categoria || 'general';
     catMap.set(cat, (catMap.get(cat)||0) + montoARS(g, { mensual: true }));
@@ -3241,10 +3276,11 @@ function renderMovimientos() {
       </div>`;
   };
   const gastoHTML = (g) => {
-    const esPago  = !!g.es_pago_tarjeta;   // pago de tarjeta: ícono y trato distinto
+    const esAporte = !!g.es_aporte_meta;   // aporte a meta
+    const esPago  = !!g.es_pago_tarjeta || esAporte;   // movimientos especiales: solo lectura
     const catObj  = esPago ? null : allCats.find(c => c.id === g.categoria || c.nombre?.toLowerCase() === (g.categoria||'').toLowerCase());
-    const icon    = esPago ? '💳' : (catObj?.icono || CAT_ICON[g.categoria] || '📌');
-    const catColor= esPago ? '#a78bfa' : (catObj?.color || '#94a3b8');
+    const icon    = esAporte ? '🎯' : (g.es_pago_tarjeta ? '💳' : (catObj?.icono || CAT_ICON[g.categoria] || '📌'));
+    const catColor= esAporte ? '#10b981' : (g.es_pago_tarjeta ? '#a78bfa' : (catObj?.color || '#94a3b8'));
     const monto   = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
     const cuotas  = g.tipo === 'cuotas' ? `cuota ${g.cuota_numero}/${g.cuotas_total}` : '';
     const tarjeta = g.tarjeta_id ? state.tarjetas.find(t=>t.id===g.tarjeta_id) : null;
@@ -3264,7 +3300,7 @@ function renderMovimientos() {
           </div>
           <div class="mov-row-meta" style="margin-top:.2rem">
             <span class="mov-cat-badge" style="background:${catColor}14;color:${catColor};border-color:${catColor}33">
-              ${icon} ${escapeHtml(esPago ? 'Pago tarjeta' : (catObj?.nombre || g.categoria || 'general'))}
+              ${icon} ${escapeHtml(esAporte ? 'Aporte a meta' : (g.es_pago_tarjeta ? 'Pago tarjeta' : (catObj?.nombre || g.categoria || 'general')))}
             </span>
             ${g.subcategoria ? `<span class="mov-subcat-badge">${escapeHtml(g.subcategoria)}</span>` : ''}
           </div>
@@ -3273,7 +3309,9 @@ function renderMovimientos() {
           <span class="mov-row-monto">${monedaFmt}</span>
           ${g.compartido ? `<span style="font-size:.68rem;color:var(--ink-muted)">total ${FMT.format(g.monto)}</span>` : ''}
           <div class="mov-row-actions">
-            ${esPago
+            ${esAporte
+              ? `<span class="mov-pago-hint" title="Aporte registrado a tu meta de ahorro">🎯 ahorro</span>`
+              : g.es_pago_tarjeta
               ? `<span class="mov-pago-hint" title="Revertí el pago desde la tarjeta (Tarjetas → ↺ Pendiente)">↩ desde tarjeta</span>`
               : `<button class="mov-row-btn edit" data-edit-gas="${g.id}" title="Editar">${SVG_EDIT}</button>
                  <button class="mov-row-btn del"  data-del-gas="${g.id}"  title="Eliminar">${SVG_TRASH}</button>`}
@@ -3289,7 +3327,7 @@ function renderMovimientos() {
     const m = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
     // Los pagos de tarjeta SÍ se muestran en el historial (egreso real de la cuenta),
     // pero NO se suman al "total del día" para no inflar los consumos (ya están en la deuda).
-    items.push({ fecha: g.fecha || '', tipo: 'gasto', signo: -1, monto: m, moneda: g.moneda, esPago: !!g.es_pago_tarjeta, html: gastoHTML(g) });
+    items.push({ fecha: g.fecha || '', tipo: 'gasto', signo: -1, monto: m, moneda: g.moneda, esPago: !!(g.es_pago_tarjeta || g.es_aporte_meta), html: gastoHTML(g) });
   }
   items.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
 
@@ -3384,7 +3422,7 @@ function _renderFiltrosCategoria(mes) {
     ? state.ajustes.catalogos.categorias_gasto
     : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.categorias_gasto);
   const catsEnMes = new Set(
-    state.gastos.filter(g => !g.deleted && !g.es_pago_tarjeta && g.fecha?.startsWith(mes))
+    state.gastos.filter(g => !g.deleted && !g.es_pago_tarjeta && !g.es_aporte_meta && g.fecha?.startsWith(mes))
       .map(g => g.categoria || 'general')
   );
 
@@ -3987,6 +4025,87 @@ async function handleSubmitCuenta(form) {
   await DB.put('cuentas', cuenta); notificarCambioLocal();
   await reloadAll();
   toast('✓ Cuenta guardada');
+}
+
+/* ============ APORTE A META (transferir del saldo líquido) ============ */
+let _aporteMetaCtx = null;
+
+/** Margen libre real mensual (ingresos − gastos − cuotas comprometidas). */
+function _margenLibreReal() {
+  return Math.max(0, (state.estado?.margen_libre_mes || 0) - (state.capacidad?.cuotas_mensuales_proyectadas || 0));
+}
+
+function abrirAporteMeta(metaId) {
+  const m = state.metas.find(x => x.id === metaId);
+  if (!m) return;
+  _aporteMetaCtx = { metaId };
+  const falta = Math.max(0, (m.monto_objetivo || 0) - (m.monto_actual || 0));
+  document.getElementById('am-subtitulo').textContent = `${m.nombre} · faltan ${FMT.format(falta)}`;
+
+  // Sugerencia: el aporte mensual estimado por la IA (margen repartido por prioridad).
+  const est = estimarMesesMeta(state.metas, _margenLibreReal()).get(metaId);
+  const sugerido = est?.aporteMensual ? Math.round(est.aporteMensual) : 0;
+  const montoInp = document.getElementById('am-monto');
+  montoInp.value = sugerido || '';
+  document.getElementById('am-sugerido').textContent = est?.aporteMensual
+    ? `Sugerido por la IA: ${FMT.format(est.aporteMensual)}/mes${est.alcanzable ? ` · completás en ~${est.mesesRestantes} ${est.mesesRestantes===1?'mes':'meses'}` : ''}`
+    : 'Sin margen libre este mes para sugerir un aporte.';
+
+  // Botones rápidos: aporte sugerido, lo que falta.
+  const quick = document.getElementById('am-quick');
+  if (quick) {
+    const opts = [];
+    if (sugerido > 0) opts.push({ lbl: `Sugerido ${FMT.format(sugerido)}`, val: sugerido });
+    if (falta > 0)    opts.push({ lbl: `Completar ${FMT.format(falta)}`, val: Math.round(falta) });
+    quick.innerHTML = opts.map(o => `<button type="button" class="am-quick-btn" data-val="${o.val}">${o.lbl}</button>`).join('');
+    quick.querySelectorAll('.am-quick-btn').forEach(b => b.onclick = () => { montoInp.value = b.dataset.val; });
+  }
+
+  // Cuentas de dónde sale el aporte.
+  const sel = document.getElementById('am-cuenta');
+  const cuentas = (state.cuentas || []).filter(c => !c.deleted && c.activa !== false);
+  sel.innerHTML = `<option value="">— No descontar (solo sumar a la meta) —</option>` +
+    cuentas.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)} · saldo ${FMT.format(calcularSaldoCuenta(c))}</option>`).join('');
+
+  document.getElementById('dlg-aporte-meta')?.showModal();
+}
+
+async function confirmarAporteMeta() {
+  if (!_aporteMetaCtx) return;
+  const m = state.metas.find(x => x.id === _aporteMetaCtx.metaId);
+  if (!m) return;
+  const monto = parseFloat(document.getElementById('am-monto')?.value) || 0;
+  if (monto <= 0) { toast('Ingresá un monto a aportar', 1800); return; }
+  const cuentaId = document.getElementById('am-cuenta')?.value || '';
+
+  // Si se elige cuenta: registrar un movimiento que descuenta del saldo líquido.
+  // es_aporte_meta lo excluye del análisis de consumo (es una transferencia a ahorro).
+  if (cuentaId) {
+    const g = {
+      id: uuid(),
+      fecha: new Date().toISOString().slice(0, 10),
+      monto, moneda: 'ARS',
+      descripcion: `Aporte a meta · ${m.nombre}`,
+      categoria: 'Ahorro',
+      metodo_pago: 'transferencia',
+      tipo: 'unico',
+      cuenta_id: cuentaId,
+      tarjeta_id: null,
+      es_aporte_meta: true,
+      meta_id: m.id,
+      updated_at: nowTs(),
+    };
+    await DB.put('gastos', g);
+  }
+
+  // Sumar al monto ahorrado de la meta.
+  m.monto_actual = (m.monto_actual || 0) + monto;
+  await DB.put('metas', m);
+  notificarCambioLocal();
+  document.getElementById('dlg-aporte-meta')?.close();
+  const completa = m.monto_actual >= (m.monto_objetivo || 0);
+  toast(`✓ Aportaste ${FMT.format(monto)} a "${m.nombre}"${cuentaId ? ' (descontado de la cuenta)' : ''}${completa ? ' · 🎉 ¡Meta completa!' : ''}`, 3000);
+  await reloadAll();
 }
 
 async function handleSubmitMeta(form) {
@@ -5600,7 +5719,7 @@ function renderMetasMobile() {
     return;
   }
 
-  const margen    = Math.max(0, (state.estado?.margen_libre_mes || 0) - (state.capacidad?.cuotas_mensuales_proyectadas || 0));
+  const margen    = _margenLibreReal();
   const pesos     = metas.map(m => (m.prioridad || 3));
   const sumaPesos = pesos.reduce((a,b)=>a+b,0) || 1;
   const estMeses  = estimarMesesMeta(metas, margen);
@@ -5612,11 +5731,13 @@ function renderMetasMobile() {
     const completa = pct >= 100;
     const est      = estMeses.get(m.id);
     const mesesTxt = (!completa && est)
-      ? (est.alcanzable ? ` · <b style="color:var(--brand)">~${est.mesesRestantes} ${est.mesesRestantes === 1 ? 'mes' : 'meses'}</b>` : ` · <b style="color:var(--warning)">sin margen</b>`)
+      ? (est.alcanzable
+          ? `<b style="color:var(--brand)">~${est.mesesRestantes} ${est.mesesRestantes === 1 ? 'mes' : 'meses'}</b>${est.fechaEstimada ? ` <span style="color:var(--ink-muted)">(${_fmtPeriodoMeta(est.fechaEstimada)})</span>` : ''}`
+          : `<b style="color:var(--warning)">sin margen libre</b>`)
       : '';
     return `
-      <div class="meta-card-m card-glass rounded-2xl p-4" data-meta-id="${m.id}" style="cursor:pointer">
-        <div class="flex items-center justify-between mb-2">
+      <div class="meta-card-m card-glass rounded-2xl p-4" data-meta-id="${m.id}">
+        <div class="flex items-center justify-between mb-2" data-meta-edit="${m.id}" style="cursor:pointer">
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-lg flex-shrink-0">${icon}</span>
             <p class="font-semibold text-sm truncate">${escapeHtml(m.nombre)}</p>
@@ -5624,18 +5745,30 @@ function renderMetasMobile() {
           <span class="ff-display font-bold text-sm" style="color:${completa?'var(--success)':'var(--brand-3)'}">${pct}%</span>
         </div>
         <div class="bar mb-2"><span style="width:${pct}%;${completa?'background:var(--success)':''}"></span></div>
-        <div class="flex justify-between items-center text-[11px]" style="color:var(--ink-2)">
+        <div class="flex justify-between items-center text-[11px] mb-2" style="color:var(--ink-2)">
           <span>${FMT.format(m.monto_actual||0)} <span style="color:var(--ink-muted)">/ ${FMT.format(m.monto_objetivo||0)}</span></span>
           ${m.fecha_objetivo ? `<span style="color:var(--ink-muted)">📅 ${m.fecha_objetivo}</span>` : ''}
-          ${!completa ? `<span>Aportar <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes${mesesTxt}</span>` : `<span style="color:var(--success)">✓ Completada</span>`}
         </div>
+        ${!completa ? `
+          <div class="meta-plan">
+            <span class="meta-plan-line">💡 Aportá <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes · listo en ${mesesTxt || '—'}</span>
+            <button type="button" class="meta-aportar-btn" data-meta-aportar="${m.id}">＋ Aportar</button>
+          </div>` : `
+          <div class="meta-plan">
+            <span style="color:var(--success);font-weight:600">🎉 ¡Meta completada!</span>
+            <button type="button" class="meta-aportar-btn" data-meta-aportar="${m.id}">＋ Aportar</button>
+          </div>`}
       </div>`;
   }).join('');
 
-  // Click en una meta → editarla
-  lista.querySelectorAll('[data-meta-id]').forEach(card => {
-    card.addEventListener('click', async () => {
-      const m = await DB.get('metas', card.dataset.metaId);
+  // Botón aportar (no abre la edición)
+  lista.querySelectorAll('[data-meta-aportar]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); abrirAporteMeta(btn.dataset.metaAportar); });
+  });
+  // Click en el encabezado de la meta → editarla
+  lista.querySelectorAll('[data-meta-edit]').forEach(head => {
+    head.addEventListener('click', async () => {
+      const m = await DB.get('metas', head.dataset.metaEdit);
       if (!m) return;
       openDialog('dlg-meta', {
         _editing_id: m.id, nombre: m.nombre,
@@ -5644,6 +5777,14 @@ function renderMetasMobile() {
       });
     });
   });
+}
+
+/** Formatea un período YYYY-MM a "mar 2027" para las estimaciones de metas. */
+function _fmtPeriodoMeta(ym) {
+  if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return ym || '';
+  const [y, m] = ym.split('-');
+  const mn = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${mn[parseInt(m,10)-1]} ${y}`;
 }
 
 async function cerrarPeriodoUSD(tarjetaId) {
@@ -7191,72 +7332,23 @@ function _restaurarActivoHome() {
  * Se actualiza manualmente al cerrar cada sesión de mejoras.
  * Al tocar el card de versión en Ajustes se abre el drawer con este listado.
  */
-const CHANGELOG = [
-  {
-    version: '1.87', fecha: '2026-06-04',
-    items: [
-      'Botón de pago directo en cada tarjeta del dashboard',
-      'Contabilidad unificada: moneda extranjera, cuotas y saldo real corregidos',
-      'Saldo líquido = plata acumulada real (incluye saldo inicial de cuentas)',
-      'Historial agrupado por fecha funciona igual en celular y navegador',
-      'Detección de actualizaciones mejorada: el botón aparece antes de actualizar',
-      'Filtro de historial como bottom-sheet (no se corta en pantallas chicas)',
-    ],
-  },
-  {
-    version: '1.81', fecha: '2026-06-03',
-    items: [
-      'Calculadora activa automáticamente al abrir la carga de gasto/ingreso',
-      'Formulario de carga sin deslizar: todo entra en una pantalla',
-      'Guardar gasto/ingreso directo desde el botón "✓ Guardar" del teclado',
-      'Se quitaron las casillas de texto libre de categoría y descripción',
-      'Histórico de gasto agrupado por fecha con encabezados sticky',
-      'Animación de sincronización mejorada (solo al finalizar)',
-    ],
-  },
-  {
-    version: '1.78', fecha: '2026-06-03',
-    items: [
-      'Sincronización de config (categorías, habituales) entre dispositivos',
-      'Todos los datos se respaldan al repo de GitHub en cada sync',
-      'Proyección IA: ingresos ya se calculan correctamente (bug crítico corregido)',
-      'Scroll del celular restaurado (overflow-x clip sin romper scroll vertical)',
-    ],
-  },
-  {
-    version: '1.70', fecha: '2026-06-02',
-    items: [
-      'Carga unificada gasto/ingreso en una pantalla con toggle',
-      'Filtros de historial en dos casillas en la misma línea',
-      'OCR de boletas/tickets con Tesseract.js (PDF e imágenes)',
-      'Aprobar gastos habituales descuenta del saldo general',
-      'Proyección IA con mediana y cuotas futuras inyectadas mes a mes',
-      'Eliminada la función "ciclo activo" (contorno luminoso)',
-    ],
-  },
-  {
-    version: '1.60', fecha: '2026-05-30',
-    items: [
-      'Auditoría exhaustiva de saldos y contabilidad',
-      'Gastos habituales con cuenta configurable por ítem',
-      'Estrategia inversora (All Weather) en el panel de IA',
-      'Parser de resúmenes bancarios Macro y BBVA mejorado',
-      'Bloqueo de orientación vertical nativo (Android)',
-    ],
-  },
-  {
-    version: '1.50', fecha: '2026-05-20',
-    items: [
-      'Tarjetas de crédito con ciclos de facturación y editor masivo',
-      'Capacidad crediticia con regla 30% y simulador de compras',
-      'Multi-moneda: USD/EUR/BRL en gastos y resúmenes',
-      'Widgets redimensionables con drag desde la esquina',
-      'Sincronización GitHub: reset propagable con _meta.json',
-    ],
-  },
-];
+// Historial de cambios. Fuente única: changelog.json (fetcheado fresco, no-store),
+// así la versión vieja puede mostrar los cambios de la versión NUEVA antes de actualizar.
+let CHANGELOG = [];
+async function cargarChangelog() {
+  try {
+    const r = await fetch(`./changelog.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (r.ok) { const d = await r.json(); if (Array.isArray(d.entradas)) CHANGELOG = d.entradas; }
+  } catch (e) { /* offline: queda lo que haya */ }
+  return CHANGELOG;
+}
 
-function abrirChangelog() {
+async function abrirChangelog() {
+  if (!CHANGELOG.length) await cargarChangelog();
+  _renderChangelogOverlay();
+}
+
+function _renderChangelogOverlay() {
   // El changelog se muestra dentro del dialog de Settings (top-layer):
   // inyectamos un panel superpuesto dentro de #dlg-settings para no
   // luchar contra el stacking context nativo del <dialog>.
@@ -7312,8 +7404,9 @@ async function init() {
   // La sincronización con GitHub ocurre después, en background.
   await reloadAll();
 
-  // Cargar version.json (no bloqueante: si falla, seguimos)
+  // Cargar version.json + changelog.json (no bloqueante: si fallan, seguimos)
   cargarVersion();
+  cargarChangelog();
 
   // ── Calculadora, boleta, orientación (síncronos, 0 costo perceptible) ──
   initCalculadora();
@@ -7498,6 +7591,15 @@ async function init() {
   document.getElementById('pc-confirmar')?.addEventListener('click', () => confirmarPagoCiclo());
   document.getElementById('pc-cancelar')?.addEventListener('click', () => document.getElementById('dlg-pago-ciclo')?.close());
   document.getElementById('pc-close-x')?.addEventListener('click', () => document.getElementById('dlg-pago-ciclo')?.close());
+
+  // Aporte a meta
+  document.getElementById('am-confirmar')?.addEventListener('click', () => confirmarAporteMeta());
+  document.getElementById('am-cancelar')?.addEventListener('click', () => document.getElementById('dlg-aporte-meta')?.close());
+  document.getElementById('am-close-x')?.addEventListener('click', () => document.getElementById('dlg-aporte-meta')?.close());
+
+  // Consulta de actualización
+  document.getElementById('upd-aplicar')?.addEventListener('click', () => { document.getElementById('dlg-update')?.close(); _aplicarUpdateAhora(); });
+  document.getElementById('upd-despues')?.addEventListener('click', () => document.getElementById('dlg-update')?.close());
 
   // ── Salud financiera (análisis IA completo) ──────────────────
   document.getElementById('salud-close-x')?.addEventListener('click', () => document.getElementById('dlg-salud')?.close());

@@ -1,0 +1,79 @@
+{
+  "entradas": [
+    {
+      "version": "1.90",
+      "fecha": "2026-06-04",
+      "items": [
+        "Metas: estimación de aporte mensual, tiempo y fecha para completar según tus ingresos y gastos",
+        "Metas: botón para aportar y descontar del saldo líquido, con registro en el historial",
+        "Cada meta nueva recalcula el aporte y el tiempo de todas las demás",
+        "Subcategorías al elegir categoría en gasto e ingreso (misma pantalla)",
+        "Filtro por subcategoría en el historial",
+        "Los pagos de tarjeta ahora se ven en el historial",
+        "Antes de actualizar se muestran los cambios de la nueva versión"
+      ]
+    },
+    {
+      "version": "1.87",
+      "fecha": "2026-06-04",
+      "items": [
+        "Botón de pago directo en cada tarjeta del dashboard",
+        "Contabilidad unificada: moneda extranjera, cuotas y saldo real corregidos",
+        "Saldo líquido = plata acumulada real (incluye saldo inicial de cuentas)",
+        "Historial agrupado por fecha funciona igual en celular y navegador",
+        "Detección de actualizaciones mejorada: el botón aparece antes de actualizar"
+      ]
+    },
+    {
+      "version": "1.81",
+      "fecha": "2026-06-03",
+      "items": [
+        "Calculadora activa automáticamente al abrir la carga de gasto/ingreso",
+        "Formulario de carga sin deslizar: todo entra en una pantalla",
+        "Guardar gasto/ingreso directo desde el botón del teclado",
+        "Histórico de gasto agrupado por fecha con encabezados sticky",
+        "Animación de sincronización mejorada (solo al finalizar)"
+      ]
+    },
+    {
+      "version": "1.78",
+      "fecha": "2026-06-03",
+      "items": [
+        "Sincronización de config (categorías, habituales) entre dispositivos",
+        "Todos los datos se respaldan al repo de GitHub en cada sync",
+        "Proyección IA: ingresos ya se calculan correctamente",
+        "Scroll del celular restaurado"
+      ]
+    },
+    {
+      "version": "1.70",
+      "fecha": "2026-06-02",
+      "items": [
+        "Carga unificada gasto/ingreso en una pantalla con toggle",
+        "OCR de boletas/tickets (PDF e imágenes)",
+        "Aprobar gastos habituales descuenta del saldo general",
+        "Proyección IA con mediana y cuotas futuras"
+      ]
+    },
+    {
+      "version": "1.60",
+      "fecha": "2026-05-30",
+      "items": [
+        "Auditoría exhaustiva de saldos y contabilidad",
+        "Gastos habituales con cuenta configurable por ítem",
+        "Estrategia inversora (All Weather) en el panel de IA",
+        "Parser de resúmenes bancarios Macro y BBVA"
+      ]
+    },
+    {
+      "version": "1.50",
+      "fecha": "2026-05-20",
+      "items": [
+        "Tarjetas de crédito con ciclos de facturación",
+        "Capacidad crediticia con regla 30% y simulador",
+        "Multi-moneda: USD/EUR/BRL en gastos y resúmenes",
+        "Widgets redimensionables"
+      ]
+    }
+  ]
+}
