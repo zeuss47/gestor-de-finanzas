@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "2.0",
-    "build":  117,
-    "modified":  "2026-06-06T00:12:10Z",
-    "commit":  "M changelog.json, M js/ai-advisor.js, M js/app.js",
-    "notes":  "Auto-update 2026-06-05 21:12"
+    "version":  "2.1",
+    "build":  118,
+    "modified":  "2026-06-06T05:35:57Z",
+    "commit":  "M .gitignore, D _pp3/Default/Cache/Cache_Data/data_0, D _pp3/Default/Cache/Cache_Data/data_1, D _...",
+    "notes":  "Auto-update 2026-06-06 02:35"
 }
