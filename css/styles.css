@@ -654,6 +654,10 @@ html.light #bottom-nav::before { background: #eef2ff; }
 /* ══════════════════════════════════════════════════════════════
    HISTORIAL — Filtros, búsqueda y filas detalladas
 ══════════════════════════════════════════════════════════════ */
+/* La barra superior (título + búsqueda + selector de mes) hace wrap en pantallas
+   angostas: sin esto, el ancho mínimo de la fila (≈403px por el input month nativo)
+   forzaba a la sección a desbordar el viewport y cortaba el total del día. */
+#section-movimientos > .flex.justify-between { flex-wrap: wrap; row-gap: .5rem; }
 .mov-search-wrap {
   position: relative; display: flex; align-items: center;
 }
@@ -712,9 +716,11 @@ html.light #bottom-nav::before { background: #eef2ff; }
 }
 .mov-period-fecha {
   font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: .82rem;
-  color: var(--ink); text-transform: capitalize; letter-spacing: -.01em;
+  color: var(--ink); letter-spacing: -.01em;
+  /* La 1ª letra se capitaliza en JS (fmtCabecera): evita "9 De Junio". */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.mov-period-total { font-size: .68rem; color: var(--ink-muted); white-space: nowrap; }
+.mov-period-total { font-size: .68rem; color: var(--ink-muted); white-space: nowrap; flex-shrink: 0; }
 
 /* Filas de historial detalladas */
 .mov-row-gasto {

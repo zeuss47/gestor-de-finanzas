@@ -255,7 +255,11 @@ export function proyectarBalance({ gastos = [], ingresos = [], cuentas = [], tar
   const flujosConDatos = mesesSerie
     .filter(m => (ingresosMes.get(m) || 0) > 0 || (gastosMes.get(m) || 0) > 0)
     .map(m => (ingresosMes.get(m) || 0) - (gastosMes.get(m) || 0));
-  const serieFlujo = flujosConDatos.length >= 2 ? flujosConDatos : flujosMensuales;
+  // Con AL MENOS 1 mes de actividad real usamos esa serie (la regresión ya da
+  // pendiente 0 con 1 punto). Caer a flujosMensuales reintroduciría los meses en
+  // cero → mediana 0 + pendiente espuria → proyección inflada. Solo si no hay
+  // ningún mes con datos usamos la serie completa (toda en 0).
+  const serieFlujo = flujosConDatos.length >= 1 ? flujosConDatos : flujosMensuales;
   // pendiente: cuanto cambia el flujo mensual mes-a-mes
   const { pendiente: tendenciaMensual, intercepto } = regresion(serieFlujo);
   // baseline: MEDIANA del flujo mensual → robusta a meses atípicos (un bono o

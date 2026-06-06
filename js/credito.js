@@ -54,8 +54,11 @@ export function cuotasPendientes(gastos, tarjetas, hoy = new Date()) {
     const cierreM = cicloActual.cierre.getMonth() + 1;
 
     const dist = (cierreY - baseY) * 12 + (cierreM - baseM);
-    const cuotaActual = Math.max(0, Math.min(g.cuotas_total, dist + 1));
-    const pendientes = Math.max(0, g.cuotas_total - cuotaActual + 1);
+    // nCuota = qué número de cuota cae en el ciclo actual (igual criterio que cards.js).
+    const nCuota = dist + 1;
+    if (nCuota > g.cuotas_total) continue;          // ya terminó: 0 cuotas pendientes (no fantasma)
+    const cuotaActual = Math.max(1, nCuota);        // si aún no empezó (nCuota<1), la 1ª es la próxima
+    const pendientes = g.cuotas_total - cuotaActual + 1;
 
     if (pendientes <= 0) continue;
 

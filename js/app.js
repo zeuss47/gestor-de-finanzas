@@ -1022,8 +1022,17 @@ function _cotizacionGasto(g) {
  */
 function montoARS(g, { mensual = false } = {}) {
   let m = (Number(g?.monto) || 0) * _cotizacionGasto(g);
-  if (g?.compartido) m = m * (1 - (g.compartido.porcentaje_otro || 0) / 100);
-  if (mensual && (g?.tipo === 'amortizacion' || g?.es_amortizacion_anual)) m = m / 12;
+  if (g?.compartido) {
+    // Clamp defensivo: un dato corrupto >100% invertiría el signo del gasto.
+    const pOtro = Math.min(100, Math.max(0, Number(g.compartido.porcentaje_otro) || 0));
+    m = m * (1 - pOtro / 100);
+  }
+  if (mensual) {
+    // Prorrateo del flujo MENSUAL: la amortización anual /12 y las CUOTAS por su
+    // cantidad (una compra de $120k en 12 cuotas pesa $10k/mes, no $120k de golpe).
+    if (g?.tipo === 'amortizacion' || g?.es_amortizacion_anual) m = m / 12;
+    else if (g?.tipo === 'cuotas' && (Number(g?.cuotas_total) || 0) > 1) m = m / g.cuotas_total;
+  }
   return m;
 }
 
@@ -3431,7 +3440,8 @@ function renderMovimientos() {
     if (iso === hoyISO)  return 'Hoy';
     if (iso === ayerISO) return 'Ayer';
     const d = new Date(iso + 'T12:00:00');
-    return d.toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' });
+    const txt = d.toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' });
+    return txt.charAt(0).toUpperCase() + txt.slice(1);   // solo la 1ª letra ("Martes, 9 de junio")
   };
 
   for (const [fecha, grupo] of grupos) {

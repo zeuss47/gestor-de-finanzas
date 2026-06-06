@@ -132,6 +132,12 @@ export function resumenTarjeta(tarjeta, gastos, hoy = new Date()) {
   // - Sino, usar `cotizacion_referencia` (la del momento de la compra)
   // - Si ninguna existe, marcar como "pendiente"
   const acumular = (g, monto) => {
+    // Gasto compartido: contar SOLO tu parte (mismo criterio que montoARS en app.js).
+    // Sin esto, deudaTarjetas y saldo_proyectado sobreestiman la deuda con la parte ajena.
+    if (g.compartido) {
+      const pOtro = Math.min(100, Math.max(0, Number(g.compartido.porcentaje_otro) || 0));
+      monto = monto * (1 - pOtro / 100);
+    }
     const moneda = g.moneda || 'ARS';
     if (moneda === 'ARS') return monto;
     monedasExtra[moneda] = (monedasExtra[moneda] || 0) + monto;

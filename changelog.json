@@ -1,6 +1,18 @@
 {
   "entradas": [
     {
+      "version": "1.96",
+      "fecha": "2026-06-06",
+      "items": [
+        "Cuotas: una compra en cuotas ahora pesa su cuota mensual (no el total de golpe) en el margen y los gráficos",
+        "Tarjetas: las compras ya pagadas dejan de descontar capacidad (se eliminó la cuota fantasma)",
+        "Tarjetas: los gastos compartidos descuentan solo tu parte del saldo proyectado",
+        "Proyección: con poco historial ya no se infla la estimación de saldo",
+        "Historial: las fechas se ven bien (\"9 de junio\") y el total del día ya no se corta en pantallas chicas",
+        "Gastos compartidos: se valida el porcentaje (0–100%)"
+      ]
+    },
+    {
       "version": "1.95",
       "fecha": "2026-06-05",
       "items": [
