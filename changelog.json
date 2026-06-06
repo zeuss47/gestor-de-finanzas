@@ -1,6 +1,35 @@
 {
   "entradas": [
     {
+      "version": "1.95",
+      "fecha": "2026-06-05",
+      "items": [
+        "Toda la IA ahora se basa en tu saldo disponible real, no en un flujo teórico desconectado de tu efectivo",
+        "Metas: el aporte sugerido ya no supera tu saldo; cuando lo limita, te lo explicamos y recalculamos el tiempo real",
+        "Asesor de salud: el plan del mes y el fondo de emergencia sugieren montos según tu efectivo disponible",
+        "Asesor: si tu flujo es positivo pero no tenés efectivo libre, te avisa en vez de sugerir aportes irreales",
+        "Plazos largos se muestran en años (ej. ~7 años y 5 m)"
+      ]
+    },
+    {
+      "version": "1.94",
+      "fecha": "2026-06-05",
+      "items": [
+        "Actualizaciones: con auto-update activado, la app se actualiza sola y al hacerlo te muestra los cambios (¡App actualizada!)",
+        "Actualizaciones: con auto-update desactivado, te avisa con una notificación cuando hay versión nueva, sin aplicar nada",
+        "Actualizaciones: el botón Actualizar siempre muestra qué cambia antes de aplicar"
+      ]
+    },
+    {
+      "version": "1.93",
+      "fecha": "2026-06-05",
+      "items": [
+        "Metas: el aporte sugerido ahora es el mismo en el inicio y en la sección Metas",
+        "Metas: si gastás igual o más de lo que ganás, avisa que no hay margen (ya no sugiere aportes ni plazos irreales)",
+        "Metas: el tiempo para completar se calcula con el aporte sugerido real (horizontes largos se muestran en años)"
+      ]
+    },
+    {
       "version": "1.92",
       "fecha": "2026-06-05",
       "items": [

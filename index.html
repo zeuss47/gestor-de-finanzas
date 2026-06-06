@@ -1721,12 +1721,12 @@
     <div class="form-modern-header">
       <div class="form-modern-icon" style="background:linear-gradient(135deg,var(--brand),var(--brand-2))">✨</div>
       <div>
-        <h3 class="ff-display text-xl font-bold tracking-tight">Hay una versión nueva</h3>
+        <h3 class="ff-display text-xl font-bold tracking-tight" id="upd-titulo">Hay una versión nueva</h3>
         <p class="text-xs" style="color:var(--ink-muted)" id="upd-subtitulo">—</p>
       </div>
     </div>
     <div class="form-modern-body">
-      <p class="text-xs mb-2" style="color:var(--ink-2)">Esta actualización trae:</p>
+      <p class="text-xs mb-2" style="color:var(--ink-2)" id="upd-leyenda">Esta actualización trae:</p>
       <ul class="cl-items" id="upd-cambios"></ul>
     </div>
     <div class="form-modern-footer">
@@ -3094,6 +3094,14 @@
 
 <!-- ===== TOAST =============================================== -->
 <div id="toast"></div>
+
+<!-- ===== NOTIFICACIÓN DE ACTUALIZACIÓN DISPONIBLE (auto-update OFF) ===== -->
+<div id="update-banner" class="update-banner" role="status" style="display:none">
+  <span class="update-banner-ic">✨</span>
+  <span class="update-banner-txt" id="update-banner-txt">Hay una versión nueva disponible</span>
+  <button type="button" id="update-banner-btn" class="update-banner-btn">Ver cambios</button>
+  <button type="button" id="update-banner-close" class="update-banner-x" aria-label="Cerrar">✕</button>
+</div>
 
 <!-- ===== OVERLAY: ÉXITO DE SINCRONIZACIÓN ==================== -->
 <div id="flying-money-overlay" role="presentation" aria-hidden="true">

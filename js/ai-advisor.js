@@ -118,6 +118,9 @@ function generarEstrategias(ctx) {
   const push = (e) => E.push(e);
 
   const disponible = ingresoMes - gastosHabituales - compromisoMensual;
+  // Aportable real = excedente del mes topado por el efectivo disponible.
+  const saldoReal  = Math.max(0, saldoLiquido || 0);
+  const aportable  = Math.min(Math.max(0, disponible), saldoReal);
 
   // 1. Déficit estructural: gastás más de lo que ingresás
   if (ingresoMes > 0 && disponible < 0) {
@@ -190,14 +193,20 @@ function generarEstrategias(ctx) {
   if (subscores.reservas < 50 && ingresoMes > 0) {
     const objetivo = (gastosHabituales + compromisoMensual) * 3;
     const falta = Math.max(0, objetivo - saldoLiquido);
+    // Aporte mensual realista al fondo: ideal armarlo en ~6 meses, pero topado al
+    // efectivo que tenés. Si el aporte real es menor, el plazo se estira en serio.
+    const aporteFondo = Math.min(aportable, falta / 6);
+    const mesesFondo  = aporteFondo > 0 ? Math.ceil(falta / aporteFondo) : null;
     push({
       id: 'reserva', tipo: 'consejo', prioridad: 50,
       titulo: '🛟 Tu fondo de emergencia es bajo',
       detalle: `Lo ideal es tener 3 meses de gastos cubiertos (${fmt(objetivo)}). Hoy te faltan ${fmt(falta)}.`,
       impacto: 0,
-      accion: disponible > 0
-        ? `Apartá ${fmt(Math.min(disponible, falta / 6))} por mes y en ~6 meses armás el colchón.`
-        : 'Primero equilibrá tu flujo mensual, después construí el fondo.',
+      accion: aportable > 0
+        ? `Apartá ${fmt(aporteFondo)} por mes${mesesFondo ? ` y en ~${mesesFondo} ${mesesFondo === 1 ? 'mes' : 'meses'} armás el colchón` : ''}.`
+        : (disponible > 0
+            ? `Tenés excedente mensual (${fmt(disponible)}) pero tu saldo líquido está comprometido. Liberá efectivo para empezar a armar el fondo.`
+            : 'Primero equilibrá tu flujo mensual, después construí el fondo.'),
     });
   }
 
@@ -305,7 +314,11 @@ function planGestionMensual(ctx, configRaw) {
 
   const { ingresoMes, gastosHabituales, compromisoMensual, saldoLiquido, metas = [] } = ctx;
   const gastosFijos = gastosHabituales + compromisoMensual;
-  const disponible  = ingresoMes - gastosFijos;       // excedente mensual
+  const disponible  = ingresoMes - gastosFijos;       // excedente mensual (FLUJO, diagnóstico)
+  // Lo que REALMENTE podés destinar este mes está topado por tu efectivo real:
+  // no podés aportar plata que no tenés (el flujo puede estar en tarjeta o ya usado).
+  const saldoReal   = Math.max(0, saldoLiquido || 0);
+  const aportable   = Math.min(Math.max(0, disponible), saldoReal);
 
   // ── Fondo de emergencia: de las metas marcadas, o derivado de gastos fijos ──
   const metasEmergencia = (metas || []).filter(m => !m.deleted && m.es_emergencia);
@@ -326,11 +339,11 @@ function planGestionMensual(ctx, configRaw) {
 
   // Estado de déficit: no hay excedente para gestionar
   if (ingresoMes <= 0) {
-    return { disponible: 0, estado: 'sin_datos', mensaje: 'Cargá tus ingresos para activar el plan de gestión.', pasos: [], inversion: null, config: cfg };
+    return { disponible: 0, aportable: 0, estado: 'sin_datos', mensaje: 'Cargá tus ingresos para activar el plan de gestión.', pasos: [], inversion: null, config: cfg };
   }
   if (disponible <= 0) {
     return {
-      disponible: r0(disponible), estado: 'deficit',
+      disponible: r0(disponible), aportable: 0, estado: 'deficit',
       mensaje: `Tu flujo mensual es negativo o nulo (${fmt(disponible)}). Antes de ahorrar o invertir, equilibrá ingresos y gastos.`,
       pasos: [{
         n: 1, clave: 'deficit', icon: '🚨', titulo: 'Equilibrá tu flujo primero',
@@ -340,8 +353,22 @@ function planGestionMensual(ctx, configRaw) {
       inversion: null, config: cfg,
     };
   }
+  // Flujo positivo pero sin efectivo libre: el excedente del mes no está disponible
+  // como saldo (consumos en tarjeta o ya usado). No se puede aportar nada todavía.
+  if (aportable <= 0) {
+    return {
+      disponible: r0(disponible), aportable: 0, estado: 'sin_liquidez',
+      mensaje: `Tu flujo del mes es positivo (${fmt(disponible)}), pero tu saldo disponible es ${fmt(saldoReal)}. No tenés efectivo libre para destinar al fondo o invertir ahora.`,
+      pasos: [{
+        n: 1, clave: 'sin_liquidez', icon: '💧', titulo: 'Sin efectivo libre este mes',
+        detalle: `El excedente del mes (${fmt(disponible)}) todavía no está disponible como efectivo: puede estar en consumos de tarjeta o ya usado. Tu saldo líquido real es ${fmt(saldoReal)}.`,
+        monto: 0, accion: 'Liberá efectivo (pagá/bajá consumos) o esperá a que se acredite para empezar a aportar.',
+      }],
+      inversion: null, config: cfg,
+    };
+  }
 
-  let restante = disponible;
+  let restante = aportable;   // se reparte el efectivo real, no el flujo teórico
 
   // ── PASO 1 — Buffett: ratio de ahorro mínimo ──
   const cumpleAhorro = disponible >= ahorroMinimo;
@@ -423,7 +450,7 @@ function planGestionMensual(ctx, configRaw) {
   let estado, mensaje;
   if (faltaFondo > 0) {
     estado = 'fondo';
-    mensaje = `Prioridad: armar el fondo de emergencia. Destiná ${fmt(Math.min(disponible, faltaFondo))}/mes hasta cubrir ${cfg.meses_fondo_emergencia} meses.`;
+    mensaje = `Prioridad: armar el fondo de emergencia. Destiná ${fmt(Math.min(aportable, faltaFondo))}/mes (según tu saldo disponible) hasta cubrir ${cfg.meses_fondo_emergencia} meses.`;
   } else if (deudaMalaMensual > 0 && inversion === null) {
     estado = 'deuda';
     mensaje = `Fondo cubierto. Ahora enfocá el excedente en cancelar deuda antes de invertir.`;
@@ -435,7 +462,7 @@ function planGestionMensual(ctx, configRaw) {
     mensaje = `Plan al día. Seguí aportando al fondo y revisá tus metas.`;
   }
 
-  return { disponible: r0(disponible), estado, mensaje, pasos, inversion, config: cfg };
+  return { disponible: r0(disponible), aportable: r0(aportable), estado, mensaje, pasos, inversion, config: cfg };
 }
 
 export { planGestionMensual };

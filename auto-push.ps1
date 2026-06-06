@@ -78,11 +78,16 @@ if (Test-Path $versionFile) {
 $swFile = "$REPO\sw.js"
 if ((Test-Path $swFile) -and $newBuild) {
     try {
-        $sw = Get-Content $swFile -Raw
+        # IMPORTANTE: leer SIEMPRE como UTF-8. Si se usa Get-Content -Raw sin
+        # encoding, PowerShell 5.1 interpreta el UTF-8 como Windows-1252 y al
+        # reescribir duplica los bytes de cada caracter acentuado -> el archivo
+        # crece de forma exponencial en cada commit (corrupcion de mojibake).
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        $sw = [System.IO.File]::ReadAllText($swFile, $utf8NoBom)
         # Conserva la base (ej. 'v3.3.0-pages') y reemplaza/agrega el sufijo -b<build>.
         $swNew = [regex]::Replace($sw, "const VERSION = '([^']*?)(?:-b\d+)?';", "const VERSION = '`${1}-b$newBuild';")
         if ($swNew -ne $sw) {
-            [System.IO.File]::WriteAllText($swFile, $swNew)   # UTF-8 sin BOM
+            [System.IO.File]::WriteAllText($swFile, $swNew, $utf8NoBom)   # UTF-8 sin BOM
             & git add sw.js 2>$null
         }
     } catch { }

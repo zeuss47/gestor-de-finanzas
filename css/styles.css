@@ -1143,6 +1143,40 @@ fieldset legend {
 .toast-undo:hover { filter: brightness(1.08); }
 .toast-undo:active { transform: scale(.95); }
 
+/* ── Notificación de actualización disponible (banner, auto-update OFF) ── */
+.update-banner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + .6rem);
+  left: 50%; transform: translateX(-50%) translateY(-140%);
+  z-index: 1000; width: min(94vw, 460px);
+  display: flex; align-items: center; gap: .6rem;
+  padding: .65rem .7rem .65rem .9rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand) 22%, var(--bg-3)), var(--bg-3));
+  backdrop-filter: blur(20px);
+  border: 1px solid color-mix(in srgb, var(--brand) 45%, var(--border-2));
+  border-radius: 1rem;
+  box-shadow: 0 10px 34px rgba(0,0,0,.45);
+  opacity: 0; transition: transform .28s cubic-bezier(.2,.9,.3,1), opacity .28s ease;
+}
+.update-banner.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.update-banner-ic { font-size: 1.1rem; flex-shrink: 0; }
+.update-banner-txt { flex: 1; min-width: 0; font-size: .8rem; font-weight: 600; color: var(--ink); }
+.update-banner-btn {
+  flex-shrink: 0; border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2, var(--brand)));
+  color: #04121a; font-weight: 800; font-size: .76rem; font-family: inherit;
+  padding: .4rem .8rem; border-radius: 999px;
+  transition: filter .15s ease, transform .08s ease;
+}
+.update-banner-btn:hover { filter: brightness(1.08); }
+.update-banner-btn:active { transform: scale(.95); }
+.update-banner-x {
+  flex-shrink: 0; border: none; cursor: pointer; background: transparent;
+  color: var(--ink-muted); font-size: .9rem; line-height: 1;
+  padding: .3rem .35rem; border-radius: 8px; transition: color .15s ease, background .15s ease;
+}
+.update-banner-x:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 10%, transparent); }
+
 /* ── Alerts / pulse-glow ─────────────────────────────────────── */
 .pulse-warn  { animation: pulse-warn  1.6s ease-in-out infinite; }
 .pulse-glow  { animation: pulse-glow  2s   ease-in-out infinite; }
@@ -3701,6 +3735,13 @@ body.view-analisis #main-widgets::before {
   background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
   border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
   border-radius: 1rem; padding: .7rem .8rem;
+}
+.mm-resumen-note {
+  font-size: .68rem; line-height: 1.35; color: var(--ink-muted);
+  margin-top: .5rem; padding: .5rem .7rem;
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--border));
+  border-radius: .8rem;
 }
 
 .meta-plan { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }

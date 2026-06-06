@@ -104,20 +104,107 @@ function aplicarActualizacionSiCorresponde() {
 }
 
 /**
- * Se llama cuando se DETECTA una versión nueva. Regla clave: el botón
- * "✨ Actualizar" SIEMPRE aparece PRIMERO (junto a la versión), aunque el
- * auto-update esté activado. Recién después, si hay auto-update, se aplica
- * sola tras un margen visible (para que el usuario alcance a ver el aviso).
+ * Se llama cuando se DETECTA una versión nueva (vía SW o chequeo en background).
+ * Comportamiento según el ajuste `auto_update`:
+ *  - ON  → aplica sola en background; AL RECARGAR muestra los cambios (what's new).
+ *  - OFF → NO aplica nada. Muestra una NOTIFICACIÓN visible (banner) + el botón en
+ *          Ajustes. La app se actualiza recién cuando el usuario lo confirma.
+ * En ambos casos el botón "✨ Actualizar" queda disponible en Ajustes.
  */
 let _autoUpdateTimer = null;
 async function _onUpdateDetectado() {
   _hayActualizacionSW = true;
-  await notificarUpdateDisponible();          // ← muestra el botón antes de actualizar
+  await notificarUpdateDisponible();          // ← botón ✨ en la card de Ajustes
   const auto = state.ajustes?.auto_update !== false;
-  if (!auto) return;                          // sin auto-update: queda esperando el toque
-  if (_autoUpdateTimer) clearTimeout(_autoUpdateTimer);
-  // Margen para que el aviso se vea unos segundos antes de recargar.
-  _autoUpdateTimer = setTimeout(() => aplicarActualizacionSiCorresponde(), 5000);
+  if (auto) {
+    // Auto-update: dejá marcado que al recargar hay que mostrar los cambios.
+    try { localStorage.setItem('gf_whatsnew_pending', '1'); } catch {}
+    ocultarBannerUpdate();
+    if (_autoUpdateTimer) clearTimeout(_autoUpdateTimer);
+    // Margen breve para no recargar encima de una acción en curso.
+    _autoUpdateTimer = setTimeout(() => aplicarActualizacionSiCorresponde(), 4000);
+  } else {
+    // Sin auto-update: notificar y esperar al usuario (no aplicar).
+    mostrarBannerUpdate();
+  }
+}
+
+/** Muestra la notificación (banner) de versión nueva sin aplicar nada. */
+function mostrarBannerUpdate() {
+  const banner = document.getElementById('update-banner');
+  if (!banner) return;
+  const ver = _updateDisponible?.version ? `v${_updateDisponible.version}` : '';
+  // Si el usuario ya cerró el aviso de ESTA versión, no reaparecer (hasta que haya otra).
+  if (sessionStorage.getItem('gf_update_banner_dismissed') === ver && ver) return;
+  const txt = document.getElementById('update-banner-txt');
+  if (txt) txt.textContent = `Hay una versión nueva${ver ? ' ' + ver : ''} disponible`;
+  banner.style.display = '';
+  requestAnimationFrame(() => banner.classList.add('show'));
+}
+
+function ocultarBannerUpdate(recordarCerrado = false) {
+  const banner = document.getElementById('update-banner');
+  if (!banner) return;
+  if (recordarCerrado) {
+    const ver = _updateDisponible?.version ? `v${_updateDisponible.version}` : '';
+    try { sessionStorage.setItem('gf_update_banner_dismissed', ver); } catch {}
+  }
+  banner.classList.remove('show');
+  setTimeout(() => { banner.style.display = 'none'; }, 250);
+}
+
+/**
+ * Tras aplicar una actualización automática y recargar, muestra los cambios de la
+ * versión que quedó instalada ("¡App actualizada!"). Se llama una vez que
+ * version.json y changelog.json están cargados.
+ */
+function mostrarWhatsNewSiActualizado() {
+  let pending = false;
+  try { pending = localStorage.getItem('gf_whatsnew_pending') === '1'; } catch {}
+  if (!pending) return;
+  try { localStorage.removeItem('gf_whatsnew_pending'); } catch {}
+  if (!CHANGELOG.length) return;             // sin changelog no hay nada que mostrar
+  abrirWhatsNew(state.version || {});
+}
+
+/** Configura dlg-update en modo informativo (ya aplicada): "¡App actualizada!". */
+function abrirWhatsNew(v) {
+  const dlg = document.getElementById('dlg-update');
+  if (!dlg) return;
+  const titulo  = document.getElementById('upd-titulo');
+  const sub     = document.getElementById('upd-subtitulo');
+  const leyenda = document.getElementById('upd-leyenda');
+  const aplicar = document.getElementById('upd-aplicar');
+  const despues = document.getElementById('upd-despues');
+  if (titulo)  titulo.textContent  = '¡App actualizada! 🎉';
+  if (sub)     sub.textContent     = v.version ? `Ahora estás en v${String(v.version).split('.').slice(0,2).join('.')}` : 'Nueva versión instalada';
+  if (leyenda) leyenda.textContent = 'Esto es lo nuevo:';
+  _fillUpdItems(CHANGELOG[0]);               // la versión recién instalada = entrada más reciente
+  if (despues) despues.style.display = 'none';
+  if (aplicar) { aplicar.textContent = '✓ Listo'; aplicar.dataset.mode = 'whatsnew'; }
+  dlg.showModal();
+}
+
+/** Restaura dlg-update al modo "consulta" (antes de actualizar). */
+function _resetUpdDialog() {
+  const titulo  = document.getElementById('upd-titulo');
+  const leyenda = document.getElementById('upd-leyenda');
+  const aplicar = document.getElementById('upd-aplicar');
+  const despues = document.getElementById('upd-despues');
+  if (titulo)  titulo.textContent  = 'Hay una versión nueva';
+  if (leyenda) leyenda.textContent = 'Esta actualización trae:';
+  if (despues) despues.style.display = '';
+  if (aplicar) { aplicar.textContent = '⬇ Actualizar ahora'; delete aplicar.dataset.mode; }
+}
+
+/** Llena la lista de cambios del diálogo de update con una entrada del changelog. */
+function _fillUpdItems(entry) {
+  const ul = document.getElementById('upd-cambios');
+  if (!ul) return;
+  const items = (entry?.items || []).slice(0, 8);
+  ul.innerHTML = items.length
+    ? items.map(it => `<li class="cl-item">${escapeHtml(it)}</li>`).join('')
+    : '<li class="cl-item">Mejoras y correcciones.</li>';
 }
 
 /** Aplica YA la actualización (recarga con la versión nueva). */
@@ -139,9 +226,11 @@ async function aplicarUpdateManual() {
   const dlg = document.getElementById('dlg-update');
   if (!dlg) { _aplicarUpdateAhora(); return; }
   // El botón vive en Ajustes (un <dialog>): lo cerramos para que el preview no
-  // quede atrapado debajo en el top-layer nativo.
+  // quede atrapado debajo en el top-layer nativo. También ocultamos el banner.
   const settings = document.getElementById('dlg-settings');
   if (settings?.open) settings.close();
+  ocultarBannerUpdate();
+  _resetUpdDialog();         // asegurar modo "consulta" (no quedó en what's new)
 
   await cargarChangelog();   // fresco: trae los cambios de la versión nueva
   const v = _updateDisponible || state.version || {};
@@ -153,14 +242,7 @@ async function aplicarUpdateManual() {
   }
   // Los cambios de la versión a la que se va a actualizar = entrada más reciente del changelog.
   const instalada = state.version?.version;
-  const nueva = CHANGELOG.find(e => e.version !== instalada) || CHANGELOG[0];
-  const ul = document.getElementById('upd-cambios');
-  if (ul) {
-    const items = (nueva?.items || []).slice(0, 8);
-    ul.innerHTML = items.length
-      ? items.map(it => `<li class="cl-item">${escapeHtml(it)}</li>`).join('')
-      : '<li class="cl-item">Mejoras y correcciones.</li>';
-  }
+  _fillUpdItems(CHANGELOG.find(e => e.version !== instalada) || CHANGELOG[0]);
   dlg.showModal();
 }
 
@@ -514,11 +596,14 @@ function actualizarVersionUI() {
   }
   if (cardEl) _wireUpdateBadge(cardEl);
 
-  // Toast al detectar versión nueva (comparado con la guardada en localStorage)
+  // Toast al detectar versión nueva (comparado con la guardada en localStorage).
+  // Si venimos de una auto-actualización, el diálogo "what's new" ya muestra los
+  // cambios → no duplicar con un toast.
   try {
     const last = localStorage.getItem('app_last_build');
-    if (last && parseInt(last) !== v.build) {
-      setTimeout(() => toast(`✨ Versión actualizada: v${v.version} · build #${v.build}`, 3500), 1500);
+    const whatsNewPendiente = localStorage.getItem('gf_whatsnew_pending') === '1';
+    if (last && parseInt(last) !== v.build && !whatsNewPendiente) {
+      setTimeout(() => toast(`✨ Versión actualizada a v${corto}`, 3500), 1500);
     }
     localStorage.setItem('app_last_build', String(v.build));
     localStorage.setItem('app_last_version', v.version);
@@ -1646,7 +1731,7 @@ function renderIA(el) {
   if (planBox) {
     const plan = salud?.plan;
     if (plan && plan.estado !== 'sin_datos') {
-      const ICON = { deficit:'🚨', fondo:'🛟', deuda:'🔻', inversion:'🌦️', ok:'✅' };
+      const ICON = { deficit:'🚨', sin_liquidez:'💧', fondo:'🛟', deuda:'🔻', inversion:'🌦️', ok:'✅' };
       planBox.innerHTML = `
         <div class="plan-mini">
           <span class="plan-mini-icon">${ICON[plan.estado] || '📋'}</span>
@@ -1699,7 +1784,7 @@ function _planGestionHTML(plan) {
       <p class="text-sm" style="color:var(--ink-muted)">${escapeHtml(plan.mensaje)}</p>`;
   }
   const ESTADO_COLOR = {
-    deficit: 'var(--danger)', fondo: 'var(--warning)', deuda: 'var(--warning)',
+    deficit: 'var(--danger)', sin_liquidez: 'var(--warning)', fondo: 'var(--warning)', deuda: 'var(--warning)',
     inversion: 'var(--success)', ok: 'var(--brand)',
   };
   const PASO_COLOR = {
@@ -1745,7 +1830,7 @@ function _planGestionHTML(plan) {
   return `
     <p class="salud-section-title">📋 Plan de gestión mensual</p>
     <div class="plan-banner" style="border-color:${headColor}">
-      <span class="plan-banner-disp">Excedente: <b style="color:${headColor}">${_FMT0(plan.disponible)}/mes</b></span>
+      <span class="plan-banner-disp">Aportable: <b style="color:${headColor}">${_FMT0(plan.aportable != null ? plan.aportable : plan.disponible)}/mes</b>${(plan.aportable != null && plan.disponible != null && plan.disponible > plan.aportable + 1) ? ` <span style="color:var(--ink-muted);font-weight:400">(flujo ${_FMT0(plan.disponible)}, topado a tu saldo)</span>` : ''}</span>
       <span class="plan-banner-msg">${escapeHtml(plan.mensaje)}</span>
     </div>
     <div class="plan-pasos">${pasosHtml}</div>
@@ -2054,22 +2139,17 @@ function renderMetas(el) {
   }
 
   // Margen NETO de compromisos: las cuotas vigentes/futuras reducen lo aportable
-  // a metas. Al crear una cuota nueva, esto baja y recalcula los meses (reloadAll).
-  const margen    = Math.max(0, (state.estado.margen_libre_mes || 0) - (state.capacidad?.cuotas_mensuales_proyectadas || 0));
-  const pesos     = state.metas.map(m => (m.prioridad || 3));
-  const sumaPesos = pesos.reduce((a,b)=>a+b,0) || 1;
-  const estMeses  = estimarMesesMeta(state.metas, margen);   // IA: meses por meta
+  // a metas. Mismo cálculo que la sección Metas (_margenLibreReal) → home y
+  // sección muestran SIEMPRE el mismo aporte sugerido.
+  const margen    = _margenLibreReal();
+  const estMeses  = estimarMesesMeta(state.metas, margen);   // IA: aporte + meses por meta (waterfall)
 
-  state.metas.sort((a,b)=>(b.prioridad||3)-(a.prioridad||3)).forEach((m, i) => {
+  state.metas.sort((a,b)=>(b.prioridad||3)-(a.prioridad||3)).forEach((m) => {
     const pct      = Math.min(100, Math.round((100*m.monto_actual)/(m.monto_objetivo||1)));
-    const sugerido = margen * (pesos[i] / sumaPesos);
+    const completa = m.monto_actual >= (m.monto_objetivo || 0);
     const icon     = m.es_emergencia ? '🛡️' : '🎯';
     const est      = estMeses.get(m.id);
-    const mesesTxt = est
-      ? (est.alcanzable
-          ? ` · <b style="color:var(--brand)">~${est.mesesRestantes} ${est.mesesRestantes === 1 ? 'mes' : 'meses'}</b>`
-          : ` · <b style="color:var(--warning)">sin margen</b>`)
-      : (m.monto_actual >= m.monto_objetivo ? ` · <b style="color:var(--success)">✓ completa</b>` : '');
+    const plan      = _planMetaLinea(est, completa);   // fuente única (igual que sección Metas)
     const fechaLabel = m.fecha_objetivo
       ? `<span class="badge badge-muted text-[10px]">${m.fecha_objetivo}</span>` : '';
 
@@ -2081,14 +2161,14 @@ function renderMetas(el) {
             <p class="font-semibold text-sm">${escapeHtml(m.nombre)}</p>
             ${fechaLabel}
           </div>
-          <span class="ff-display font-bold text-sm" style="color:var(--brand-3)">${pct}%</span>
+          <span class="ff-display font-bold text-sm" style="color:${completa?'var(--success)':'var(--brand-3)'}">${pct}%</span>
         </div>
         <div class="bar mb-2">
-          <span style="width:${pct}%"></span>
+          <span style="width:${pct}%;${completa?'background:var(--success)':''}"></span>
         </div>
-        <div class="flex justify-between text-[11px]" style="color:var(--ink-2)">
-          <span>${FMT.format(m.monto_actual)} <span style="color:var(--ink-muted)">/ ${FMT.format(m.monto_objetivo)}</span></span>
-          <span>Aportar <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes${mesesTxt}</span>
+        <div class="flex justify-between items-center text-[11px] gap-2" style="color:var(--ink-2)">
+          <span class="flex-shrink-0">${FMT.format(m.monto_actual)} <span style="color:var(--ink-muted)">/ ${FMT.format(m.monto_objetivo)}</span></span>
+          <span class="text-right" style="line-height:1.25">${plan.lineaHTML}</span>
         </div>
       </div>`);
   });
@@ -4041,8 +4121,24 @@ async function handleSubmitCuenta(form) {
 /* ============ APORTE A META (transferir del saldo líquido) ============ */
 let _aporteMetaCtx = null;
 
-/** Margen libre real mensual (ingresos − gastos − cuotas comprometidas). */
+/**
+ * Lo que REALMENTE podés destinar a metas por mes.
+ * No es solo el flujo del mes (ingresos − gastos − cuotas): ese número puede
+ * estar inflado si parte de tus gastos están en tarjeta (todavía no bajaron el
+ * efectivo). El tope REAL es tu saldo líquido disponible: no podés aportar plata
+ * que no tenés. Por eso devolvemos el MENOR de los dos.
+ *   flujoNeto = max(0, margen_libre_mes − cuotas_comprometidas)
+ *   tope      = saldo_liquido disponible
+ *   → aportable = min(flujoNeto, tope)
+ */
 function _margenLibreReal() {
+  const flujoNeto = Math.max(0, (state.estado?.margen_libre_mes || 0) - (state.capacidad?.cuotas_mensuales_proyectadas || 0));
+  const saldoDisp = Math.max(0, state.estado?.saldo_liquido || 0);
+  return Math.min(flujoNeto, saldoDisp);
+}
+
+/** El flujo mensual teórico (ingresos − gastos − cuotas), sin tope de saldo. Solo informativo. */
+function _flujoMensualNeto() {
   return Math.max(0, (state.estado?.margen_libre_mes || 0) - (state.capacidad?.cuotas_mensuales_proyectadas || 0));
 }
 
@@ -5840,9 +5936,11 @@ function renderMetasMobile() {
     return;
   }
 
-  const margen    = _margenLibreReal();
+  const margen    = _margenLibreReal();          // aportable real = min(flujo, saldo)
+  const flujo     = _flujoMensualNeto();          // flujo teórico del mes (informativo)
   const saldoDisp = Math.max(0, state.estado?.saldo_liquido || 0);
   const estMeses  = estimarMesesMeta(metas, margen);
+  const limitadoPorSaldo = flujo > saldoDisp + 1; // el saldo es el cuello de botella
 
   // Encabezado: deja claro sobre qué base se calculan los aportes.
   const totalAporte = [...estMeses.values()].reduce((a, e) => a + (e.aporteMensual || 0), 0);
@@ -5850,24 +5948,19 @@ function renderMetasMobile() {
   if (headEl) {
     headEl.innerHTML = margen > 0
       ? `<div class="mm-resumen-grid">
-           <div><span class="mm-r-lbl">Disponible / mes</span><b class="mm-r-val">${FMT.format(margen)}</b></div>
+           <div><span class="mm-r-lbl">Aportable / mes</span><b class="mm-r-val">${FMT.format(margen)}</b></div>
            <div><span class="mm-r-lbl">Repartido en metas</span><b class="mm-r-val" style="color:var(--brand-3)">${FMT.format(totalAporte)}</b></div>
            <div><span class="mm-r-lbl">Saldo disponible</span><b class="mm-r-val" style="color:${saldoDisp>=0?'var(--ink)':'var(--danger)'}">${FMT.format(saldoDisp)}</b></div>
-         </div>`
-      : `<div class="mm-resumen-warn">⚠️ Este mes no te sobra margen (ingresos − gastos). Podés aportar igual desde tu saldo disponible: <b>${FMT.format(saldoDisp)}</b>.</div>`;
+         </div>${limitadoPorSaldo ? `<div class="mm-resumen-note">ℹ️ Tu flujo del mes daría ${FMT.format(flujo)}, pero ajustamos el aporte a tu saldo disponible real (${FMT.format(saldoDisp)}).</div>` : ''}`
+      : `<div class="mm-resumen-warn">⚠️ Sin saldo disponible para aportar a tus metas ahora. ${flujo > 0 ? `(Tu flujo del mes da ${FMT.format(flujo)}, pero tu saldo líquido es ${FMT.format(saldoDisp)}.)` : 'Tus gastos igualan o superan tus ingresos.'}</div>`;
   }
 
-  lista.innerHTML = metas.map((m, i) => {
+  lista.innerHTML = metas.map((m) => {
     const pct      = Math.min(100, Math.round((100*(m.monto_actual||0))/(m.monto_objetivo||1)));
     const icon     = m.es_emergencia ? '🛡️' : '🎯';
     const completa = pct >= 100;
     const est      = estMeses.get(m.id);
-    const sugerido = est?.aporteMensual || 0;   // aporte ya acotado por el waterfall
-    const mesesTxt = (!completa && est)
-      ? (est.alcanzable
-          ? `<b style="color:var(--brand)">~${est.mesesRestantes} ${est.mesesRestantes === 1 ? 'mes' : 'meses'}</b>${est.fechaEstimada ? ` <span style="color:var(--ink-muted)">(${_fmtPeriodoMeta(est.fechaEstimada)})</span>` : ''}`
-          : `<b style="color:var(--warning)">sin margen libre</b>`)
-      : '';
+    const plan     = _planMetaLinea(est, completa);   // fuente única (igual que el home)
     return `
       <div class="meta-card-m card-glass rounded-2xl p-4" data-meta-id="${m.id}">
         <div class="flex items-center justify-between mb-2" data-meta-edit="${m.id}" style="cursor:pointer">
@@ -5883,11 +5976,7 @@ function renderMetasMobile() {
           ${m.fecha_objetivo ? `<span style="color:var(--ink-muted)">📅 ${m.fecha_objetivo}</span>` : ''}
         </div>
         <div class="meta-plan">
-          <span class="meta-plan-line">${completa
-            ? `<span style="color:var(--success);font-weight:600">🎉 ¡Meta completada!</span>`
-            : sugerido > 0
-            ? `💡 Aporte sugerido <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes · listo en ${mesesTxt || '—'}`
-            : `<span style="color:var(--warning)">💡 Sin margen este mes para repartir aporte</span>`}</span>
+          <span class="meta-plan-line">${plan.lineaHTML}</span>
           <div class="meta-actions">
             <button type="button" class="meta-icon-btn meta-aportar-btn" data-meta-aportar="${m.id}" title="Aportar" aria-label="Aportar">＋</button>
             <button type="button" class="meta-icon-btn meta-del-btn" data-meta-del="${m.id}" title="Eliminar meta" aria-label="Eliminar meta">
@@ -5926,6 +6015,39 @@ function _fmtPeriodoMeta(ym) {
   const [y, m] = ym.split('-');
   const mn = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   return `${mn[parseInt(m,10)-1]} ${y}`;
+}
+
+/** Texto legible del horizonte: meses cortos, o años para plazos largos. */
+function _fmtHorizonteMeta(meses) {
+  if (!isFinite(meses) || meses <= 0) return '';
+  if (meses === 1)  return '~1 mes';
+  if (meses <= 18)  return `~${meses} meses`;
+  if (meses >= 120) return '+10 años';
+  const años = Math.floor(meses / 12), resto = meses % 12;
+  const aPart = `${años} ${años === 1 ? 'año' : 'años'}`;
+  return resto >= 1 ? `~${aPart} y ${resto} m` : `~${aPart}`;
+}
+
+/**
+ * Arma la línea de plan de UNA meta de forma idéntica en el home y en la sección
+ * Metas (fuente única). Usa SIEMPRE est.aporteMensual (waterfall, ya acotado),
+ * así el aporte mostrado y el tiempo se calculan con el MISMO número.
+ * @returns {{sugerido:number, alcanzable:boolean, lineaHTML:string}}
+ */
+function _planMetaLinea(est, completa) {
+  if (completa) {
+    return { sugerido: 0, alcanzable: false,
+      lineaHTML: `<span style="color:var(--success);font-weight:600">🎉 ¡Meta completada!</span>` };
+  }
+  const sugerido = est?.aporteMensual || 0;
+  if (sugerido <= 0 || !est?.alcanzable) {
+    return { sugerido: 0, alcanzable: false,
+      lineaHTML: `<span style="color:var(--warning)">⚠️ Sin margen este mes: tus gastos igualan o superan tus ingresos</span>` };
+  }
+  const horizonte = _fmtHorizonteMeta(est.mesesRestantes);
+  const fecha = est.fechaEstimada ? ` <span style="color:var(--ink-muted)">(${_fmtPeriodoMeta(est.fechaEstimada)})</span>` : '';
+  return { sugerido, alcanzable: true,
+    lineaHTML: `💡 Aporte sugerido <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes · listo en <b style="color:var(--brand)">${horizonte}</b>${fecha}` };
 }
 
 async function cerrarPeriodoUSD(tarjetaId) {
@@ -7545,9 +7667,9 @@ async function init() {
   // La sincronización con GitHub ocurre después, en background.
   await reloadAll();
 
-  // Cargar version.json + changelog.json (no bloqueante: si fallan, seguimos)
-  cargarVersion();
-  cargarChangelog();
+  // Cargar version.json + changelog.json (no bloqueante: si fallan, seguimos).
+  // Cuando ambos están listos, si venimos de una auto-actualización, mostrar los cambios.
+  Promise.all([cargarVersion(), cargarChangelog()]).then(() => mostrarWhatsNewSiActualizado());
 
   // ── Calculadora, boleta, orientación (síncronos, 0 costo perceptible) ──
   initCalculadora();
@@ -7744,9 +7866,18 @@ async function init() {
   document.getElementById('md-confirmar')?.addEventListener('click', () => _metaDelConfirmar());
   document.getElementById('md-cancelar')?.addEventListener('click', () => { document.getElementById('dlg-meta-del')?.close(); _metaDelCtx = null; });
 
-  // Consulta de actualización
-  document.getElementById('upd-aplicar')?.addEventListener('click', () => { document.getElementById('dlg-update')?.close(); _aplicarUpdateAhora(); });
+  // Consulta de actualización / What's new
+  document.getElementById('upd-aplicar')?.addEventListener('click', (e) => {
+    const esWhatsNew = e.currentTarget.dataset.mode === 'whatsnew';
+    document.getElementById('dlg-update')?.close();
+    if (esWhatsNew) { _resetUpdDialog(); }   // ya está aplicada: solo cerrar
+    else { _aplicarUpdateAhora(); }
+  });
   document.getElementById('upd-despues')?.addEventListener('click', () => document.getElementById('dlg-update')?.close());
+
+  // Notificación (banner) de actualización disponible — modo auto-update OFF
+  document.getElementById('update-banner-btn')?.addEventListener('click', () => { ocultarBannerUpdate(); aplicarUpdateManual(); });
+  document.getElementById('update-banner-close')?.addEventListener('click', () => ocultarBannerUpdate(true));
 
   // ── Salud financiera (análisis IA completo) ──────────────────
   document.getElementById('salud-close-x')?.addEventListener('click', () => document.getElementById('dlg-salud')?.close());
