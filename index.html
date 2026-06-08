@@ -1772,6 +1772,43 @@
   </div>
 </dialog>
 
+<!-- ===== AJUSTAR SALDO DE CUENTA (conciliación) ============== -->
+<dialog id="dlg-ajuste-cuenta">
+  <div class="form-modern" style="min-width:min(94vw,440px);max-width:480px">
+    <div class="form-modern-header">
+      <div class="form-modern-icon" style="background:linear-gradient(135deg,#64748b,#94a3b8)">⚖️</div>
+      <div>
+        <h3 class="ff-display text-xl font-bold tracking-tight">Ajustar saldo</h3>
+        <p class="text-xs" style="color:var(--ink-muted)" id="aj-subtitulo">—</p>
+      </div>
+      <button type="button" id="aj-close-x"
+        style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
+        title="Cerrar">✕</button>
+    </div>
+    <div class="form-modern-body">
+      <div class="aj-saldo-actual">
+        <span class="aj-saldo-lbl">Saldo según la app</span>
+        <b class="aj-saldo-val" id="aj-calculado">$ 0</b>
+      </div>
+      <div class="form-section">
+        <label class="form-label">¿Cuánto tenés realmente en esta cuenta?</label>
+        <div class="input-with-prefix"><span class="input-prefix">$</span>
+          <input type="number" id="aj-real" class="input input-lg" step="0.01" inputmode="decimal" placeholder="Saldo real (tu banco / billetera)" /></div>
+      </div>
+      <div class="aj-diff" id="aj-diff-box" style="display:none">
+        <span id="aj-diff-txt"></span>
+      </div>
+      <p class="text-[10px] mt-1" style="color:var(--ink-muted)">
+        Se crea un movimiento de <b>Ajuste de saldo</b> por la diferencia, visible en el historial. No cuenta como gasto ni ingreso de consumo, y lo podés borrar para deshacer.
+      </p>
+    </div>
+    <div class="form-modern-footer">
+      <button type="button" id="aj-confirmar" class="btn-primary flex-1">✓ Ajustar al saldo real</button>
+      <button type="button" id="aj-cancelar" class="btn-secondary flex-1">Cancelar</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="dlg-meta">
   <form method="dialog" class="form-modern" style="min-width:min(94vw,560px);max-width:600px">
     <input type="hidden" name="_editing_id" />

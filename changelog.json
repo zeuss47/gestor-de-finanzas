@@ -1,6 +1,15 @@
 {
   "entradas": [
     {
+      "version": "1.97",
+      "fecha": "2026-06-06",
+      "items": [
+        "Nuevo: Ajustar saldo de una cuenta — botón ⚖️ en 'Mis Cuentas' para conciliar con tu banco",
+        "Ingresás tu saldo real y la app crea un movimiento de ajuste por la diferencia (te muestra cuánto suma o resta)",
+        "El ajuste queda en el historial (⚖️ Ajuste de saldo), no cuenta como gasto/ingreso de consumo y lo podés borrar para deshacer"
+      ]
+    },
+    {
       "version": "1.96",
       "fecha": "2026-06-06",
       "items": [

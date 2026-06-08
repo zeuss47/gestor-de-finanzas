@@ -1076,7 +1076,7 @@ function computarEstadoGlobal() {
   for (const g of state.gastos) {
     if (g.deleted || !g.fecha?.startsWith(mk)) continue;
     if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;  // contador puro
-    if (g.es_pago_tarjeta || g.es_aporte_meta) continue;                              // el pago no es consumo nuevo (ya está en la deuda)
+    if (g.es_pago_tarjeta || g.es_aporte_meta || g.es_ajuste) continue;                              // el pago no es consumo nuevo (ya está en la deuda)
     egresosMes += montoARS(g, { mensual: true });
   }
 
@@ -1085,7 +1085,7 @@ function computarEstadoGlobal() {
   for (const g of state.gastos) {
     if (g.deleted || !g.fecha) continue;
     if (g.es_habitual && !g.cuenta_id && !g.aprobado) continue;
-    if (g.es_pago_tarjeta || g.es_aporte_meta) continue;
+    if (g.es_pago_tarjeta || g.es_aporte_meta || g.es_ajuste) continue;
     const k = g.fecha.slice(0,7);
     if (k === mk) continue;
     buckets.set(k, (buckets.get(k)||0) + montoARS(g, { mensual: true }));
@@ -1429,6 +1429,76 @@ function calcularSaldoCuenta(cuenta) {
     saldo -= montoARS(g);   // moneda + compartido unificados
   }
   return saldo;
+}
+
+/* ============ Ajuste de saldo (conciliación por cuenta) ============
+   El usuario ingresa el saldo REAL de una cuenta (su banco/billetera) y se
+   crea un movimiento de ajuste por la diferencia. Es un gasto con flag
+   es_ajuste (excluido del análisis de consumo, como es_pago_tarjeta). El monto
+   es saldoCalculado − saldoReal: si la cuenta tenía de menos (faltó anotar un
+   ingreso), el monto es negativo → sube el saldo; si tenía de más (faltó un
+   gasto), es positivo → lo baja. Queda registrado y es reversible (borrable). */
+let _ajusteCtx = null;
+
+function _ajusteRecalcDiff() {
+  if (!_ajusteCtx) return;
+  const real = parseFloat(document.getElementById('aj-real')?.value);
+  const box = document.getElementById('aj-diff-box');
+  const txt = document.getElementById('aj-diff-txt');
+  if (!isFinite(real)) { box.style.display = 'none'; return; }
+  const diff = real - _ajusteCtx.calculado;   // cuánto cambia el saldo
+  box.style.display = '';
+  if (Math.abs(diff) < 0.005) {
+    box.className = 'aj-diff aj-diff-ok';
+    txt.innerHTML = '✓ El saldo ya coincide, no hace falta ajustar.';
+  } else if (diff > 0) {
+    box.className = 'aj-diff aj-diff-up';
+    txt.innerHTML = `Se sumarán <b>${FMT.format(diff)}</b> (tenías de más: faltó registrar un ingreso o sobra plata).`;
+  } else {
+    box.className = 'aj-diff aj-diff-down';
+    txt.innerHTML = `Se restarán <b>${FMT.format(Math.abs(diff))}</b> (tenías de menos: faltó registrar un gasto).`;
+  }
+}
+
+function abrirAjusteCuenta(cuentaId) {
+  const c = (state.cuentas || []).find(x => x.id === cuentaId && !x.deleted);
+  if (!c) return;
+  const calculado = calcularSaldoCuenta(c);
+  _ajusteCtx = { cuentaId, calculado, nombre: c.nombre };
+  document.getElementById('aj-subtitulo').textContent = `${c.nombre} · ${c.moneda || 'ARS'}`;
+  document.getElementById('aj-calculado').textContent = FMT.format(calculado);
+  const inp = document.getElementById('aj-real');
+  inp.value = '';
+  inp.oninput = _ajusteRecalcDiff;
+  document.getElementById('aj-diff-box').style.display = 'none';
+  document.getElementById('dlg-ajuste-cuenta')?.showModal();
+  setTimeout(() => inp.focus(), 50);
+}
+
+async function confirmarAjusteCuenta() {
+  if (!_ajusteCtx) return;
+  const real = parseFloat(document.getElementById('aj-real')?.value);
+  if (!isFinite(real)) { toast('Ingresá el saldo real de la cuenta', 2000); return; }
+  const monto = _ajusteCtx.calculado - real;   // lo que hay que restar para llegar al real
+  if (Math.abs(monto) < 0.005) { toast('El saldo ya coincide', 2000); document.getElementById('dlg-ajuste-cuenta')?.close(); return; }
+  await DB.put('gastos', {
+    id: uuid(),
+    fecha: new Date().toISOString().slice(0, 10),
+    monto, moneda: 'ARS',
+    descripcion: `Ajuste de saldo · ${_ajusteCtx.nombre}`,
+    categoria: 'Ajuste',
+    metodo_pago: 'ajuste',
+    tipo: 'unico',
+    cuenta_id: _ajusteCtx.cuentaId,
+    tarjeta_id: null,
+    es_ajuste: true,
+    updated_at: nowTs(),
+  });
+  notificarCambioLocal();
+  document.getElementById('dlg-ajuste-cuenta')?.close();
+  toast(`⚖️ Saldo ajustado a ${FMT.format(real)}`, 3000);
+  _ajusteCtx = null;
+  await reloadAll();
 }
 
 /** Ajusta la luminancia de un color hex. factor<1 oscurece, >1 aclara. */
@@ -2045,7 +2115,7 @@ function renderBalance(el) {
     ingMap.set(k, (ingMap.get(k) || 0) + ((i.sueldo_neto || 0) + (i.bonos || 0)));
   }
   for (const g of state.gastos || []) {
-    if (g.deleted || g.es_pago_tarjeta || g.es_aporte_meta || (g.es_habitual && !g.cuenta_id && !g.aprobado) || !enRango(g.fecha)) continue; // pago de tarjeta / habitual-contador no es consumo
+    if (g.deleted || g.es_pago_tarjeta || g.es_aporte_meta || g.es_ajuste || (g.es_habitual && !g.cuenta_id && !g.aprobado) || !enRango(g.fecha)) continue; // pago de tarjeta / habitual-contador no es consumo
     const k = bucketKey(new Date(g.fecha + 'T12:00:00'));
     gasMap.set(k, (gasMap.get(k) || 0) + gastoEf(g));
   }
@@ -2273,7 +2343,7 @@ function renderResumenAnual(el) {
   const gastosPorMes = new Map();
   for (const g of state.gastos) {
     if (g.deleted || !g.fecha?.startsWith(pfx)) continue;
-    if (g.es_pago_tarjeta || g.es_aporte_meta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
+    if (g.es_pago_tarjeta || g.es_aporte_meta || g.es_ajuste || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
     const mk = g.fecha.slice(0,7);
     gastosPorMes.set(mk, (gastosPorMes.get(mk)||0) + montoARS(g, { mensual: true }));
   }
@@ -2314,7 +2384,7 @@ function renderFlujoMensual(el) {
   const buckets = new Map(), ingrMap = new Map();
   for (const g of state.gastos) {
     if (g.deleted || !g.fecha) continue;
-    if (g.es_pago_tarjeta || g.es_aporte_meta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
+    if (g.es_pago_tarjeta || g.es_aporte_meta || g.es_ajuste || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // no es consumo nuevo
     const k = g.fecha.slice(0,7);
     buckets.set(k, (buckets.get(k)||0) + montoARS(g, { mensual: true }));
   }
@@ -2368,7 +2438,7 @@ function renderCategorias(el) {
   const catMap = new Map();
   for (const g of state.gastos) {
     if (g.deleted) continue;
-    if (g.es_pago_tarjeta || g.es_aporte_meta || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // pago tarjeta / habitual-contador no es consumo
+    if (g.es_pago_tarjeta || g.es_aporte_meta || g.es_ajuste || (g.es_habitual && !g.cuenta_id && !g.aprobado)) continue; // pago tarjeta / habitual-contador no es consumo
     if (!g.fecha?.startsWith(mk)) continue;
     const cat = g.categoria || 'general';
     catMap.set(cat, (catMap.get(cat)||0) + montoARS(g, { mensual: true }));
@@ -3367,19 +3437,23 @@ function renderMovimientos() {
   const gastoHTML = (g) => {
     const esDevol = !!g.es_devolucion_meta;   // devolución de meta a una cuenta (monto negativo)
     const esAporte = !!g.es_aporte_meta;   // aporte a meta (incluye devoluciones)
+    const esAjuste = !!g.es_ajuste;        // ajuste de saldo (conciliación); monto puede ser negativo
     const esPago  = !!g.es_pago_tarjeta || esAporte;   // movimientos especiales: solo lectura
-    const catObj  = esPago ? null : allCats.find(c => c.id === g.categoria || c.nombre?.toLowerCase() === (g.categoria||'').toLowerCase());
-    const icon    = esDevol ? '↩️' : (esAporte ? '🎯' : (g.es_pago_tarjeta ? '💳' : (catObj?.icono || CAT_ICON[g.categoria] || '📌')));
-    const catColor= esAporte ? '#10b981' : (g.es_pago_tarjeta ? '#a78bfa' : (catObj?.color || '#94a3b8'));
+    const esEspecial = esPago || esAjuste;
+    const catObj  = esEspecial ? null : allCats.find(c => c.id === g.categoria || c.nombre?.toLowerCase() === (g.categoria||'').toLowerCase());
+    const icon    = esAjuste ? '⚖️' : (esDevol ? '↩️' : (esAporte ? '🎯' : (g.es_pago_tarjeta ? '💳' : (catObj?.icono || CAT_ICON[g.categoria] || '📌'))));
+    const catColor= esAjuste ? '#64748b' : (esAporte ? '#10b981' : (g.es_pago_tarjeta ? '#a78bfa' : (catObj?.color || '#94a3b8')));
     const monto   = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
     const cuotas  = g.tipo === 'cuotas' ? `cuota ${g.cuota_numero}/${g.cuotas_total}` : '';
     const tarjeta = g.tarjeta_id ? state.tarjetas.find(t=>t.id===g.tarjeta_id) : null;
-    const metodo  = tarjeta ? `💳 ${escapeHtml(tarjeta.nombre)}` : (METODO_LABEL[g.metodo_pago] || g.metodo_pago || 'efectivo');
-    const monedaFmt = esDevol
+    const metodo  = tarjeta ? `💳 ${escapeHtml(tarjeta.nombre)}` : (esAjuste ? 'conciliación' : (METODO_LABEL[g.metodo_pago] || g.metodo_pago || 'efectivo'));
+    // Un monto negativo (devolución, o ajuste que sube el saldo) se muestra como "+$X" verde.
+    const sumaAlSaldo = esDevol || (esAjuste && monto < 0);
+    const monedaFmt = sumaAlSaldo
       ? `<span style="color:#10b981">+${FMT.format(Math.abs(monto))}</span>`
       : (g.moneda && g.moneda !== 'ARS')
       ? `${g.moneda} ${(g.monto||0).toLocaleString('es-AR',{minimumFractionDigits:2})}`
-      : FMT.format(monto);
+      : (esAjuste ? `<span style="color:var(--danger)">−${FMT.format(Math.abs(monto))}</span>` : FMT.format(monto));
     return `
       <div class="mov-row-gasto" data-id="${g.id}" data-tipo="gasto">
         <div class="mov-row-icon" style="background:${catColor}18;border:1px solid ${catColor}33">${icon}</div>
@@ -3392,7 +3466,7 @@ function renderMovimientos() {
           </div>
           <div class="mov-row-meta" style="margin-top:.2rem">
             <span class="mov-cat-badge" style="background:${catColor}14;color:${catColor};border-color:${catColor}33">
-              ${icon} ${escapeHtml(esDevol ? 'Devolución de meta' : (esAporte ? 'Aporte a meta' : (g.es_pago_tarjeta ? 'Pago tarjeta' : (catObj?.nombre || g.categoria || 'general'))))}
+              ${icon} ${escapeHtml(esAjuste ? 'Ajuste de saldo' : (esDevol ? 'Devolución de meta' : (esAporte ? 'Aporte a meta' : (g.es_pago_tarjeta ? 'Pago tarjeta' : (catObj?.nombre || g.categoria || 'general')))))}
             </span>
             ${g.subcategoria ? `<span class="mov-subcat-badge">${escapeHtml(g.subcategoria)}</span>` : ''}
           </div>
@@ -3401,7 +3475,9 @@ function renderMovimientos() {
           <span class="mov-row-monto">${monedaFmt}</span>
           ${g.compartido ? `<span style="font-size:.68rem;color:var(--ink-muted)">total ${FMT.format(g.monto)}</span>` : ''}
           <div class="mov-row-actions">
-            ${esDevol
+            ${esAjuste
+              ? `<button class="mov-row-btn del" data-del-gas="${g.id}" title="Deshacer este ajuste de saldo">${SVG_TRASH}</button>`
+              : esDevol
               ? `<span class="mov-pago-hint" title="Saldo devuelto a tu cuenta al eliminar la meta">↩ a cuenta</span>`
               : esAporte
               ? `<span class="mov-pago-hint" title="Aporte registrado a tu meta de ahorro">🎯 ahorro</span>`
@@ -3421,7 +3497,7 @@ function renderMovimientos() {
     const m = g.compartido ? g.monto * (1 - (g.compartido.porcentaje_otro||0)/100) : g.monto;
     // Los pagos de tarjeta SÍ se muestran en el historial (egreso real de la cuenta),
     // pero NO se suman al "total del día" para no inflar los consumos (ya están en la deuda).
-    items.push({ fecha: g.fecha || '', tipo: 'gasto', signo: -1, monto: m, moneda: g.moneda, esPago: !!(g.es_pago_tarjeta || g.es_aporte_meta), html: gastoHTML(g) });
+    items.push({ fecha: g.fecha || '', tipo: 'gasto', signo: -1, monto: m, moneda: g.moneda, esPago: !!(g.es_pago_tarjeta || g.es_aporte_meta || g.es_ajuste), html: gastoHTML(g) });
   }
   items.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
 
@@ -3517,7 +3593,7 @@ function _renderFiltrosCategoria(mes) {
     ? state.ajustes.catalogos.categorias_gasto
     : (state.ajustes?.categorias_gasto || AJUSTES_DEFAULT.categorias_gasto);
   const catsEnMes = new Set(
-    state.gastos.filter(g => !g.deleted && !g.es_pago_tarjeta && !g.es_aporte_meta && g.fecha?.startsWith(mes))
+    state.gastos.filter(g => !g.deleted && !g.es_pago_tarjeta && !g.es_aporte_meta && !g.es_ajuste && g.fecha?.startsWith(mes))
       .map(g => g.categoria || 'general')
   );
 
@@ -5116,8 +5192,11 @@ function abrirSelectorEntidad(tipo, items) {
             <p class="text-[10px]" style="color:var(--ink-muted)">${escapeHtml(c.banco||c.tipo)} · ${c.moneda||'ARS'}</p>
           </div>
           <span class="hd-item-monto" style="color:${saldo>=0?'var(--success)':'var(--danger)'}">${FMT.format(saldo)}</span>
+          <button type="button" class="hd-item-ajuste" data-ajuste-cuenta="${c.id}" title="Ajustar saldo (conciliar con tu banco)" aria-label="Ajustar saldo">⚖️</button>
         </div>`);
     });
+    list.querySelectorAll('[data-ajuste-cuenta]').forEach(btn =>
+      btn.addEventListener('click', (e) => { e.stopPropagation(); dlg.close(); abrirAjusteCuenta(btn.dataset.ajusteCuenta); }));
   } else { // metas
     items.sort((a,b)=> (b.prioridad||3) - (a.prioridad||3));
     items.forEach(m => {
@@ -7869,6 +7948,11 @@ async function init() {
   document.getElementById('am-confirmar')?.addEventListener('click', () => confirmarAporteMeta());
   document.getElementById('am-cancelar')?.addEventListener('click', () => document.getElementById('dlg-aporte-meta')?.close());
   document.getElementById('am-close-x')?.addEventListener('click', () => document.getElementById('dlg-aporte-meta')?.close());
+
+  // Ajuste de saldo de cuenta (conciliación)
+  document.getElementById('aj-confirmar')?.addEventListener('click', () => confirmarAjusteCuenta());
+  document.getElementById('aj-cancelar')?.addEventListener('click', () => { document.getElementById('dlg-ajuste-cuenta')?.close(); _ajusteCtx = null; });
+  document.getElementById('aj-close-x')?.addEventListener('click', () => { document.getElementById('dlg-ajuste-cuenta')?.close(); _ajusteCtx = null; });
 
   // Eliminar meta con saldo: opciones (solo eliminar / devolver a cuenta / transferir)
   document.querySelectorAll('#dlg-meta-del .md-opt').forEach(b =>

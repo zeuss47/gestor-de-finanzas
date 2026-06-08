@@ -38,7 +38,7 @@ function gastoPorCategoria(gastos, hoy, meses = 3) {
   }
   const porCat = new Map();
   for (const g of gastos) {
-    if (g.deleted || g.es_pago_tarjeta || (g.es_habitual && !g.cuenta_id) || !g.fecha) continue;
+    if (g.deleted || g.es_pago_tarjeta || g.es_aporte_meta || g.es_ajuste || (g.es_habitual && !g.cuenta_id) || !g.fecha) continue;
     if (!claves.some(c => g.fecha.startsWith(c))) continue;
     const cat = g.categoria || 'general';
     porCat.set(cat, (porCat.get(cat) || 0) + montoEfectivo(g));
