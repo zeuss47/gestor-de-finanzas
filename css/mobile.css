@@ -1,42 +1,54 @@
 /* ================================================================
-   Gestor de Finanzas — Estilos de MÓVIL (≤767px: teléfono)
-   Bottom-nav, una columna, drawers.
-   Se carga DESPUÉS de styles.css (base). Editá acá SOLO lo de este modo;
-   no puede afectar al otro porque cada bloque conserva su @media.
+   Gestor de Finanzas — Estilos de MÓVIL  (≤767px, teléfono)
+   ----------------------------------------------------------------
+   Se carga DESPUÉS de styles.css (base).
+   Cada bloque conserva su @media exacto: editar acá NO afecta al escritorio.
+
+   Índice:
+     1. Teléfono (≤767px) — una columna, sin paneles, navegación inferior
+     2. Pantallas chicas (≤640px) — formularios a una columna
+     3. Muy chicas (≤520px) — filas de resumen compactas
    ================================================================ */
 
+
+/* ================================================================
+   1 · TELÉFONO (≤767px) — una columna, sin paneles laterales
+   ================================================================ */
 @media (max-width: 767px) {
+  /* La navegación es la barra inferior: sin sidebar, panel derecho ni KPI-strip */
   #sidebar,
   #right-panel { display: none !important; }
+  #kpi-strip   { display: none !important; }
 
-  #kpi-strip { display: none !important; }
+  /* Redimensionar widgets es de escritorio (mouse): ocultar controles táctiles */
+  .widget-resize-control,
+  .widget-resize-handle { display: none; }
+
+  /* Estadísticas de gráficos a 2 columnas (caben mejor en pantalla angosta) */
+  .hd-chart-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
+
+/* ================================================================
+   2 · PANTALLAS CHICAS (≤640px) — formularios a una columna
+   ================================================================ */
 @media (max-width: 640px) {
-  .form-modern .grid-cols-2 {
-    grid-template-columns: 1fr !important;
-  }
-  /* Alinear el ancho del form interno al del dialog padre para evitar
-     overflow horizontal de 2px por estilos inline `min-width:96vw`. */
+  .form-modern .grid-cols-2 { grid-template-columns: 1fr !important; }
+
+  /* Igualar el ancho del form al del dialog para evitar 2px de overflow
+     horizontal por los estilos inline `min-width:96vw`. */
   .form-modern {
     min-width: min(94vw, 720px) !important;
     max-width: 94vw !important;
   }
 }
 
-@media (max-width: 767px) {
-  .widget-resize-control,
-  .widget-resize-handle { display: none; }
-}
 
-@media (max-width: 767px) {
-  .hd-chart-stats { grid-template-columns: repeat(2, 1fr); }
-}
-
+/* ================================================================
+   3 · MUY CHICAS (≤520px) — filas de resumen compactas
+   ================================================================ */
 @media (max-width: 520px) {
-  .rsb-mov-row {
-    grid-template-columns: auto 1fr auto;
-  }
+  .rsb-mov-row   { grid-template-columns: auto 1fr auto; }
   .rsb-mov-badge { display: none; }
   .rsb-mov-monto { font-size: .8rem; }
 }
