@@ -694,7 +694,7 @@ const AJUSTES_DEFAULT = {
   notificaciones: { habilitadas: true, alertas_tarjeta_dias: [5,2,1], confirmar_movimientos: true, alertas_ia: true },
   ui: {
     tema: 'auto',
-    color_primario: '#2dd4bf',
+    color_primario: '#C9A24E',
     widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','comparador'],
     widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','comparador'],
     widgets_tamanos: {
@@ -830,7 +830,7 @@ function aplicarTema() {
   const esClaro = tema === 'claro' || (tema === 'auto' && !matchMedia('(prefers-color-scheme: dark)').matches);
   html.classList.toggle('light', esClaro);
   aplicarColoresPersonalizados(esClaro);
-  document.getElementById('meta-theme')?.setAttribute('content', esClaro ? '#f6f8fb' : '#020617');
+  document.getElementById('meta-theme')?.setAttribute('content', esClaro ? '#F2F2ED' : '#0E0E11');
 }
 
 /* ============ Sistema de colores personalizable ============
@@ -838,17 +838,17 @@ function aplicarTema() {
    color con su valor por defecto (oscuro/claro) y las variables CSS que afecta.
    `bg`/`soft`/`-2` se DERIVAN del color base para mantener coherencia.        */
 const PALETA_SISTEMA = [
-  { id: 'brand',   nombre: 'Acento principal',  desc: 'Botones, links, resaltados', def: '#2dd4bf', defLight: '#0d9488',
+  { id: 'brand',   nombre: 'Acento principal',  desc: 'Botones, links, resaltados', def: '#C9A24E', defLight: '#9A7A24',
     vars: c => ({ '--brand': c, '--brand-glow': c + '3a', '--brand-soft': c + '20', '--info': c, '--info-bg': c + '1a' }) },
-  { id: 'brand2',  nombre: 'Acento secundario', desc: 'Gradientes (FAB, botones)',  def: '#3b82f6', defLight: '#2563eb',
+  { id: 'brand2',  nombre: 'Acento secundario', desc: 'Gradientes (FAB, botones)',  def: '#E2C079', defLight: '#B8923A',
     vars: c => ({ '--brand-2': c, '--neon-pink': c }) },
-  { id: 'brand3',  nombre: 'Acento terciario',  desc: 'Detalles, badges',           def: '#38bdf8', defLight: '#0284c7',
+  { id: 'brand3',  nombre: 'Acento terciario',  desc: 'Detalles, badges',           def: '#9A7B33', defLight: '#8A6D2E',
     vars: c => ({ '--brand-3': c }) },
-  { id: 'success', nombre: 'Éxito / Ingresos',  desc: 'Saldos positivos, ingresos', def: '#22c55e', defLight: '#16a34a',
+  { id: 'success', nombre: 'Éxito / Ingresos',  desc: 'Saldos positivos, ingresos', def: '#46B98A', defLight: '#178A5E',
     vars: c => ({ '--success': c, '--success-2': _ajustarLuminancia(c, 1.3), '--success-bg': c + '1a', '--neon-green': c }) },
-  { id: 'danger',  nombre: 'Peligro / Gastos',  desc: 'Gastos, alertas, eliminar',  def: '#f43f5e', defLight: '#e11d48',
+  { id: 'danger',  nombre: 'Peligro / Gastos',  desc: 'Gastos, alertas, eliminar',  def: '#D85C4A', defLight: '#C0432F',
     vars: c => ({ '--danger': c, '--danger-2': _ajustarLuminancia(c, 1.3), '--danger-bg': c + '1a' }) },
-  { id: 'warning', nombre: 'Advertencia',       desc: 'Avisos, vencimientos',       def: '#f59e0b', defLight: '#d97706',
+  { id: 'warning', nombre: 'Advertencia',       desc: 'Avisos, vencimientos',       def: '#E0A33A', defLight: '#B5781E',
     vars: c => ({ '--warning': c, '--warning-2': _ajustarLuminancia(c, 1.3), '--warning-bg': c + '1a' }) },
 ];
 
@@ -856,7 +856,7 @@ const PALETA_SISTEMA = [
 function aplicarColoresPersonalizados(esClaro) {
   const custom = state.ajustes?.ui?.colores || {};
   const root = document.documentElement.style;
-  let brandVal = '#2dd4bf', brand2Val = '#3b82f6';
+  let brandVal = '#C9A24E', brand2Val = '#E2C079';
   for (const c of PALETA_SISTEMA) {
     // legacy: color_primario sigue siendo el acento principal si no hay custom.brand
     const fallback = (c.id === 'brand' && state.ajustes?.ui?.color_primario) || (esClaro ? c.defLight : c.def);
@@ -1755,7 +1755,7 @@ function _scoreGaugeHTML(salud, size = 72) {
               stroke-linecap="round" stroke-dasharray="${dash} ${circ}"
               transform="rotate(-90 ${cx} ${cx})"/>
       <text x="50%" y="48%" text-anchor="middle" dominant-baseline="middle"
-            style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:${size*0.28}px;fill:var(--ink)">${score}</text>
+            style="font-family:'IBM Plex Mono',sans-serif;font-weight:700;font-size:${size*0.28}px;fill:var(--ink)">${score}</text>
       <text x="50%" y="68%" text-anchor="middle" dominant-baseline="middle"
             style="font-size:${size*0.12}px;fill:var(--ink-muted)">/100</text>
     </svg>`;
@@ -2066,7 +2066,7 @@ const _balanceState = {
 const _BAL_SERIES = {
   ingresos: { label: 'Ingresos', color: '#22c55e', ckey: 'success' },
   gastos:   { label: 'Gastos',   color: '#f43f5e', ckey: 'danger' },
-  balance:  { label: 'Balance acumulado', color: '#2dd4bf', ckey: 'brand' },
+  balance:  { label: 'Balance acumulado', color: '#C9A24E', ckey: 'brand' },
 };
 
 function _balanceRango() {
@@ -2527,7 +2527,7 @@ function renderTipoCambio(el) {
             <p class="text-[10px]" style="color:var(--ink-muted)">1 ${key.replace('USD_','')} = ${FMT.format(c.valor)}</p>
           </div>
         </div>
-        <p class="ff-display text-sm font-bold" style="color:var(--brand)">
+        <p class="ff-display text-sm font-bold" style="color:var(--brand-ink)">
           ${equiv.toFixed(2)}
         </p>
       </div>`);
@@ -5283,7 +5283,7 @@ function abrirSelectorEntidad(tipo, items) {
       const estrellas = '★'.repeat(p) + '☆'.repeat(5 - p);
       list.insertAdjacentHTML('beforeend', `
         <div class="hd-item">
-          <span class="hd-item-icon" style="background:var(--brand-soft);color:var(--brand)">🎯</span>
+          <span class="hd-item-icon" style="background:var(--brand-soft);color:var(--brand-ink)">🎯</span>
           <div class="hd-item-info">
             <p class="text-sm font-semibold" style="color:var(--ink)">${escapeHtml(m.nombre)}</p>
             <p class="text-[10px]" style="color:var(--ink-muted)">
@@ -5298,7 +5298,7 @@ function abrirSelectorEntidad(tipo, items) {
           </div>
           <div class="text-right flex-shrink-0">
             <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Faltan</p>
-            <p class="ff-display font-bold text-sm" style="color:var(--brand)">${FMT.format(Math.max(0, (m.monto_objetivo||0) - (m.monto_actual||0)))}</p>
+            <p class="ff-display font-bold text-sm" style="color:var(--brand-ink)">${FMT.format(Math.max(0, (m.monto_objetivo||0) - (m.monto_actual||0)))}</p>
           </div>
         </div>`);
     });
@@ -5394,7 +5394,7 @@ function abrirDrawerTarjeta(tarjetaId) {
       <span style="display:flex;flex-wrap:wrap;gap:.15rem .8rem;margin-bottom:.4rem;font-size:.66rem;color:var(--ink-muted)">
         <span>Ingreso <b style="color:var(--success)">${FMT.format(cap.ingreso_mes)}</b></span>
         <span>Gastos habituales <b style="color:var(--ink)">${FMT.format(cap.gastos_habituales)}</b></span>
-        <span>Límite financiero <b style="color:var(--brand)">${FMT.format(cap.limite_financiero)}</b></span>
+        <span>Límite financiero <b style="color:var(--brand-ink)">${FMT.format(cap.limite_financiero)}</b></span>
         <span>Cuotas+tarjetas <b style="color:var(--warning)">${FMT.format(cap.compromiso_tarjetas + cap.cuotas_mensuales_proyectadas)}</b></span>
       </span>
       <span style="color:var(--ink-2)">${escapeHtml(cap.sugerencia)}</span>`;
@@ -5443,7 +5443,7 @@ function abrirDrawerTarjeta(tarjetaId) {
             Cierra ${fmt(ciclo.cierre)} · Vence ${fmt(ciclo.vencimiento)}
           </p>
         </div>
-        <span class="hd-item-monto" style="color:var(--brand)">
+        <span class="hd-item-monto" style="color:var(--brand-ink)">
           ${cuotaMensualTotal > 0 ? '~' + FMT.format(cuotaMensualTotal) : '—'}
         </span>
       </div>`);
@@ -5620,7 +5620,7 @@ function renderCiclosTarjeta(tarjeta, resumenActual) {
       ? (ec.diasParaCierre >= 0 ? `cierra en ${ec.diasParaCierre} día${ec.diasParaCierre === 1 ? '' : 's'}` : '')
       : (estado === 'cerrado_pendiente' && ec.diasParaVencimiento >= 0 ? `vence en ${ec.diasParaVencimiento} día${ec.diasParaVencimiento === 1 ? '' : 's'}` : '');
     const total = c.resumenMes.total_resumen;
-    const actualBadge = c.esActual ? '<span style="color:var(--brand);font-size:.6rem;margin-left:.25rem">● actual</span>' : '';
+    const actualBadge = c.esActual ? '<span style="color:var(--brand-ink);font-size:.6rem;margin-left:.25rem">● actual</span>' : '';
     const nGastos = (c.resumenMes.movimientos_ids || []).length;
 
     return `
@@ -6116,7 +6116,7 @@ function renderMetasMobile() {
     headEl.innerHTML = margen > 0
       ? `<div class="mm-resumen-grid">
            <div><span class="mm-r-lbl">Aportable / mes</span><b class="mm-r-val">${FMT.format(margen)}</b></div>
-           <div><span class="mm-r-lbl">Repartido en metas</span><b class="mm-r-val" style="color:var(--brand-3)">${FMT.format(totalAporte)}</b></div>
+           <div><span class="mm-r-lbl">Repartido en metas</span><b class="mm-r-val" style="color:var(--brand-ink)">${FMT.format(totalAporte)}</b></div>
            <div><span class="mm-r-lbl">Saldo disponible</span><b class="mm-r-val" style="color:${saldoDisp>=0?'var(--ink)':'var(--danger)'}">${FMT.format(saldoDisp)}</b></div>
          </div>${limitadoPorSaldo ? `<div class="mm-resumen-note">ℹ️ Tu flujo del mes daría ${FMT.format(flujo)}, pero ajustamos el aporte a tu saldo disponible real (${FMT.format(saldoDisp)}).</div>` : ''}`
       : `<div class="mm-resumen-warn">⚠️ Sin saldo disponible para aportar a tus metas ahora. ${flujo > 0 ? `(Tu flujo del mes da ${FMT.format(flujo)}, pero tu saldo líquido es ${FMT.format(saldoDisp)}.)` : 'Tus gastos igualan o superan tus ingresos.'}</div>`;
@@ -6214,7 +6214,7 @@ function _planMetaLinea(est, completa) {
   const horizonte = _fmtHorizonteMeta(est.mesesRestantes);
   const fecha = est.fechaEstimada ? ` <span style="color:var(--ink-muted)">(${_fmtPeriodoMeta(est.fechaEstimada)})</span>` : '';
   return { sugerido, alcanzable: true,
-    lineaHTML: `💡 Aporte sugerido <b style="color:var(--brand-3)">${FMT.format(sugerido)}</b>/mes · listo en <b style="color:var(--brand)">${horizonte}</b>${fecha}` };
+    lineaHTML: `💡 Aporte sugerido <b style="color:var(--brand-ink)">${FMT.format(sugerido)}</b>/mes · listo en <b style="color:var(--brand-ink)">${horizonte}</b>${fecha}` };
 }
 
 async function cerrarPeriodoUSD(tarjetaId) {
@@ -8646,7 +8646,7 @@ function renderCatalogoSettings(tipo) {
         <input class="catalog-item-name" type="text" value="${escapeHtml(cat.nombre)}" data-idx="${idx}" data-tipo="${tipo}" maxlength="32" placeholder="Nombre"/>
         <div class="subcat-list catalog-subcat-list" data-idx="${idx}" data-tipo="${tipo}">
           ${subcats.map((s, si) => `<span class="subcat-chip">${escapeHtml(s)}<button type="button" data-action="delsubcat" data-idx="${idx}" data-tipo="${tipo}" data-si="${si}" title="Eliminar subcategoría">✕</button></span>`).join('')}
-          <button type="button" class="subcat-chip" data-action="addsubcat" data-idx="${idx}" data-tipo="${tipo}" style="cursor:pointer;border-style:dashed;color:var(--brand)">+ subcategoría</button>
+          <button type="button" class="subcat-chip" data-action="addsubcat" data-idx="${idx}" data-tipo="${tipo}" style="cursor:pointer;border-style:dashed;color:var(--brand-ink)">+ subcategoría</button>
         </div>
       </div>
       <span class="catalog-item-color" data-action="color" data-idx="${idx}" data-tipo="${tipo}" style="background:${cat.color}" title="Color"></span>

@@ -14,7 +14,8 @@
   <!-- Fuentes: cargadas desde HTML para evitar bloqueos de @import en CSS -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Tipografía "Instrumento": IBM Plex Mono (numerales/ledger, firma) + Inter (texto) -->
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
   <!-- Tailwind CSS — generado con CLI v3 (sin CDN, sin warning de producción) -->
   <link rel="stylesheet" href="./css/tailwind.css" />
@@ -68,13 +69,13 @@
       margin-bottom: .35rem;
     }
     .card-preview-name {
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'IBM Plex Mono', sans-serif;
       font-size: 1.15rem;
       font-weight: 700;
       margin-bottom: .8rem;
     }
     .card-preview-number {
-      font-family: 'Space Grotesk', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.3rem;
       letter-spacing: .2em;
       font-weight: 600;
@@ -94,7 +95,7 @@
       margin-bottom: .1rem;
     }
     .card-preview-value {
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'IBM Plex Mono', sans-serif;
       font-weight: 700;
       font-size: .95rem;
     }
@@ -128,7 +129,7 @@
       color: white;
       font-weight: 700;
       font-size: .85rem;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'IBM Plex Mono', sans-serif;
       box-shadow: 0 2px 8px rgba(0,0,0,.3);
     }
     .bank-card b {
@@ -142,10 +143,10 @@
     }
     .bank-card:has(input:checked) {
       background: var(--brand-soft);
-      border-color: var(--brand);
+      border-color: var(--brand-ink);
       box-shadow: 0 0 12px var(--brand-glow);
     }
-    .bank-card:has(input:checked) b { color: var(--brand); }
+    .bank-card:has(input:checked) b { color: var(--brand-ink); }
 
     /* Slider de días */
     .day-slider-wrap {
@@ -192,10 +193,10 @@
       width: 48px; height: 48px;
       border-radius: var(--r-sm);
       background: var(--brand-soft);
-      color: var(--brand);
+      color: var(--brand-ink);
       border: 1px solid var(--brand);
       display: flex; align-items: center; justify-content: center;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'IBM Plex Mono', sans-serif;
       font-weight: 700;
       font-size: 1.25rem;
       flex-shrink: 0;
@@ -231,7 +232,7 @@
       box-shadow: 0 0 16px currentColor;
     }
     .color-custom-wrap {
-      background: linear-gradient(135deg,#2dd4bf,#3b82f6,#8b5cf6);
+      background: linear-gradient(135deg,#C9A24E,#E2C079,#46B98A);
       display: flex; align-items: center; justify-content: center;
     }
     .color-custom {
@@ -378,7 +379,7 @@
         <button id="btn-sync"
                 class="rounded-xl flex items-center justify-center transition-colors"
                 style="background:var(--surface-2);border:1px solid var(--border)"
-                title="Sincronizar">
+                aria-label="Sincronizar" title="Sincronizar">
           <div style="display:flex;align-items:center;gap:.2rem">
             <span id="sync-status" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -390,7 +391,7 @@
         <button id="btn-settings"
                 class="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
                 style="background:var(--surface-2);border:1px solid var(--border)"
-                title="Ajustes">
+                aria-label="Ajustes" title="Ajustes">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.7 1.7 0 0 0 .4 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.4 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .4-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.4-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.4h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.4 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
@@ -482,7 +483,7 @@
   <section id="qa-wrap" class="mobile-only fixed bottom-20 left-0 right-0 z-20 pointer-events-none">
     <div class="max-w-md mx-auto px-4">
       <div class="flex gap-2 overflow-x-auto pb-2 pointer-events-auto" id="quick-actions">
-        <button id="qa-docs" class="quick-btn" style="border-color:var(--brand);color:var(--brand)">📄 Cargar PDF</button>
+        <button id="qa-docs" class="quick-btn" style="border-color:var(--brand-ink);color:var(--brand-ink)">📄 Cargar PDF</button>
         <!-- Contadores de gastos habituales (dinámico) -->
         <span id="qa-habituales" class="contents"></span>
         <button data-quick="kiosco"      class="quick-btn">🥤 Kiosco</button>
@@ -552,7 +553,7 @@
     <div class="right-panel-section">
       <div class="flex items-center justify-between mb-3">
         <p class="sidebar-section-title">Últimos movimientos</p>
-        <button class="text-[11px]" style="color:var(--brand-3)" data-tab="gastos" id="rp-ver-todos">ver todos</button>
+        <button class="text-[11px]" style="color:var(--brand-ink)" data-tab="gastos" id="rp-ver-todos">ver todos</button>
       </div>
       <div id="rp-movimientos" class="space-y-2"></div>
     </div>
@@ -572,7 +573,7 @@
       <p class="sidebar-section-title mb-3">Acción rápida</p>
       <button id="rp-btn-gasto"   class="btn-primary w-full mb-2 text-sm">+ Nuevo gasto</button>
       <button id="rp-btn-ingreso" class="btn-secondary w-full mb-2 text-sm">+ Registrar ingreso</button>
-      <button id="rp-btn-docs"    class="btn-secondary w-full text-sm" style="border-color:var(--brand);color:var(--brand)">📄 Cargar PDF</button>
+      <button id="rp-btn-docs"    class="btn-secondary w-full text-sm" style="border-color:var(--brand-ink);color:var(--brand-ink)">📄 Cargar PDF</button>
     </div>
 
   </div>
@@ -715,7 +716,7 @@
     <div data-bind="plan-mini"></div>
 
     <button type="button" data-action="ver-salud" class="btn-secondary w-full text-sm mt-3"
-            style="border-color:var(--brand);color:var(--brand)">
+            style="border-color:var(--brand-ink);color:var(--brand-ink)">
       🧠 Ver análisis completo y simulador
     </button>
   </article>
@@ -970,7 +971,7 @@
                 style="background:var(--success-bg);color:var(--success);border:1px solid var(--success)"
                 data-action="refresh-rates" title="Traer cotizaciones live de dolarapi.com">🔄</button>
         <button class="text-xs font-semibold px-3 py-1 rounded-full transition glitch"
-                style="background:var(--brand-soft);color:var(--brand)"
+                style="background:var(--brand-soft);color:var(--brand-ink)"
                 data-action="edit-rates">⚙</button>
       </div>
     </header>
@@ -1065,7 +1066,7 @@
     <!-- Resultado -->
     <div class="conv-result-box mt-4">
       <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Te sale en pesos</p>
-      <p class="ff-display text-2xl font-bold mt-1" style="color:var(--brand)" data-bind="conv-result">$0</p>
+      <p class="ff-display text-2xl font-bold mt-1" style="color:var(--brand-ink)" data-bind="conv-result">$0</p>
       <p class="text-[11px] mt-1" style="color:var(--ink-2)" data-bind="conv-detail">Completá los pasos para ver el total</p>
     </div>
   </article>
@@ -1229,7 +1230,7 @@
                      oninput="document.getElementById('hid-cotiz-gasto').value=this.value;window._gsActualizarEquiv?.()"/>
             </div>
             <div class="cotizacion-equivalente" id="cot-equiv" hidden>
-              ≈ <b style="color:var(--brand)" id="cot-equiv-valor">$0</b> ARS
+              ≈ <b style="color:var(--brand-ink)" id="cot-equiv-valor">$0</b> ARS
             </div>
           </div>
           <button type="button" id="gasto-next-2" class="btn-primary w-full mt-1">
@@ -1385,7 +1386,7 @@
       <!-- Preview visual de la tarjeta -->
       <div class="card-preview-wrap">
         <div class="card-preview" id="card-preview"
-             style="background:linear-gradient(135deg,#2dd4bfdd,#2dd4bf88)">
+             style="background:linear-gradient(135deg,#C9A24Edd,#C9A24E88)">
           <div class="card-preview-chip">
             <svg viewBox="0 0 32 24" fill="none">
               <rect x="0" y="0" width="32" height="24" rx="3" fill="rgba(255,255,255,0.25)"/>
@@ -1438,7 +1439,7 @@
         <div class="form-section">
           <label class="form-label">Últimos 4 dígitos</label>
           <input name="ultimos_4" maxlength="4" pattern="\d{4}" placeholder="0000" class="input input-lg" id="ip-num"
-                 style="font-family:'Space Grotesk',monospace;letter-spacing:.15em" />
+                 style="font-family:'IBM Plex Mono',monospace;letter-spacing:.15em" />
         </div>
         <div class="form-section">
           <label class="form-label">Tipo de uso</label>
@@ -1519,7 +1520,7 @@
             <line x1="8" y1="2" x2="8" y2="6"/>
             <line x1="16" y1="2" x2="16" y2="6"/>
           </svg>
-          📅 Ciclos personalizados <span id="ciclos-count" style="margin-left:auto;color:var(--brand);font-weight:700">0</span>
+          📅 Ciclos personalizados <span id="ciclos-count" style="margin-left:auto;color:var(--brand-ink);font-weight:700">0</span>
         </summary>
         <div class="mt-3">
           <p class="text-[11px] mb-3" style="color:var(--ink-muted)">
@@ -1528,7 +1529,7 @@
           <div id="ciclos-custom-list" class="space-y-2 mb-3"></div>
 
           <div class="ciclo-custom-add">
-            <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--brand)">Agregar ciclo</p>
+            <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--brand-ink)">Agregar ciclo</p>
             <div class="grid grid-cols-3 gap-2">
               <div class="form-section">
                 <label class="form-label">Inicio</label>
@@ -1552,7 +1553,7 @@
       <div class="form-section">
         <label class="form-label">Color de la tarjeta</label>
         <div class="color-presets">
-          <label class="color-swatch" style="background:linear-gradient(135deg,#2dd4bf,#0d9488)"><input type="radio" name="color_quick" value="#2dd4bf" checked/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#C9A24E,#9A7B33)"><input type="radio" name="color_quick" value="#C9A24E" checked/></label>
           <label class="color-swatch" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)"><input type="radio" name="color_quick" value="#3b82f6"/></label>
           <label class="color-swatch" style="background:linear-gradient(135deg,#6366f1,#4338ca)"><input type="radio" name="color_quick" value="#6366f1"/></label>
           <label class="color-swatch" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)"><input type="radio" name="color_quick" value="#8b5cf6"/></label>
@@ -1560,7 +1561,7 @@
           <label class="color-swatch" style="background:linear-gradient(135deg,#f59e0b,#b45309)"><input type="radio" name="color_quick" value="#f59e0b"/></label>
           <label class="color-swatch" style="background:linear-gradient(135deg,#f43f5e,#be123c)"><input type="radio" name="color_quick" value="#f43f5e"/></label>
           <label class="color-swatch color-custom-wrap">
-            <input name="color" type="color" value="#2dd4bf" class="color-custom" id="ip-color" />
+            <input name="color" type="color" value="#C9A24E" class="color-custom" id="ip-color" />
           </label>
         </div>
       </div>
@@ -1711,7 +1712,7 @@
       </div>
       <button type="button" id="pc-close-x"
         style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
-        title="Cerrar">✕</button>
+        aria-label="Cerrar" title="Cerrar">✕</button>
     </div>
     <div class="form-modern-body">
       <!-- Sección USD (solo si el ciclo tiene consumos en dólares) -->
@@ -1763,7 +1764,7 @@
       </div>
       <button type="button" id="edc-close-x"
         style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
-        title="Cerrar">✕</button>
+        aria-label="Cerrar" title="Cerrar">✕</button>
     </div>
     <div class="form-modern-body">
       <p class="text-[11px] mb-2" style="color:var(--ink-muted)">
@@ -1820,7 +1821,7 @@
       </div>
       <button type="button" id="am-close-x"
         style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
-        title="Cerrar">✕</button>
+        aria-label="Cerrar" title="Cerrar">✕</button>
     </div>
     <div class="form-modern-body">
       <div class="form-section">
@@ -1856,7 +1857,7 @@
       </div>
       <button type="button" id="aj-close-x"
         style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
-        title="Cerrar">✕</button>
+        aria-label="Cerrar" title="Cerrar">✕</button>
     </div>
     <div class="form-modern-body">
       <div class="aj-saldo-actual">
@@ -2238,7 +2239,7 @@
       </div>
       <button type="button" id="salud-close-x"
         style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
-        title="Cerrar">✕</button>
+        aria-label="Cerrar" title="Cerrar">✕</button>
     </div>
     <div class="form-modern-body" id="salud-body" style="overflow-y:auto;overscroll-behavior:contain"></div>
     <div class="form-modern-footer">
@@ -2263,7 +2264,7 @@
       </div>
       <button type="button" id="ec-close-x"
         style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
-        title="Cerrar">✕</button>
+        aria-label="Cerrar" title="Cerrar">✕</button>
     </div>
     <div class="form-modern-body">
       <p class="text-[11px] mb-1" style="color:var(--ink-muted)">
@@ -2295,7 +2296,7 @@
       </div>
       <button type="button" id="docs-close-x"
         style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1"
-        title="Cerrar">✕</button>
+        aria-label="Cerrar" title="Cerrar">✕</button>
     </div>
 
     <div class="form-modern-body">
@@ -2395,7 +2396,7 @@
       <button type="button" id="rsb-close-x"
         style="margin-left:auto;background:transparent;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.1rem;padding:.25rem .4rem;border-radius:6px;line-height:1;transition:color .15s"
         onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--ink-muted)'"
-        title="Cerrar">✕</button>
+        aria-label="Cerrar" title="Cerrar">✕</button>
     </div>
 
     <!-- Paso 0: drop zone (acepta varios PDFs) -->
@@ -2438,7 +2439,7 @@
   <div class="widget-drawer" style="min-width:min(96vw,720px);max-width:720px">
 
     <!-- Header con tarjeta visual -->
-    <div class="widget-drawer-header" id="td-header" style="background:linear-gradient(135deg,#2dd4bfdd,#2dd4bf88)">
+    <div class="widget-drawer-header" id="td-header" style="background:linear-gradient(135deg,#C9A24Edd,#C9A24E88)">
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0 flex-1">
           <span class="widget-drawer-icon" style="background:rgba(255,255,255,0.18);box-shadow:0 0 12px rgba(255,255,255,0.2)">💳</span>
@@ -2447,7 +2448,7 @@
             <p class="text-[11px] truncate text-white/70" id="td-banco">—</p>
           </div>
         </div>
-        <button type="button" id="td-close" class="hd-close-btn" title="Cerrar">✕</button>
+        <button type="button" id="td-close" class="hd-close-btn" aria-label="Cerrar" title="Cerrar">✕</button>
       </div>
 
       <!-- KPIs -->
@@ -2521,11 +2522,11 @@
           </div>
           <div class="usd-amount-card">
             <span class="label">Cotización hoy</span>
-            <span class="value" style="color:var(--brand)" id="td-usd-cotiz-actual">$0</span>
+            <span class="value" style="color:var(--brand-ink)" id="td-usd-cotiz-actual">$0</span>
           </div>
           <div class="usd-amount-card">
             <span class="label">Equivale a</span>
-            <span class="value" style="color:var(--brand)" id="td-usd-equiv">$0</span>
+            <span class="value" style="color:var(--brand-ink)" id="td-usd-equiv">$0</span>
           </div>
         </div>
         <button type="button" id="td-close-period" class="btn-primary w-full text-sm">
@@ -2618,7 +2619,7 @@
             <p class="text-[11px] truncate" id="hd-subtitle" style="color:var(--ink-muted)">—</p>
           </div>
         </div>
-        <button type="button" id="hd-close" class="hd-close-btn" title="Cerrar">✕</button>
+        <button type="button" id="hd-close" class="hd-close-btn" aria-label="Cerrar" title="Cerrar">✕</button>
       </div>
 
       <!-- KPI mini strip -->
@@ -2680,7 +2681,7 @@
             <div id="hd-calendar-wrap" hidden>
               <div class="hd-cal-header">
                 <button type="button" id="hd-cal-prev" class="hd-cal-nav">‹</button>
-                <span id="hd-cal-month-label" class="ff-display text-sm font-semibold" style="color:var(--brand)">—</span>
+                <span id="hd-cal-month-label" class="ff-display text-sm font-semibold" style="color:var(--brand-ink)">—</span>
                 <button type="button" id="hd-cal-next" class="hd-cal-nav">›</button>
               </div>
               <div id="hd-cal-grid" class="hd-cal-grid">
@@ -2695,7 +2696,7 @@
               <div class="flex items-center gap-3 mt-2 text-xs px-1">
                 <div class="flex items-center gap-1.5">
                   <span class="hd-cal-legend-dot" style="background:var(--brand)"></span>
-                  <span style="color:var(--ink-2)">Desde: <b id="hd-cal-from-label" style="color:var(--brand)">—</b></span>
+                  <span style="color:var(--ink-2)">Desde: <b id="hd-cal-from-label" style="color:var(--brand-ink)">—</b></span>
                 </div>
                 <span style="color:var(--ink-muted)">→</span>
                 <div class="flex items-center gap-1.5">
@@ -2959,7 +2960,7 @@
           </div>
 
           <button type="button" id="btn-export-pdf" class="btn-secondary w-full text-sm mt-3"
-                  style="border-color:var(--brand);color:var(--brand)">
+                  style="border-color:var(--brand-ink);color:var(--brand-ink)">
             📄 Generar y descargar PDF
           </button>
         </fieldset>
@@ -3015,9 +3016,9 @@
             ¿Cómo configurarlo? (paso a paso)
           </summary>
           <div class="text-xs space-y-2 mt-3" style="color:var(--ink-2)">
-            <p><b style="color:var(--brand)">1.</b> Andá a <a href="https://github.com/new" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:underline">github.com/new</a> y creá un <b>repositorio privado</b> (ej: <code>finanzas-data</code>).</p>
-            <p><b style="color:var(--brand)">2.</b> Andá a <a href="https://github.com/settings/tokens/new?scopes=repo&description=finanzas-app" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:underline">github.com/settings/tokens/new</a> y generá un <b>token</b> con scope <code>repo</code>.</p>
-            <p><b style="color:var(--brand)">3.</b> Pegá el token y el nombre del repo abajo. La app sincroniza sola cada 5 min y al cerrar pestaña.</p>
+            <p><b style="color:var(--brand-ink)">1.</b> Andá a <a href="https://github.com/new" target="_blank" rel="noopener" style="color:var(--brand-ink);text-decoration:underline">github.com/new</a> y creá un <b>repositorio privado</b> (ej: <code>finanzas-data</code>).</p>
+            <p><b style="color:var(--brand-ink)">2.</b> Andá a <a href="https://github.com/settings/tokens/new?scopes=repo&description=finanzas-app" target="_blank" rel="noopener" style="color:var(--brand-ink);text-decoration:underline">github.com/settings/tokens/new</a> y generá un <b>token</b> con scope <code>repo</code>.</p>
+            <p><b style="color:var(--brand-ink)">3.</b> Pegá el token y el nombre del repo abajo. La app sincroniza sola cada 5 min y al cerrar pestaña.</p>
             <p style="color:var(--success)">✓ Tu PAT se guarda solo en este dispositivo, jamás se sube al repo.</p>
           </div>
         </details>

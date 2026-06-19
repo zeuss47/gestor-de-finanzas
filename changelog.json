@@ -1,6 +1,15 @@
 {
   "entradas": [
     {
+      "version": "2.3",
+      "fecha": "2026-06-19",
+      "items": [
+        "Nuevo diseño \"Instrumento\": identidad cálida (grafito + acento latón/oro) con los números en tipografía monoespaciada estilo ledger. Más distintivo y premium, en modo claro y oscuro.",
+        "Mejor contraste en modo claro (texto y acentos cumplen accesibilidad AA).",
+        "Accesibilidad: etiquetas en botones de ícono (sincronizar, ajustes, cerrar) y áreas táctiles más grandes en la navegación y los chips."
+      ]
+    },
+    {
       "version": "2.1",
       "fecha": "2026-06-19",
       "items": [
