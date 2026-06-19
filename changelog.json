@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.1",
+      "fecha": "2026-06-19",
+      "items": [
+        "Mejora interna: los estilos se separaron en base + escritorio + móvil (3 archivos), para poder mejorar cada modo sin afectar al otro",
+        "Sin cambios visibles: el diseño quedó verificado idéntico en escritorio, tablet y teléfono"
+      ]
+    },
+    {
       "version": "2.0",
       "fecha": "2026-06-19",
       "items": [

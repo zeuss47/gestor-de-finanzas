@@ -1,0 +1,42 @@
+/* ================================================================
+   Gestor de Finanzas — Estilos de MÓVIL (≤767px: teléfono)
+   Bottom-nav, una columna, drawers.
+   Se carga DESPUÉS de styles.css (base). Editá acá SOLO lo de este modo;
+   no puede afectar al otro porque cada bloque conserva su @media.
+   ================================================================ */
+
+@media (max-width: 767px) {
+  #sidebar,
+  #right-panel { display: none !important; }
+
+  #kpi-strip { display: none !important; }
+}
+
+@media (max-width: 640px) {
+  .form-modern .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+  /* Alinear el ancho del form interno al del dialog padre para evitar
+     overflow horizontal de 2px por estilos inline `min-width:96vw`. */
+  .form-modern {
+    min-width: min(94vw, 720px) !important;
+    max-width: 94vw !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .widget-resize-control,
+  .widget-resize-handle { display: none; }
+}
+
+@media (max-width: 767px) {
+  .hd-chart-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 520px) {
+  .rsb-mov-row {
+    grid-template-columns: auto 1fr auto;
+  }
+  .rsb-mov-badge { display: none; }
+  .rsb-mov-monto { font-size: .8rem; }
+}

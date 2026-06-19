@@ -29,6 +29,8 @@ const SHELL_FILES = [
   BASE + 'version.json',
   BASE + 'changelog.json',
   BASE + 'css/styles.css',
+  BASE + 'css/desktop.css',
+  BASE + 'css/mobile.css',
   BASE + 'css/tailwind.css',
   BASE + 'js/app.js',
   BASE + 'js/db.js',

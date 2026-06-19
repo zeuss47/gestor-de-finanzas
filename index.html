@@ -19,7 +19,12 @@
   <!-- Tailwind CSS — generado con CLI v3 (sin CDN, sin warning de producción) -->
   <link rel="stylesheet" href="./css/tailwind.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="./css/styles.css?v=1780003460" />
+  <!-- CSS en 3 capas: base compartida → escritorio → móvil.
+       Editá desktop.css o mobile.css por separado; cada uno conserva su @media
+       y NO puede romper el diseño del otro modo. -->
+  <link rel="stylesheet" href="./css/styles.css?v=1780003461" />
+  <link rel="stylesheet" href="./css/desktop.css?v=1780003461" />
+  <link rel="stylesheet" href="./css/mobile.css?v=1780003461" />
   <style>
     /* ── Preview de tarjeta (en dlg-tarjeta) ─────────────────────── */
     .card-preview-wrap {

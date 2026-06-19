@@ -1,0 +1,144 @@
+/* ================================================================
+   Gestor de Finanzas — Estilos de ESCRITORIO (≥768px: tablet + desktop)
+   Sidebar, 3 paneles, grillas anchas.
+   Se carga DESPUÉS de styles.css (base). Editá acá SOLO lo de este modo;
+   no puede afectar al otro porque cada bloque conserva su @media.
+   ================================================================ */
+
+@media (min-width: 1024px) {
+  body {
+    display: flex;
+    align-items: stretch;
+    padding-bottom: 0;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  #sidebar {
+    display: flex !important;
+    flex-direction: column;
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+  }
+
+  #main-area {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    height: 100dvh;
+  }
+
+  #right-panel {
+    display: flex !important;
+    flex-direction: column;
+    width: var(--right-panel-w);
+    flex-shrink: 0;
+  }
+
+  #kpi-strip { display: grid !important; }
+
+  /* #bottom-nav lo gobierna la base: #bottom-nav{display:grid!important} (styles.css).
+     En el archivo único esa regla base venía DESPUÉS y ganaba por orden, así que el
+     bottom-nav SÍ se mostraba en desktop. Conservamos ese comportamiento (no lo ocultamos
+     acá, sería un cambio visual). Solo ocultamos #qa-wrap, que sí estaba oculto. */
+  #qa-wrap   { display: none !important; }
+
+  body { padding-bottom: 0; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  #main-area {
+    flex: 1;
+    min-width: 0;
+  }
+
+  #main-widgets:not(.hidden) {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: minmax(80px, auto);
+    grid-auto-flow: row dense;
+    gap: 1rem;
+    padding: 1rem;
+    align-items: stretch;
+  }
+
+  /* Tablet: sm=2col, md=2col, lg=4col */
+  #main-widgets > .widget[data-size="sm"] { grid-column: span 2; }
+  #main-widgets > .widget[data-size="md"] { grid-column: span 2; }
+  #main-widgets > .widget[data-size="lg"] { grid-column: span 4; }
+
+  #sidebar,
+  #right-panel { display: none !important; }
+}
+
+@media (min-width: 1024px) {
+  .desktop-only { display: revert; }
+}
+
+@media (min-width: 1024px) {
+  .mobile-only { display: none; }
+}
+
+@media (min-width: 1024px) {
+  #main-widgets:not(.hidden) {
+    display: grid;
+    /* 6 columnas fijas. Cada widget puede ocupar 2/3/4/6 columnas. */
+    grid-template-columns: repeat(6, 1fr);
+    /* Filas se autogeneran con altura mínima coherente */
+    grid-auto-rows: minmax(80px, auto);
+    /* DENSE: rellena espacios vacíos con widgets siguientes que entren */
+    grid-auto-flow: row dense;
+    gap: 1rem;
+    max-width: none;
+    padding: 1.25rem;
+    align-items: stretch;
+  }
+
+  /* Default span por tamaño cuando NO hay estilo inline aplicado */
+  #main-widgets > .widget[data-size="sm"] { grid-column: span 2; }
+  #main-widgets > .widget[data-size="md"] { grid-column: span 3; }
+  #main-widgets > .widget[data-size="lg"] { grid-column: span 6; }
+
+  /* Sobrescribir reglas viejas para que data-size mande */
+  [data-widget="estado_global"],
+  [data-widget="grafico"],
+  [data-widget="flujo_mensual"],
+  [data-widget="resumen_anual"] {
+    grid-column: revert;
+  }
+
+  /* Historial a pantalla completa en desktop */
+  #section-movimientos:not(.hidden) {
+    display: block;
+    max-width: none;
+    padding: 0 1.25rem 2rem;
+  }
+  #section-movimientos .space-y-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: .75rem 1.25rem;
+    align-items: start;       /* cada bloque-día a su alto, sin estirarse */
+  }
+  #section-movimientos #mov-empty { grid-column: 1 / -1; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  #main-widgets:not(.hidden) {
+    display: grid;
+  }
+}
+
+@media (min-width: 700px) {
+  #dlg-settings { width: min(92vw, 700px) !important; }
+}
+
+@media (min-width: 1080px) {
+  #dlg-settings { width: 820px !important; }
+  #dlg-settings .settings-panel:not(.hidden) {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0 1.25rem; align-items: start;
+  }
+  #dlg-settings .settings-panel:not(.hidden) > fieldset { margin-bottom: 1rem; }
+  /* Elementos que deben ocupar todo el ancho igual */
+  #dlg-settings .settings-panel:not(.hidden) > .span-2 { grid-column: 1 / -1; }
+}
