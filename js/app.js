@@ -695,8 +695,8 @@ const AJUSTES_DEFAULT = {
   ui: {
     tema: 'auto',
     color_primario: '#2dd4bf',
-    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','conversor','comparador'],
-    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','conversor','comparador'],
+    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','comparador'],
+    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','comparador'],
     widgets_tamanos: {
       estado_global: 'lg',
       sueldo:        'lg',
@@ -712,8 +712,6 @@ const AJUSTES_DEFAULT = {
       flujo_mensual: 'lg',
       categorias:    'md',
       tipo_cambio:   'md',
-      calculadora:   'sm',
-      conversor:     'md',
       comparador:    'md',
     },
   },
@@ -799,10 +797,16 @@ async function loadAjustes() {
 async function _migrarWidgetsNuevos(aj) {
   if (!aj.ui || !Array.isArray(aj.ui.widgets_orden)) return;
   const nuevos = Object.keys(TPL).filter(k => !aj.ui.widgets_orden.includes(k));
-  if (!nuevos.length) return;
-  aj.ui.widgets_orden.push(...nuevos);
-  if (Array.isArray(aj.ui.widgets_visibles)) {
-    aj.ui.widgets_visibles.push(...nuevos.filter(k => !aj.ui.widgets_visibles.includes(k)));
+  // Podar widgets que ya NO son del grid (ej. calculadora/conversor pasaron al
+  // menú de Utilidades → se quitan del dashboard del usuario, sin duplicar).
+  const ordenPodado = aj.ui.widgets_orden.filter(k => TPL[k]);
+  const visPodado = Array.isArray(aj.ui.widgets_visibles) ? aj.ui.widgets_visibles.filter(k => TPL[k]) : null;
+  const cambioPoda = ordenPodado.length !== aj.ui.widgets_orden.length
+    || (visPodado && visPodado.length !== aj.ui.widgets_visibles.length);
+  if (!nuevos.length && !cambioPoda) return;
+  aj.ui.widgets_orden = [...ordenPodado, ...nuevos];
+  if (visPodado) {
+    aj.ui.widgets_visibles = [...visPodado, ...nuevos.filter(k => !visPodado.includes(k))];
   }
   try { await DB.put('ajustes', aj); } catch {}
 }
@@ -1119,8 +1123,6 @@ const RENDERERS = {
   flujo_mensual:      renderFlujoMensual,
   categorias:         renderCategorias,
   tipo_cambio:        renderTipoCambio,
-  calculadora:        renderCalculadora,
-  conversor:          renderConversor,
   comparador:         renderComparador,
   prediccion:         renderPrediccion,
   balance:            renderBalance,
@@ -1140,8 +1142,6 @@ const TPL = {
   flujo_mensual:      'tpl-widget-flujo_mensual',
   categorias:         'tpl-widget-categorias',
   tipo_cambio:        'tpl-widget-tipo_cambio',
-  calculadora:        'tpl-widget-calculadora',
-  conversor:          'tpl-widget-conversor',
   comparador:         'tpl-widget-comparador',
   prediccion:         'tpl-widget-prediccion',
   balance:            'tpl-widget-balance',
@@ -2734,6 +2734,31 @@ function renderConversor(el) {
   };
   el.querySelectorAll('input[type="number"]').forEach(i => i.oninput = compute);
   compute();
+}
+
+/* ============ Menú de Utilidades (drawer izquierdo, móvil) ============
+   Aloja la calculadora de split y el conversor de viaje. Se renderizan al
+   abrir (clonando sus templates) para tener instancias frescas cada vez. */
+function abrirUtilidades() {
+  const content = document.getElementById('utils-content');
+  if (content) {
+    content.innerHTML = '';
+    [['calculadora', renderCalculadora], ['conversor', renderConversor]].forEach(([id, fn]) => {
+      const tpl = document.getElementById('tpl-widget-' + id);
+      const art = tpl?.content?.firstElementChild?.cloneNode(true);
+      if (art) { content.appendChild(art); try { fn(art); } catch (e) { console.warn('util render', id, e); } }
+    });
+  }
+  document.getElementById('utils-overlay')?.classList.add('open');
+  const d = document.getElementById('utils-drawer');
+  if (d) { d.classList.add('open'); d.setAttribute('aria-hidden', 'false'); }
+  document.body.style.overflow = 'hidden';
+}
+function cerrarUtilidades() {
+  document.getElementById('utils-overlay')?.classList.remove('open');
+  const d = document.getElementById('utils-drawer');
+  if (d) { d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); }
+  document.body.style.overflow = '';
 }
 
 function renderComparador(el) {
@@ -7915,6 +7940,14 @@ async function init() {
   document.getElementById('btn-sync').onclick = doSync;
   document.getElementById('btn-settings').onclick = abrirSettings;
   document.getElementById('btn-notif-ask').onclick = () => Notif.pedirPermiso();
+
+  // Menú de Utilidades (drawer izquierdo)
+  document.getElementById('btn-utils')?.addEventListener('click', abrirUtilidades);
+  document.getElementById('utils-close')?.addEventListener('click', cerrarUtilidades);
+  document.getElementById('utils-overlay')?.addEventListener('click', cerrarUtilidades);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('utils-drawer')?.classList.contains('open')) cerrarUtilidades();
+  });
 
   document.querySelectorAll('[data-quick]').forEach(b => b.onclick = () => quickAction(b.dataset.quick));
 

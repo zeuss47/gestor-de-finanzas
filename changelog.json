@@ -1,6 +1,15 @@
 {
   "entradas": [
     {
+      "version": "2.0",
+      "fecha": "2026-06-19",
+      "items": [
+        "Nuevo menú de Utilidades: deslizá desde la izquierda (botón ☰ arriba) para abrirlo",
+        "La calculadora de gastos compartidos (Split) y el Conversor de viaje ahora viven en ese menú",
+        "Se quitaron del tablero principal para dejarlo más limpio (las encontrás en Utilidades)"
+      ]
+    },
+    {
       "version": "1.99",
       "fecha": "2026-06-19",
       "items": [

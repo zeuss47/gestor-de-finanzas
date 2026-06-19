@@ -360,7 +360,14 @@
   <header id="app-header">
     <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <!-- versión movida a Ajustes -->
+        <button id="btn-utils"
+                class="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                style="background:var(--surface-2);border:1px solid var(--border)"
+                aria-label="Utilidades" title="Utilidades">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
       </div>
       <div class="flex items-center gap-2">
         <button id="btn-sync"
@@ -3191,6 +3198,21 @@
 </dialog>
 
 <!-- ===== TOAST =============================================== -->
+<!-- ===== MENÚ DE UTILIDADES (drawer izquierdo) ===== -->
+<div id="utils-overlay" class="utils-overlay"></div>
+<aside id="utils-drawer" class="utils-drawer" aria-hidden="true" aria-label="Menú de utilidades">
+  <header class="utils-drawer-head">
+    <div class="flex items-center gap-2">
+      <span class="utils-drawer-ic" aria-hidden="true">🧰</span>
+      <h2 class="ff-display text-base font-bold tracking-tight">Utilidades</h2>
+    </div>
+    <button id="utils-close" class="utils-close" aria-label="Cerrar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </header>
+  <div id="utils-content" class="utils-content"></div>
+</aside>
+
 <div id="toast"></div>
 
 <!-- ===== NOTIFICACIÓN DE ACTUALIZACIÓN DISPONIBLE (auto-update OFF) ===== -->
