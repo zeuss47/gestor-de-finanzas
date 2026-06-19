@@ -745,7 +745,7 @@ const AJUSTES_DEFAULT = {
       { id: 'comida',       nombre: 'Comida',       icono: '🛒', color: '#10b981' },
       { id: 'combustible',  nombre: 'Combustible',  icono: '⛽', color: '#f59e0b' },
       { id: 'hogar',        nombre: 'Hogar',        icono: '🏠', color: '#a78bfa' },
-      { id: 'ocio',         nombre: 'Ocio',         icono: '🎬', color: '#ec4899' },
+      { id: 'ocio',         nombre: 'Ocio',         icono: '🎬', color: '#2563eb' },
       { id: 'restaurante',  nombre: 'Restaurante',  icono: '🍽', color: '#fb923c' },
       { id: 'salud',        nombre: 'Salud',        icono: '💊', color: '#f43f5e' },
       { id: 'ropa',         nombre: 'Ropa',         icono: '👗', color: '#c084fc' },
@@ -757,11 +757,11 @@ const AJUSTES_DEFAULT = {
     ],
     categorias_ingreso: [
       { id: 'sueldo',       nombre: 'Sueldo',       icono: '💼', color: '#10b981' },
-      { id: 'freelance',    nombre: 'Freelance',    icono: '💻', color: '#00f0ff' },
+      { id: 'freelance',    nombre: 'Freelance',    icono: '💻', color: '#2dd4bf' },
       { id: 'bonos',        nombre: 'Bonos',        icono: '🎁', color: '#facc15' },
       { id: 'inversiones',  nombre: 'Inversiones',  icono: '📈', color: '#a78bfa' },
       { id: 'alquiler',     nombre: 'Alquiler',     icono: '🏘', color: '#fb923c' },
-      { id: 'venta',        nombre: 'Venta',        icono: '🏷', color: '#ec4899' },
+      { id: 'venta',        nombre: 'Venta',        icono: '🏷', color: '#2563eb' },
       { id: 'otros',        nombre: 'Otros',        icono: '✨', color: '#94a3b8' },
     ],
     // Gastos habituales = contadores con valor fijo (ej: "Vianda" $5000).
@@ -851,7 +851,7 @@ const PALETA_SISTEMA = [
 function aplicarColoresPersonalizados(esClaro) {
   const custom = state.ajustes?.ui?.colores || {};
   const root = document.documentElement.style;
-  let brandVal = '#00f0ff', brand2Val = '#ff00ea';
+  let brandVal = '#2dd4bf', brand2Val = '#3b82f6';
   for (const c of PALETA_SISTEMA) {
     // legacy: color_primario sigue siendo el acento principal si no hay custom.brand
     const fallback = (c.id === 'brand' && state.ajustes?.ui?.color_primario) || (esClaro ? c.defLight : c.def);
@@ -2061,9 +2061,9 @@ const _balanceState = {
   chart: null,
 };
 const _BAL_SERIES = {
-  ingresos: { label: 'Ingresos', color: '#00ff9f', ckey: 'success' },
-  gastos:   { label: 'Gastos',   color: '#ff2d6e', ckey: 'danger' },
-  balance:  { label: 'Balance acumulado', color: '#00f0ff', ckey: 'brand' },
+  ingresos: { label: 'Ingresos', color: '#22c55e', ckey: 'success' },
+  gastos:   { label: 'Gastos',   color: '#f43f5e', ckey: 'danger' },
+  balance:  { label: 'Balance acumulado', color: '#2dd4bf', ckey: 'brand' },
 };
 
 function _balanceRango() {
@@ -3414,7 +3414,7 @@ function renderMovimientos() {
     const total = (i.sueldo_neto || 0) + (i.bonos || 0);
     return `
       <div class="mov-row-gasto" data-id="${i.id}" data-tipo="ingreso">
-        <div class="mov-row-icon" style="background:rgba(0,255,159,.1)">💰</div>
+        <div class="mov-row-icon" style="background:rgba(34,197,94,.1)">💰</div>
         <div class="mov-row-body">
           <div class="mov-row-desc">${escapeHtml(i.descripcion || 'Ingreso')}</div>
           <div class="mov-row-meta">
@@ -3422,7 +3422,7 @@ function renderMovimientos() {
             ${i.sueldo_bruto ? `<span>bruto ${FMT.format(i.sueldo_bruto)}</span>` : ''}
           </div>
           <div class="mov-row-meta" style="margin-top:.2rem">
-            <span class="mov-cat-badge" style="background:rgba(0,255,159,.1);color:var(--success);border-color:rgba(0,255,159,.25)">💰 Ingreso</span>
+            <span class="mov-cat-badge" style="background:rgba(34,197,94,.1);color:var(--success);border-color:rgba(34,197,94,.25)">💰 Ingreso</span>
           </div>
         </div>
         <div class="mov-row-right">
@@ -4173,7 +4173,7 @@ async function handleSubmitTarjeta(form) {
     limite_cuotas:  parseFloat(fd.get('limite_cuotas')||0),
     dia_cierre:     parseInt(fd.get('dia_cierre')),
     dia_vencimiento: parseInt(fd.get('dia_vencimiento')),
-    color: fd.get('color') || '#4f46e5',
+    color: fd.get('color') || '#0d9488',
     activa: base.activa !== false,
     ciclos_custom: Array.isArray(_ciclosCustomEditando) ? [..._ciclosCustomEditando] : (base.ciclos_custom || []),
   };
@@ -4196,7 +4196,7 @@ async function handleSubmitCuenta(form) {
     tipo: fd.get('tipo') || 'caja_ahorro',
     moneda: fd.get('moneda') || 'ARS',
     saldo_inicial: parseFloat(fd.get('saldo_inicial')) || 0,
-    color: fd.get('color') || '#00ff9f',
+    color: fd.get('color') || '#22c55e',
     activa: true,
   };
   await DB.put('cuentas', cuenta); notificarCambioLocal();
@@ -5258,7 +5258,7 @@ function abrirDrawerTarjeta(tarjetaId) {
   const capTarjeta = cap?.por_tarjeta?.find(p => p.tarjeta_id === tarjetaId);
 
   // Header con colores de la tarjeta (mismo gradiente premium)
-  const colorBase = tarjeta.color || '#00f0ff';
+  const colorBase = tarjeta.color || '#2dd4bf';
   const header = document.getElementById('td-header');
   if (header) header.style.background = _gradienteTarjeta(colorBase);
 
@@ -7011,11 +7011,11 @@ function _resolverColoresChart() {
     inkMuted:   get('--ink-muted',  esClaro ? '#64748b' : '#94a3b8'),
     grid:       'rgba(127,127,127,.18)',
     // Colores semánticos (siguen el acento custom y el tema)
-    success:    get('--success',    esClaro ? '#059669' : '#00ff9f'),
-    danger:     get('--danger',     esClaro ? '#dc2626' : '#ff2d6e'),
-    brand:      get('--brand',      esClaro ? '#4f46e5' : '#00f0ff'),
-    brand2:     get('--brand-2',    esClaro ? '#ec4899' : '#ff00ea'),
-    warning:    get('--warning',    esClaro ? '#d97706' : '#ffb800'),
+    success:    get('--success',    esClaro ? '#16a34a' : '#22c55e'),
+    danger:     get('--danger',     esClaro ? '#e11d48' : '#f43f5e'),
+    brand:      get('--brand',      esClaro ? '#0d9488' : '#2dd4bf'),
+    brand2:     get('--brand-2',    esClaro ? '#2563eb' : '#3b82f6'),
+    warning:    get('--warning',    esClaro ? '#d97706' : '#f59e0b'),
     tooltipBg:  esClaro ? 'rgba(255,255,255,0.96)' : 'rgba(13,16,33,0.96)',
   };
 }
@@ -7126,8 +7126,8 @@ const _widgetRenderers = {
     _hdRenderChartCustom({
       labels,
       datasets: [{
-        label: 'Neto cobrado', data, borderColor: '#00ff9f',
-        backgroundColor: 'rgba(0,255,159,.15)', tension: .3, fill: true,
+        label: 'Neto cobrado', data, borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,.15)', tension: .3, fill: true,
       }],
     });
     // Lista
@@ -7164,7 +7164,7 @@ const _widgetRenderers = {
       labels: cuentas.map(c => c.nombre || 'Cuenta'),
       datasets: [{
         label: 'Saldo', data: cuentas.map(c => Math.round(saldoCuenta(c))),
-        borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.2)',
+        borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,.2)',
         tension: 0, fill: true,
       }],
     });
@@ -7203,9 +7203,9 @@ const _widgetRenderers = {
       labels: tarjetas.map(t => t.nombre || 'Tarjeta'),
       datasets: [
         { label: 'Consumido', data: tarjetas.map(t => Math.round(consumoPorTarjeta(t))),
-          borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.2)', tension: 0, fill: true },
+          borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.2)', tension: 0, fill: true },
         { label: 'Límite',    data: tarjetas.map(t => Math.round(t.limite_credito||0)),
-          borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.05)', tension: 0, fill: false, borderDash:[5,5] },
+          borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,.05)', tension: 0, fill: false, borderDash:[5,5] },
       ],
     });
     const list = document.getElementById('hd-list');
@@ -7242,9 +7242,9 @@ const _widgetRenderers = {
       labels: metas.map(m => m.nombre || 'Meta'),
       datasets: [
         { label: 'Ahorrado', data: metas.map(m => Math.round(m.monto_actual||0)),
-          borderColor: '#00ff9f', backgroundColor: 'rgba(0,255,159,.25)', tension: 0, fill: true },
+          borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.25)', tension: 0, fill: true },
         { label: 'Objetivo', data: metas.map(m => Math.round(m.monto_objetivo||0)),
-          borderColor: '#b537ff', backgroundColor: 'rgba(181,55,255,.05)', tension: 0, fill: false, borderDash:[5,5] },
+          borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.05)', tension: 0, fill: false, borderDash:[5,5] },
       ],
     });
     const list = document.getElementById('hd-list');
@@ -7286,7 +7286,7 @@ const _widgetRenderers = {
       labels: sorted.slice(0, 10).map(([k]) => k),
       datasets: [{
         label: 'Gastado este mes', data: sorted.slice(0, 10).map(([,v]) => Math.round(v)),
-        borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.2)', tension: 0, fill: true,
+        borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.2)', tension: 0, fill: true,
       }],
     });
     const list = document.getElementById('hd-list');
@@ -7332,9 +7332,9 @@ const _widgetRenderers = {
       labels: filas.map(f => f.moneda),
       datasets: [
         { label: 'Compra', data: filas.map(f => f.compra),
-          borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.15)', tension: 0, fill: true },
+          borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,.15)', tension: 0, fill: true },
         { label: 'Venta',  data: filas.map(f => f.venta),
-          borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.15)', tension: 0, fill: true },
+          borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.15)', tension: 0, fill: true },
       ],
     });
     const list = document.getElementById('hd-list');
@@ -7375,7 +7375,7 @@ const _widgetRenderers = {
       labels: arr.map(([k]) => k),
       datasets: [{
         label: 'Alertas por tipo', data: arr.map(([,v]) => v),
-        borderColor: '#b537ff', backgroundColor: 'rgba(181,55,255,.2)', tension: 0, fill: true,
+        borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.2)', tension: 0, fill: true,
       }],
     });
     const list = document.getElementById('hd-list');
@@ -7421,7 +7421,7 @@ const _widgetRenderers = {
           Math.round(usado),
           Math.max(0, Math.round(disponible)),
         ],
-        borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,.25)', tension: 0, fill: true,
+        borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,.25)', tension: 0, fill: true,
       }],
     });
     const list = document.getElementById('hd-list');
@@ -7472,8 +7472,8 @@ const _widgetRenderers = {
     _hdRenderChartCustom({
       labels: Array(diasTotales).fill(0).map((_, i) => String(i+1)),
       datasets: [
-        { label: 'Real',       data: acumulado, borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.2)', tension: .3, fill: true },
-        { label: 'Proyectado', data: proyArr,   borderColor: '#b537ff', backgroundColor: 'transparent', borderDash:[5,5], tension: .3, fill: false },
+        { label: 'Real',       data: acumulado, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.2)', tension: .3, fill: true },
+        { label: 'Proyectado', data: proyArr,   borderColor: '#3b82f6', backgroundColor: 'transparent', borderDash:[5,5], tension: .3, fill: false },
       ],
     });
     const list = document.getElementById('hd-list');
@@ -7555,7 +7555,7 @@ const _widgetRenderers = {
         { label: 'Mes anterior', data: cats.map(c => Math.round(aM.get(c)||0)),
           borderColor: '#7a9bc2', backgroundColor: 'rgba(122,155,194,.2)', tension: 0, fill: true },
         { label: 'Este mes',     data: cats.map(c => Math.round(eM.get(c)||0)),
-          borderColor: '#ff2d6e', backgroundColor: 'rgba(255,45,110,.2)', tension: 0, fill: true },
+          borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.2)', tension: 0, fill: true },
       ],
     });
     const list = document.getElementById('hd-list');
@@ -8391,12 +8391,12 @@ async function init() {
   // Handlers de "+ Agregar" en tabs Catálogos/Cuentas
   document.getElementById('add-cat-gasto')?.addEventListener('click', () => {
     state.ajustes.catalogos = state.ajustes.catalogos || { categorias_gasto: [], categorias_ingreso: [] };
-    state.ajustes.catalogos.categorias_gasto.push({ id: '', nombre: 'Nueva', icono: '✨', color: '#00f0ff' });
+    state.ajustes.catalogos.categorias_gasto.push({ id: '', nombre: 'Nueva', icono: '✨', color: '#2dd4bf' });
     renderCatalogoSettings('gasto');
   });
   document.getElementById('add-cat-ingreso')?.addEventListener('click', () => {
     state.ajustes.catalogos = state.ajustes.catalogos || { categorias_gasto: [], categorias_ingreso: [] };
-    state.ajustes.catalogos.categorias_ingreso.push({ id: '', nombre: 'Nuevo', icono: '✨', color: '#00ff9f' });
+    state.ajustes.catalogos.categorias_ingreso.push({ id: '', nombre: 'Nuevo', icono: '✨', color: '#22c55e' });
     renderCatalogoSettings('ingreso');
   });
   document.getElementById('add-cuenta-btn')?.addEventListener('click', () => {
@@ -8409,7 +8409,7 @@ async function init() {
   document.getElementById('add-habitual')?.addEventListener('click', () => {
     state.ajustes.catalogos = state.ajustes.catalogos || {};
     if (!Array.isArray(state.ajustes.catalogos.habituales)) state.ajustes.catalogos.habituales = [];
-    state.ajustes.catalogos.habituales.push({ id: 'hab_' + Date.now(), nombre: 'Nuevo', icono: '🔁', color: '#00f0ff', valor: 1000, categoria: 'general', cuenta_id: null });
+    state.ajustes.catalogos.habituales.push({ id: 'hab_' + Date.now(), nombre: 'Nuevo', icono: '🔁', color: '#2dd4bf', valor: 1000, categoria: 'general', cuenta_id: null });
     renderHabitualesSettings();
   });
   // Buscar actualizaciones manualmente
@@ -8496,7 +8496,7 @@ function mostrarPickerEmojiHabitual(idx) {
 function mostrarPickerColorHabitual(idx) {
   const h = state.ajustes.catalogos.habituales[idx];
   const inp = document.createElement('input');
-  inp.type = 'color'; inp.value = h.color || '#00f0ff';
+  inp.type = 'color'; inp.value = h.color || '#2dd4bf';
   inp.style.cssText = 'position:fixed;left:-9999px';
   document.body.appendChild(inp);
   inp.addEventListener('input', () => { h.color = inp.value; });
@@ -8527,13 +8527,13 @@ const EMOJI_POOL = Object.values(EMOJI_CATEGORIES).flat();
 // Paleta extendida de colores neón + tradicionales
 const COLOR_POOL = [
   // Cyberpunk neón
-  '#00f0ff','#ff00ea','#39ff14','#ffea00','#ff2d92','#b537ff','#00ff9f','#ff2d6e',
+  '#2dd4bf','#3b82f6','#22c55e','#38bdf8','#f43f5e','#3b82f6','#22c55e','#f43f5e',
   // Vibrantes
-  '#10b981','#f59e0b','#a78bfa','#ec4899','#fb923c','#f43f5e','#c084fc','#38bdf8',
+  '#10b981','#f59e0b','#a78bfa','#2563eb','#fb923c','#f43f5e','#c084fc','#38bdf8',
   // Suaves
   '#facc15','#f87171','#22d3ee','#94a3b8','#84cc16','#06b6d4','#fde047','#fda4af',
   // Profundos
-  '#0ea5e9','#7c3aed','#db2777','#dc2626','#ea580c','#65a30d','#0d9488','#1e40af',
+  '#0ea5e9','#7c3aed','#db2777','#e11d48','#ea580c','#65a30d','#0d9488','#1e40af',
   // Neutros
   '#64748b','#475569','#334155','#1e293b',
 ];
@@ -8928,7 +8928,7 @@ async function editarCuenta(id) {
   if (form.elements.nombre)        form.elements.nombre.value = c.nombre || '';
   if (form.elements.banco)         form.elements.banco.value = c.banco || '';
   if (form.elements.saldo_inicial) form.elements.saldo_inicial.value = c.saldo_inicial || 0;
-  if (form.elements.color)         form.elements.color.value = c.color || '#00ff9f';
+  if (form.elements.color)         form.elements.color.value = c.color || '#22c55e';
   if (form.elements.moneda)        form.elements.moneda.value = c.moneda || 'ARS';
   const radioTipo = form.querySelector(`input[name="tipo"][value="${c.tipo}"]`);
   if (radioTipo) radioTipo.checked = true;
@@ -8983,7 +8983,7 @@ async function editarTarjeta(id) {
   if (form.elements.limite_cuotas)   form.elements.limite_cuotas.value = t.limite_cuotas || 0;
   if (form.elements.dia_cierre)      form.elements.dia_cierre.value = t.dia_cierre || 15;
   if (form.elements.dia_vencimiento) form.elements.dia_vencimiento.value = t.dia_vencimiento || 5;
-  if (form.elements.color)           form.elements.color.value = t.color || '#00f0ff';
+  if (form.elements.color)           form.elements.color.value = t.color || '#2dd4bf';
   // Refrescar la preview y el visualizador del ciclo
   setTimeout(() => {
     if (typeof updateCardPreview === 'function')  updateCardPreview();
@@ -9204,7 +9204,7 @@ function updateCardPreview() {
   const num    = f.elements.ultimos_4?.value || '';
   const cierre = f.elements.dia_cierre?.value || '—';
   const venc   = f.elements.dia_vencimiento?.value || '—';
-  const color  = f.elements.color?.value || '#00f0ff';
+  const color  = f.elements.color?.value || '#2dd4bf';
 
   const cpName = document.getElementById('cp-nombre');
   const cpBank = document.getElementById('cp-bank');

@@ -38,7 +38,7 @@
       box-shadow:
         0 12px 32px rgba(0,0,0,.5),
         0 0 0 1px rgba(255,255,255,.1) inset,
-        0 0 40px rgba(0,240,255,.2);
+        0 0 40px color-mix(in srgb, var(--brand) 16%, transparent);
       overflow: hidden;
       transition: background .3s ease, box-shadow .3s ease;
     }
@@ -226,7 +226,7 @@
       box-shadow: 0 0 16px currentColor;
     }
     .color-custom-wrap {
-      background: linear-gradient(45deg,#ff00ea,#00f0ff,#39ff14);
+      background: linear-gradient(135deg,#2dd4bf,#3b82f6,#8b5cf6);
       display: flex; align-items: center; justify-content: center;
     }
     .color-custom {
@@ -859,7 +859,7 @@
         <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Saldo actual</p>
         <p class="ff-display font-bold text-sm mt-0.5" data-bind="pred-actual">$0</p>
       </div>
-      <div class="p-2.5 rounded-xl" style="background:linear-gradient(135deg,rgba(0,240,255,0.12),rgba(255,0,234,0.05));border:1px solid var(--brand)">
+      <div class="p-2.5 rounded-xl" style="background:linear-gradient(135deg,color-mix(in srgb,var(--brand) 12%,transparent),color-mix(in srgb,var(--brand-2) 6%,transparent));border:1px solid var(--brand)">
         <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Proyectado</p>
         <p class="ff-display font-bold text-sm mt-0.5 text-glow-cyan" data-bind="pred-futuro">$0</p>
       </div>
@@ -1312,7 +1312,7 @@
       <!-- Preview visual de la tarjeta -->
       <div class="card-preview-wrap">
         <div class="card-preview" id="card-preview"
-             style="background:linear-gradient(135deg,#00f0ffdd,#00f0ff88)">
+             style="background:linear-gradient(135deg,#2dd4bfdd,#2dd4bf88)">
           <div class="card-preview-chip">
             <svg viewBox="0 0 32 24" fill="none">
               <rect x="0" y="0" width="32" height="24" rx="3" fill="rgba(255,255,255,0.25)"/>
@@ -1479,15 +1479,15 @@
       <div class="form-section">
         <label class="form-label">Color de la tarjeta</label>
         <div class="color-presets">
-          <label class="color-swatch" style="background:linear-gradient(135deg,#00f0ff,#0099cc)"><input type="radio" name="color_quick" value="#00f0ff" checked/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#ff00ea,#a300cc)"><input type="radio" name="color_quick" value="#ff00ea"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#b537ff,#7700cc)"><input type="radio" name="color_quick" value="#b537ff"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#39ff14,#00cc55)"><input type="radio" name="color_quick" value="#39ff14"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#ffea00,#cc9900)"><input type="radio" name="color_quick" value="#ffea00"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#ff2d6e,#cc0044)"><input type="radio" name="color_quick" value="#ff2d6e"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#1a1a2e,#0f0f1e)"><input type="radio" name="color_quick" value="#1a1a2e"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#2dd4bf,#0d9488)"><input type="radio" name="color_quick" value="#2dd4bf" checked/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)"><input type="radio" name="color_quick" value="#3b82f6"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#6366f1,#4338ca)"><input type="radio" name="color_quick" value="#6366f1"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)"><input type="radio" name="color_quick" value="#8b5cf6"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#22c55e,#15803d)"><input type="radio" name="color_quick" value="#22c55e"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#f59e0b,#b45309)"><input type="radio" name="color_quick" value="#f59e0b"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#f43f5e,#be123c)"><input type="radio" name="color_quick" value="#f43f5e"/></label>
           <label class="color-swatch color-custom-wrap">
-            <input name="color" type="color" value="#00f0ff" class="color-custom" id="ip-color" />
+            <input name="color" type="color" value="#2dd4bf" class="color-custom" id="ip-color" />
           </label>
         </div>
       </div>
@@ -1595,15 +1595,15 @@
       <div class="form-section">
         <label class="form-label">Color</label>
         <div class="color-presets">
-          <label class="color-swatch" style="background:linear-gradient(135deg,#00ff9f,#00cc7a)"><input type="radio" name="color_quick" value="#00ff9f" checked/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#00f0ff,#0099cc)"><input type="radio" name="color_quick" value="#00f0ff"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#ff00ea,#a300cc)"><input type="radio" name="color_quick" value="#ff00ea"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#ffea00,#cc9900)"><input type="radio" name="color_quick" value="#ffea00"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#b537ff,#7700cc)"><input type="radio" name="color_quick" value="#b537ff"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#ff2d6e,#cc0044)"><input type="radio" name="color_quick" value="#ff2d6e"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#fb923c,#ea580c)"><input type="radio" name="color_quick" value="#fb923c"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#22c55e,#15803d)"><input type="radio" name="color_quick" value="#22c55e" checked/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#2dd4bf,#0d9488)"><input type="radio" name="color_quick" value="#2dd4bf"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)"><input type="radio" name="color_quick" value="#3b82f6"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#6366f1,#4338ca)"><input type="radio" name="color_quick" value="#6366f1"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#f59e0b,#b45309)"><input type="radio" name="color_quick" value="#f59e0b"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#f43f5e,#be123c)"><input type="radio" name="color_quick" value="#f43f5e"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)"><input type="radio" name="color_quick" value="#0ea5e9"/></label>
           <label class="color-swatch color-custom-wrap">
-            <input name="color" type="color" value="#00ff9f" class="color-custom" />
+            <input name="color" type="color" value="#22c55e" class="color-custom" />
           </label>
         </div>
       </div>
@@ -2365,7 +2365,7 @@
   <div class="widget-drawer" style="min-width:min(96vw,720px);max-width:720px">
 
     <!-- Header con tarjeta visual -->
-    <div class="widget-drawer-header" id="td-header" style="background:linear-gradient(135deg,#00f0ffdd,#00f0ff88)">
+    <div class="widget-drawer-header" id="td-header" style="background:linear-gradient(135deg,#2dd4bfdd,#2dd4bf88)">
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0 flex-1">
           <span class="widget-drawer-icon" style="background:rgba(255,255,255,0.18);box-shadow:0 0 12px rgba(255,255,255,0.2)">💳</span>
