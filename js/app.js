@@ -694,7 +694,7 @@ const AJUSTES_DEFAULT = {
   notificaciones: { habilitadas: true, alertas_tarjeta_dias: [5,2,1], confirmar_movimientos: true, alertas_ia: true },
   ui: {
     tema: 'auto',
-    color_primario: '#4f46e5',
+    color_primario: '#2dd4bf',
     widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
     widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
     widgets_tamanos: {
@@ -825,7 +825,7 @@ function aplicarTema() {
   const esClaro = tema === 'claro' || (tema === 'auto' && !matchMedia('(prefers-color-scheme: dark)').matches);
   html.classList.toggle('light', esClaro);
   aplicarColoresPersonalizados(esClaro);
-  document.getElementById('meta-theme')?.setAttribute('content', esClaro ? '#f0f4ff' : '#07090f');
+  document.getElementById('meta-theme')?.setAttribute('content', esClaro ? '#f6f8fb' : '#020617');
 }
 
 /* ============ Sistema de colores personalizable ============
@@ -833,17 +833,17 @@ function aplicarTema() {
    color con su valor por defecto (oscuro/claro) y las variables CSS que afecta.
    `bg`/`soft`/`-2` se DERIVAN del color base para mantener coherencia.        */
 const PALETA_SISTEMA = [
-  { id: 'brand',   nombre: 'Acento principal',  desc: 'Botones, links, resaltados', def: '#00f0ff', defLight: '#4f46e5',
-    vars: c => ({ '--brand': c, '--brand-glow': c + '88', '--brand-soft': c + '26', '--info': c, '--info-bg': c + '1a' }) },
-  { id: 'brand2',  nombre: 'Acento secundario', desc: 'Gradientes, segundo neón',   def: '#ff00ea', defLight: '#ec4899',
+  { id: 'brand',   nombre: 'Acento principal',  desc: 'Botones, links, resaltados', def: '#2dd4bf', defLight: '#0d9488',
+    vars: c => ({ '--brand': c, '--brand-glow': c + '3a', '--brand-soft': c + '20', '--info': c, '--info-bg': c + '1a' }) },
+  { id: 'brand2',  nombre: 'Acento secundario', desc: 'Gradientes (FAB, botones)',  def: '#3b82f6', defLight: '#2563eb',
     vars: c => ({ '--brand-2': c, '--neon-pink': c }) },
-  { id: 'brand3',  nombre: 'Acento terciario',  desc: 'Detalles, badges',           def: '#ffea00', defLight: '#f59e0b',
+  { id: 'brand3',  nombre: 'Acento terciario',  desc: 'Detalles, badges',           def: '#38bdf8', defLight: '#0284c7',
     vars: c => ({ '--brand-3': c }) },
-  { id: 'success', nombre: 'Éxito / Ingresos',  desc: 'Saldos positivos, ingresos', def: '#00ff9f', defLight: '#059669',
+  { id: 'success', nombre: 'Éxito / Ingresos',  desc: 'Saldos positivos, ingresos', def: '#22c55e', defLight: '#16a34a',
     vars: c => ({ '--success': c, '--success-2': _ajustarLuminancia(c, 1.3), '--success-bg': c + '1a', '--neon-green': c }) },
-  { id: 'danger',  nombre: 'Peligro / Gastos',  desc: 'Gastos, alertas, eliminar',  def: '#ff2d6e', defLight: '#dc2626',
+  { id: 'danger',  nombre: 'Peligro / Gastos',  desc: 'Gastos, alertas, eliminar',  def: '#f43f5e', defLight: '#e11d48',
     vars: c => ({ '--danger': c, '--danger-2': _ajustarLuminancia(c, 1.3), '--danger-bg': c + '1a' }) },
-  { id: 'warning', nombre: 'Advertencia',       desc: 'Avisos, vencimientos',       def: '#ffb800', defLight: '#d97706',
+  { id: 'warning', nombre: 'Advertencia',       desc: 'Avisos, vencimientos',       def: '#f59e0b', defLight: '#d97706',
     vars: c => ({ '--warning': c, '--warning-2': _ajustarLuminancia(c, 1.3), '--warning-bg': c + '1a' }) },
 ];
 
@@ -863,8 +863,8 @@ function aplicarColoresPersonalizados(esClaro) {
   }
   // Glows decorativos del fondo, derivados del acento (adaptan al color y al
   // tema: más sutiles en claro para que no ensucien el fondo blanco).
-  const aG = esClaro ? '14' : '26';   // alpha radial 1 (hex)
-  const bG = esClaro ? '0d' : '18';   // alpha radial 2
+  const aG = esClaro ? '0d' : '12';   // alpha radial 1 (hex) — glow sutil (OLED)
+  const bG = esClaro ? '08' : '0d';   // alpha radial 2
   root.setProperty('--bg-glow-a', brandVal  + aG);
   root.setProperty('--bg-glow-b', brand2Val + bG);
   root.setProperty('--bg-grid',   brandVal  + (esClaro ? '08' : '06'));

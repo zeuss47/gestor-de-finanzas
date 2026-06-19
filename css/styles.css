@@ -3,43 +3,59 @@
    Dark-first · Glassmorphism · 3-Panel Layout · Responsive
    ================================================================ */
 
-/* ── Tokens ─────────────────────────────────────────────────── */
+/* ── Tokens — Banca profesional (Dark OLED slate) ───────────────
+   Paleta sobria de fintech: base slate casi negra, acento teal/azul
+   contenido, verde para positivos, glow mínimo. Los nombres de
+   variables se conservan (cascada a toda la app sin romper nada). */
 :root {
-  --bg:          #050614;             /* azul-negro profundo */
-  --bg-2:        #0a0e25;
-  --bg-3:        #0f1535;
-  --surface:     rgba(0, 240, 255, 0.025);
-  --surface-2:   rgba(0, 240, 255, 0.055);
-  --surface-3:   rgba(0, 240, 255, 0.1);
-  --border:      rgba(0, 240, 255, 0.12);
-  --border-2:    rgba(0, 240, 255, 0.28);
+  --bg:          #020617;             /* slate-950, OLED */
+  --bg-2:        #0a1120;
+  --bg-3:        #111c30;
+  /* Superficies NEUTRAS (antes tintadas de cyan → leían "gamer") */
+  --surface:     rgba(255, 255, 255, 0.025);
+  --surface-2:   rgba(255, 255, 255, 0.045);
+  --surface-3:   rgba(255, 255, 255, 0.075);
+  --border:      rgba(148, 163, 184, 0.14);   /* slate hairline */
+  --border-2:    rgba(148, 163, 184, 0.26);
 
-  /* Acentos neón cyberpunk */
-  --brand:       #00f0ff;             /* cyan eléctrico */
-  --brand-2:     #ff00ea;             /* magenta neón */
-  --brand-3:     #ffea00;             /* amarillo neón secundario */
-  --brand-soft:  rgba(0, 240, 255, 0.15);
-  --brand-glow:  rgba(0, 240, 255, 0.5);
+  /* Acento sobrio: teal → azul (banca). Sin neón. */
+  --brand:       #2dd4bf;             /* teal-400 */
+  --brand-2:     #3b82f6;             /* blue-500 (gradientes) */
+  --brand-3:     #38bdf8;             /* sky-400 (secundario) */
+  --brand-soft:  rgba(45, 212, 191, 0.12);
+  --brand-glow:  rgba(45, 212, 191, 0.22);    /* glow contenido */
 
-  --neon-pink:   #ff2d92;
-  --neon-purple: #b537ff;
-  --neon-green:  #39ff14;
+  /* Compat: nombres viejos apuntan al sistema sobrio */
+  --neon-pink:   #fb7185;
+  --neon-purple: #818cf8;
+  --neon-green:  #34d399;
 
-  --ink:         #e8f5ff;
-  --ink-2:       #7a9bc2;
-  --ink-muted:   #4a6789;
+  --ink:         #f1f5f9;             /* slate-100 */
+  --ink-2:       #cbd5e1;             /* slate-300 (contraste alto) */
+  --ink-muted:   #94a3b8;             /* slate-400 (cumple 4.5:1) */
 
-  --success:     #00ff9f;
-  --success-2:   #5cffb8;
-  --success-bg:  rgba(0, 255, 159, 0.1);
-  --danger:      #ff2d6e;
-  --danger-2:    #ff5a8f;
-  --danger-bg:   rgba(255, 45, 110, 0.1);
-  --warning:     #ffb800;
-  --warning-2:   #ffd33f;
-  --warning-bg:  rgba(255, 184, 0, 0.1);
-  --info:        #00d4ff;
-  --info-bg:     rgba(0, 212, 255, 0.1);
+  --success:     #22c55e;             /* green-500 */
+  --success-2:   #4ade80;
+  --success-bg:  rgba(34, 197, 94, 0.12);
+  --danger:      #f43f5e;             /* rose-500 */
+  --danger-2:    #fb7185;
+  --danger-bg:   rgba(244, 63, 94, 0.12);
+  --warning:     #f59e0b;             /* amber-500 */
+  --warning-2:   #fbbf24;
+  --warning-bg:  rgba(245, 158, 11, 0.12);
+  --info:        #38bdf8;
+  --info-bg:     rgba(56, 189, 248, 0.12);
+
+  /* Glow de fondo casi imperceptible (OLED, low white emission) */
+  --bg-glow-a:   rgba(45, 212, 191, 0.06);
+  --bg-glow-b:   rgba(59, 130, 246, 0.05);
+
+  /* Sistema de SOMBRAS en capas (profundidad profesional) */
+  --shadow-sm:   0 1px 2px rgba(0,0,0,.35), 0 1px 1px rgba(0,0,0,.25);
+  --shadow-md:   0 4px 12px -2px rgba(0,0,0,.45), 0 2px 6px -2px rgba(0,0,0,.35);
+  --shadow-lg:   0 16px 36px -10px rgba(0,0,0,.6), 0 6px 14px -6px rgba(0,0,0,.45);
+  --shadow-pop:  0 24px 60px -16px rgba(0,0,0,.7);
+  --ring:        0 0 0 3px color-mix(in srgb, var(--brand) 35%, transparent);
 
   --r-sm:  10px;
   --r:     16px;
@@ -48,24 +64,43 @@
 
   --sidebar-w:      260px;
   --right-panel-w:  300px;
-  --transition-micro:  150ms ease;
-  --transition-widget: 300ms cubic-bezier(.16,1,.3,1);
-  --transition-enter:  380ms cubic-bezier(.16,1,.3,1);
+  /* Motion: easing estándar (calmo) + spring sutil para entradas */
+  --ease-std:   cubic-bezier(.2, 0, 0, 1);
+  --ease-spring: cubic-bezier(.34, 1.4, .5, 1);
+  --transition-micro:  140ms var(--ease-std);
+  --transition-widget: 280ms var(--ease-std);
+  --transition-enter:  360ms var(--ease-std);
 }
 
-/* Light mode */
+/* Light mode — profesional, crisp (no pastel) */
 html.light {
-  --bg:        #f0f4ff;
-  --bg-2:      #e8eeff;
-  --bg-3:      #dce4ff;
-  --surface:   rgba(255,255,255,0.75);
-  --surface-2: rgba(255,255,255,0.92);
-  --surface-3: rgba(255,255,255,1);
-  --border:    rgba(0,0,0,0.07);
-  --border-2:  rgba(0,0,0,0.13);
-  --ink:       #0f172a;
-  --ink-2:     #334155;
-  --ink-muted: #64748b;
+  --bg:        #f6f8fb;               /* slate-50 cálido */
+  --bg-2:      #eef2f7;
+  --bg-3:      #e3e9f1;
+  --surface:   #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #f8fafc;
+  --border:    rgba(15, 23, 42, 0.09);
+  --border-2:  rgba(15, 23, 42, 0.16);
+  --ink:       #0f172a;               /* slate-900 */
+  --ink-2:     #334155;               /* slate-700 */
+  --ink-muted: #64748b;               /* slate-500 (4.5:1) */
+
+  --brand:      #0d9488;              /* teal-600 (contraste sobre blanco) */
+  --brand-2:    #2563eb;              /* blue-600 */
+  --brand-soft: rgba(13, 148, 136, 0.10);
+  --brand-glow: rgba(13, 148, 136, 0.16);
+  --success:    #16a34a;
+  --danger:     #e11d48;
+  --warning:    #d97706;
+
+  --bg-glow-a:  rgba(13, 148, 136, 0.05);
+  --bg-glow-b:  rgba(37, 99, 235, 0.04);
+
+  --shadow-sm:  0 1px 2px rgba(15,23,42,.06), 0 1px 1px rgba(15,23,42,.04);
+  --shadow-md:  0 4px 14px -3px rgba(15,23,42,.10), 0 2px 6px -2px rgba(15,23,42,.06);
+  --shadow-lg:  0 18px 40px -12px rgba(15,23,42,.16), 0 6px 14px -6px rgba(15,23,42,.08);
+  --shadow-pop: 0 28px 64px -18px rgba(15,23,42,.22);
 }
 
 /* ── Reset & Base ────────────────────────────────────────────── */
@@ -262,15 +297,16 @@ body { overflow-x: clip; }
 }
 
 .kpi-card {
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.04), rgba(255, 0, 234, 0.02));
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: linear-gradient(160deg, rgba(255,255,255,.04), rgba(255,255,255,.012)), var(--bg-2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: .85rem 1rem;
   position: relative;
   overflow: hidden;
-  transition: all .25s ease;
+  box-shadow: var(--shadow-sm);
+  transition: transform .25s var(--ease-std), box-shadow .25s var(--ease-std), border-color .25s var(--ease-std);
 }
 .kpi-card::after {
   content: '';
@@ -284,10 +320,7 @@ body { overflow-x: clip; }
 .kpi-card:hover {
   border-color: var(--border-2);
   transform: translateY(-3px);
-  /* Sombra negra contenida + glow interno, sin desborde radial */
-  box-shadow:
-    0 12px 24px -8px rgba(0, 0, 0, 0.6),
-    inset 0 0 20px -6px rgba(0, 240, 255, 0.25);
+  box-shadow: var(--shadow-lg);
   z-index: 3;
   will-change: transform;
 }
@@ -330,7 +363,7 @@ body { overflow-x: clip; }
   background: linear-gradient(90deg, var(--brand-soft), transparent);
   color: var(--brand);
   position: relative;
-  text-shadow: 0 0 6px rgba(0, 240, 255, 0.3);
+  text-shadow: none;
 }
 .sidebar-nav-item.active::before {
   content: '';
@@ -453,44 +486,39 @@ body { overflow-x: clip; }
 
 /* ── Cards / Glass ───────────────────────────────────────────── */
 .card-glass {
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.035), rgba(255, 0, 234, 0.02));
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  /* Panel sobrio elevado: superficie casi sólida + sombra en capas.
+     Antes era glass tintado de cyan/magenta (look "gamer"). */
+  background:
+    linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
+    var(--bg-2);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
   border: 1px solid var(--border);
   border-radius: var(--r);
   position: relative;
-  transition: border-color .25s ease, box-shadow .25s ease, transform .25s ease;
+  box-shadow: var(--shadow-md);
+  transition: border-color .25s var(--ease-std), box-shadow .25s var(--ease-std), transform .25s var(--ease-std);
   overflow: hidden;
 }
+/* Sutil brillo superior (1px) — da volumen sin neón */
 .card-glass::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, transparent 30%, var(--brand) 50%, transparent 70%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity .3s ease;
+  inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);
   pointer-events: none;
 }
 .card-glass:hover {
   border-color: var(--border-2);
-  /* Sombra contenida — sin spread radial que desborde a vecinos */
-  box-shadow:
-    0 0 0 1px rgba(0, 240, 255, 0.10),
-    0 8px 20px -8px rgba(0, 0, 0, 0.45),
-    inset 0 0 16px -8px rgba(0, 240, 255, 0.10);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-2px);
-  /* Elevar sobre vecinos sin afectarlos */
   z-index: 3;
-  /* Crear capa de composición para repaint aislado */
   will-change: transform;
 }
-.card-glass:hover::before { opacity: 1; }
+html.light .card-glass {
+  background: var(--surface);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
 
 /* ── Inputs ──────────────────────────────────────────────────── */
 .input {
@@ -509,10 +537,8 @@ body { overflow-x: clip; }
 }
 .input:focus {
   border-color: var(--brand);
-  box-shadow:
-    0 0 0 3px rgba(0, 240, 255, 0.15),
-    0 0 16px rgba(0, 240, 255, 0.3);
-  background: rgba(0, 240, 255, 0.04);
+  box-shadow: var(--ring);
+  background: var(--surface-3);
 }
 .input::placeholder { color: var(--ink-muted); }
 select.input {
@@ -529,21 +555,17 @@ select.input {
   /* Gradiente y sombras atados al color de acento personalizable (--brand /
      --brand-2 / --brand-glow / --brand-soft los setea aplicarColoresPersonalizados). */
   background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
-  color: #001f24;
+  color: #04121a;
   font-weight: 700;
-  font-size: .85rem;
+  font-size: .82rem;
   font-family: inherit;
   border: none;
   cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  letter-spacing: .01em;
   position: relative;
   overflow: hidden;
-  box-shadow:
-    0 0 0 1px var(--brand-soft),
-    0 4px 16px var(--brand-soft),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  transition: all .2s ease;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform .18s var(--ease-std), box-shadow .18s var(--ease-std), filter .18s var(--ease-std);
 }
 .btn-primary::before {
   content: '';
@@ -555,10 +577,8 @@ select.input {
 }
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow:
-    0 0 0 1px var(--brand),
-    0 6px 20px var(--brand-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  filter: brightness(1.05);
+  box-shadow: var(--shadow-md), 0 6px 18px -6px var(--brand-glow), inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 .btn-primary:hover::before { left: 100%; }
 .btn-primary:active { transform: translateY(0) scale(.97); }
@@ -577,6 +597,23 @@ select.input {
 }
 .btn-secondary:hover  { background: var(--surface-3); border-color: var(--border-2); }
 .btn-secondary:active { transform: scale(.97); }
+
+/* ── Accesibilidad: foco visible para teclado (no en click de mouse) ── */
+:where(button, a, input, select, textarea, [tabindex], [role="button"]):focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--r-sm);
+}
+
+/* ── Respetar prefers-reduced-motion (CRÍTICO, banca accesible) ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ── Bottom nav ──────────────────────────────────────────────── */
 #bottom-nav {
@@ -1599,7 +1636,8 @@ html.light #app-header { background: rgba(240,244,255,0.8); }
   97%      { opacity: 0.92; }
   98.5%    { opacity: 1; }
 }
-.kpi-card .ff-display { animation: data-flicker 8s infinite; }
+/* Los números NO parpadean (banca seria): animación desactivada. */
+.kpi-card .ff-display { animation: none; }
 
 @keyframes border-flow {
   0%   { background-position: 0% 50%; }
@@ -1611,11 +1649,11 @@ html.light #app-header { background: rgba(240,244,255,0.8); }
   animation: border-flow 3s linear infinite;
 }
 
-/* Text con sombra neón */
-.text-neon { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
-.text-glow-cyan   { color: var(--brand);     text-shadow: 0 0 8px rgba(0,240,255,.6); }
-.text-glow-pink   { color: var(--neon-pink); text-shadow: 0 0 8px rgba(255,45,146,.6); }
-.text-glow-green  { color: var(--success);   text-shadow: 0 0 8px rgba(0,255,159,.6); }
+/* Realce de texto SUTIL (antes neón agresivo). En banca, mínimo glow. */
+.text-neon { color: var(--brand); }
+.text-glow-cyan   { color: var(--brand);   text-shadow: 0 0 1px color-mix(in srgb, var(--brand) 40%, transparent); }
+.text-glow-pink   { color: var(--danger); }
+.text-glow-green  { color: var(--success); }
 
 /* ── Fix de inputs date/month en tema oscuro ─────────────────── */
 input.input[type="date"],
@@ -1812,7 +1850,7 @@ html.light select.input { color-scheme: light; }
   box-shadow:
     0 0 0 1px var(--brand-soft),
     0 32px 80px rgba(0, 0, 0, .75),
-    0 0 60px rgba(0, 240, 255, .15);
+    0 0 0 transparent;
   /* Sobrescribir el width restrictivo de dialog general */
   width: min(96vw, 720px) !important;
   max-width: 720px;
@@ -1851,7 +1889,7 @@ html.light select.input { color-scheme: light; }
   background: linear-gradient(135deg, var(--brand-soft), rgba(255, 0, 234, .1));
   border: 1px solid var(--border-2);
   flex-shrink: 0;
-  box-shadow: 0 0 16px rgba(0, 240, 255, .2);
+  box-shadow: var(--shadow-md);
 }
 .hd-close-btn {
   width: 32px;
@@ -2170,7 +2208,7 @@ html.light select.input { color-scheme: light; }
   color: #fff;
   font-weight: 700;
   border-color: var(--neon-pink);
-  box-shadow: 0 0 12px rgba(255,45,146,.5);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 30%, transparent);
 }
 .hd-cal-day.hd-cal-in-range {
   background: rgba(0, 240, 255, 0.1);
@@ -2224,7 +2262,7 @@ html.light select.input { color-scheme: light; }
   background: var(--success-bg);
   color: var(--success);
   border-color: var(--success);
-  box-shadow: 0 0 10px rgba(0,255,159,.2);
+  box-shadow: var(--shadow-sm);
 }
 .hd-type-btn[data-htype="gastos"].active {
   background: var(--danger-bg);
@@ -2255,7 +2293,7 @@ html.light select.input { color-scheme: light; }
   background: rgba(0, 240, 255, 0.12);
   color: var(--brand);
   border-color: var(--brand);
-  text-shadow: 0 0 6px rgba(0,240,255,.4);
+  text-shadow: none;
 }
 /* Separador "Subcategoría" dentro de los chips del filtro detallado */
 .hd-subcat-sep {
@@ -2264,7 +2302,7 @@ html.light select.input { color-scheme: light; }
   letter-spacing: .07em; color: var(--ink-muted);
 }
 .hd-subcat-chip { border-style: dashed; }
-.hd-subcat-chip.active { border-style: solid; background: rgba(255,0,234,.1); color: var(--brand-2); border-color: var(--brand-2); text-shadow: 0 0 6px rgba(255,0,234,.4); }
+.hd-subcat-chip.active { border-style: solid; background: rgba(255,0,234,.1); color: var(--brand-2); border-color: var(--brand-2); text-shadow: none; }
 
 /* ── Form Modern (rediseño dlg-gasto/tarjeta/meta) ───────────── */
 .form-modern {
@@ -2298,7 +2336,7 @@ html.light select.input { color-scheme: light; }
   display: flex; align-items: center; justify-content: center;
   color: #001f24;
   flex-shrink: 0;
-  box-shadow: 0 0 8px rgba(0,240,255,0.2);
+  box-shadow: var(--ring);
 }
 .form-modern-icon svg { width: 24px; height: 24px; }
 
@@ -2621,7 +2659,7 @@ dialog form.form-modern { padding: 0 !important; }
 }
 .prio-star input { position: absolute; opacity: 0; pointer-events: none; }
 .prio-star:hover { color: var(--brand-3); }
-.prio-star.active { color: var(--brand-3); text-shadow: 0 0 12px rgba(255,234,0,.6); }
+.prio-star.active { color: var(--brand-3); text-shadow: none; }
 
 /* Toggle emergencia */
 .goal-toggle {
@@ -2719,7 +2757,7 @@ input:-webkit-autofill:active,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
   -webkit-text-fill-color: #e8f5ff !important;
-  -webkit-box-shadow: 0 0 0 1000px rgba(0, 240, 255, 0.08) inset !important;
+  -webkit-box-shadow: 0 0 0 1000px color-mix(in srgb, var(--brand) 8%, var(--bg-2)) inset !important;
   caret-color: #00f0ff !important;
   transition: background-color 9999s ease-in-out 0s;
 }
@@ -3106,7 +3144,7 @@ button:focus-visible,
   padding: 0;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 32px rgba(0,0,0,.7), 0 0 24px rgba(0,240,255,.15);
+  box-shadow: var(--shadow-pop);
   width: min(94vw, 360px);
   max-height: 70vh;
   overflow: hidden;
@@ -3688,7 +3726,7 @@ body.view-analisis #main-widgets::before {
   background: linear-gradient(135deg, rgba(0,240,255,.05), rgba(255,0,234,.03));
   font-family: inherit; transition: all .2s ease;
 }
-.ver-card:hover { border-color: var(--brand); box-shadow: 0 0 14px rgba(0,240,255,.12); background: linear-gradient(135deg, rgba(0,240,255,.08), rgba(255,0,234,.05)); }
+.ver-card:hover { border-color: var(--brand-2); box-shadow: var(--shadow-md); background: var(--surface-3); }
 .ver-card:active { transform: scale(.99); }
 .ver-card-left { display: flex; align-items: center; gap: .75rem; }
 .ver-card-icon { font-size: 1.5rem; line-height: 1; }
@@ -3849,7 +3887,7 @@ body.view-analisis #main-widgets::before {
   border-radius: var(--r-sm);
   background: linear-gradient(135deg, rgba(0,240,255,0.06), rgba(255,0,234,0.03));
   border: 1px solid var(--brand);
-  box-shadow: 0 0 16px rgba(0,240,255,.08);
+  box-shadow: var(--shadow-md);
 }
 .cycle-visual {
   margin-bottom: .85rem;
@@ -3971,7 +4009,7 @@ body.view-analisis #main-widgets::before {
 .currency-selector[data-active="BRL"] {
   background: linear-gradient(135deg, rgba(0,255,159,0.15), rgba(0,240,255,0.08));
   color: var(--success);
-  text-shadow: 0 0 6px rgba(0,255,159,.4);
+  text-shadow: none;
 }
 
 .cotizacion-equivalente {
@@ -4019,7 +4057,7 @@ body.view-analisis #main-widgets::before {
   text-transform: uppercase;
   letter-spacing: .1em;
   color: var(--success);
-  text-shadow: 0 0 6px rgba(0,255,159,.4);
+  text-shadow: none;
 }
 .usd-amounts {
   display: grid;

@@ -1,6 +1,17 @@
 {
   "entradas": [
     {
+      "version": "1.98",
+      "fecha": "2026-06-06",
+      "items": [
+        "Rediseño profesional completo: nueva paleta 'Banca' (slate OLED + acento teal/azul sobrio), más confiable y seria",
+        "Tarjetas y widgets con profundidad real (sombras en capas) en vez de glow neón",
+        "Números sin parpadeo, glows calmados, mejor contraste y legibilidad en modo claro y oscuro",
+        "Foco visible para teclado y respeto de 'reducir movimiento' (accesibilidad)",
+        "Podés cambiar el acento desde Ajustes → Personalización cuando quieras"
+      ]
+    },
+    {
       "version": "1.97",
       "fecha": "2026-06-06",
       "items": [
