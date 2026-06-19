@@ -5336,7 +5336,7 @@ function abrirDrawerTarjeta(tarjetaId) {
   const capTarjeta = cap?.por_tarjeta?.find(p => p.tarjeta_id === tarjetaId);
 
   // Header con colores de la tarjeta (mismo gradiente premium)
-  const colorBase = tarjeta.color || '#2dd4bf';
+  const colorBase = tarjeta.color || '#C9A24E';
   const header = document.getElementById('td-header');
   if (header) header.style.background = _gradienteTarjeta(colorBase);
 
@@ -7087,14 +7087,14 @@ function _resolverColoresChart() {
   const esClaro = document.documentElement.classList.contains('light');
   return {
     ink:        get('--ink',        esClaro ? '#0f172a' : '#e8f5ff'),
-    inkMuted:   get('--ink-muted',  esClaro ? '#64748b' : '#94a3b8'),
+    inkMuted:   get('--ink-muted',  esClaro ? '#696558' : '#968F7E'),
     grid:       'rgba(127,127,127,.18)',
     // Colores semánticos (siguen el acento custom y el tema)
-    success:    get('--success',    esClaro ? '#16a34a' : '#22c55e'),
-    danger:     get('--danger',     esClaro ? '#e11d48' : '#f43f5e'),
-    brand:      get('--brand',      esClaro ? '#0d9488' : '#2dd4bf'),
-    brand2:     get('--brand-2',    esClaro ? '#2563eb' : '#3b82f6'),
-    warning:    get('--warning',    esClaro ? '#d97706' : '#f59e0b'),
+    success:    get('--success',    esClaro ? '#0F7A50' : '#46B98A'),
+    danger:     get('--danger',     esClaro ? '#C0432F' : '#D85C4A'),
+    brand:      get('--brand',      esClaro ? '#9A7A24' : '#C9A24E'),
+    brand2:     get('--brand-2',    esClaro ? '#B8923A' : '#E2C079'),
+    warning:    get('--warning',    esClaro ? '#B5781E' : '#E0A33A'),
     tooltipBg:  esClaro ? 'rgba(255,255,255,0.96)' : 'rgba(13,16,33,0.96)',
   };
 }
@@ -7107,6 +7107,11 @@ const _HD_COLOR_FAMILIAS = [
   { rgb: [0, 240, 255],  key: 'brand'   },
   { rgb: [181, 55, 255], key: 'brand2'  },
   { rgb: [122, 155, 194], key: 'inkMuted' },
+  /* Paleta "Banca" anterior (teal/azul/verde/rosa) → remapear al tema actual */
+  { rgb: [45, 212, 191], key: 'brand'   },
+  { rgb: [59, 130, 246], key: 'brand2'  },
+  { rgb: [34, 197, 94],  key: 'success' },
+  { rgb: [244, 63, 94],  key: 'danger'  },
 ];
 
 /** Parsea '#rgb', '#rrggbb', 'rgb(...)' o 'rgba(...)' a {r,g,b,a} o null. */
@@ -7256,7 +7261,7 @@ const _widgetRenderers = {
       const s = saldoCuenta(c);
       list.insertAdjacentHTML('beforeend', `
         <div class="hd-item">
-          <span class="hd-item-icon" style="background:${c.color||'#3b82f6'}33;color:${c.color||'#3b82f6'}">${TIPOS[c.tipo]||'🏦'}</span>
+          <span class="hd-item-icon" style="background:${c.color||'#C9A24E'}33;color:${c.color||'#C9A24E'}">${TIPOS[c.tipo]||'🏦'}</span>
           <div class="hd-item-info">
             <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(c.nombre)}</p>
             <p class="text-[10px]" style="color:var(--ink-muted)">${c.tipo||'cuenta'} · inicial ${FMT.format(c.saldo_inicial||0)}</p>
@@ -7296,7 +7301,7 @@ const _widgetRenderers = {
       const pct  = t.limite_credito ? Math.round((cons / t.limite_credito) * 100) : 0;
       list.insertAdjacentHTML('beforeend', `
         <div class="hd-item">
-          <span class="hd-item-icon" style="background:${t.color||'#3b82f6'}33;color:${t.color||'#3b82f6'}">💳</span>
+          <span class="hd-item-icon" style="background:${t.color||'#C9A24E'}33;color:${t.color||'#C9A24E'}">💳</span>
           <div class="hd-item-info">
             <p class="text-sm font-semibold truncate" style="color:var(--ink)">${escapeHtml(t.nombre)}</p>
             <p class="text-[10px]" style="color:var(--ink-muted)">${pct}% usado · cierre día ${t.dia_cierre || '—'}</p>
@@ -8583,7 +8588,7 @@ function mostrarPickerEmojiHabitual(idx) {
 function mostrarPickerColorHabitual(idx) {
   const h = state.ajustes.catalogos.habituales[idx];
   const inp = document.createElement('input');
-  inp.type = 'color'; inp.value = h.color || '#2dd4bf';
+  inp.type = 'color'; inp.value = h.color || '#C9A24E';
   inp.style.cssText = 'position:fixed;left:-9999px';
   document.body.appendChild(inp);
   inp.addEventListener('input', () => { h.color = inp.value; });
@@ -9070,7 +9075,7 @@ async function editarTarjeta(id) {
   if (form.elements.limite_cuotas)   form.elements.limite_cuotas.value = t.limite_cuotas || 0;
   if (form.elements.dia_cierre)      form.elements.dia_cierre.value = t.dia_cierre || 15;
   if (form.elements.dia_vencimiento) form.elements.dia_vencimiento.value = t.dia_vencimiento || 5;
-  if (form.elements.color)           form.elements.color.value = t.color || '#2dd4bf';
+  if (form.elements.color)           form.elements.color.value = t.color || '#C9A24E';
   // Refrescar la preview y el visualizador del ciclo
   setTimeout(() => {
     if (typeof updateCardPreview === 'function')  updateCardPreview();
@@ -9291,7 +9296,7 @@ function updateCardPreview() {
   const num    = f.elements.ultimos_4?.value || '';
   const cierre = f.elements.dia_cierre?.value || '—';
   const venc   = f.elements.dia_vencimiento?.value || '—';
-  const color  = f.elements.color?.value || '#2dd4bf';
+  const color  = f.elements.color?.value || '#C9A24E';
 
   const cpName = document.getElementById('cp-nombre');
   const cpBank = document.getElementById('cp-bank');

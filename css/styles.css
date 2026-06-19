@@ -5153,3 +5153,8 @@ body.view-analisis #main-widgets::before {
 .nav-btn { min-height: 44px; }
 .quick-btn { min-height: 44px; }
 .cat-chip, .hd-cat-chip, .hd-subcat-chip, .pred-horizonte, .balance-range button { min-height: 38px; }
+
+/* ── Numerales mono: side-bearing — evitar recorte de montos largos ──── */
+.ff-display { letter-spacing: -0.01em; }
+.balance-kpis, .balance-kpis > * { min-width: 0; }
+.kpi-card .ff-display, .balance-kpi .val { padding-right: 1px; }

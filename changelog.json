@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.4",
+      "fecha": "2026-06-19",
+      "items": [
+        "Diseño Instrumento: los gráficos del detalle (cuentas, tarjetas, metas y más) ahora usan el color latón del tema, en vez del teal/azul anterior.",
+        "Colores por defecto de íconos y nuevos ítems alineados al tema. Ajuste fino para que los montos largos no se recorten."
+      ]
+    },
+    {
       "version": "2.3",
       "fecha": "2026-06-19",
       "items": [
