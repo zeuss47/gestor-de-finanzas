@@ -998,6 +998,67 @@
   </article>
 </template>
 
+<!-- Conversor de viaje (moneda extranjera -> USD -> ARS) -->
+<template id="tpl-widget-conversor">
+  <article class="widget card-glass p-5">
+    <header class="flex items-center justify-between mb-4">
+      <h2 class="ff-display text-sm font-semibold uppercase tracking-wider" style="color:var(--ink-muted)">
+        Conversor de viaje
+      </h2>
+      <span class="badge badge-brand">Multi-moneda</span>
+    </header>
+
+    <div class="space-y-3">
+      <!-- Paso 1: monto extranjero -->
+      <div>
+        <label class="conv-step-lbl">1 · Gasté en el exterior</label>
+        <div class="conv-row">
+          <input type="number" step="any" inputmode="decimal" class="input" data-bind="conv-monto" placeholder="217620" aria-label="Monto gastado en moneda extranjera"/>
+          <input type="text" class="input conv-moneda-inp" data-bind="conv-moneda" value="Guaraní" aria-label="Nombre de la moneda"/>
+        </div>
+      </div>
+
+      <!-- Paso 2: a dólares -->
+      <div>
+        <label class="conv-step-lbl">2 · Convertido a dólar</label>
+        <div class="conv-toggle" role="tablist">
+          <button type="button" class="conv-toggle-btn active" data-conv-mode="usd" role="tab">Me cobraron US$</button>
+          <button type="button" class="conv-toggle-btn" data-conv-mode="tasa" role="tab">Sé la tasa</button>
+        </div>
+        <div data-conv-pane="usd" class="mt-2">
+          <div class="input-with-prefix">
+            <span class="input-prefix">US$</span>
+            <input type="number" step="any" inputmode="decimal" class="input" data-bind="conv-usd" placeholder="35,98" aria-label="Monto en dólares"/>
+          </div>
+        </div>
+        <div data-conv-pane="tasa" class="mt-2" hidden>
+          <div class="conv-rate-row">
+            <span class="conv-rate-lbl">1 US$ =</span>
+            <input type="number" step="any" inputmode="decimal" class="input" data-bind="conv-tasa" placeholder="6048" aria-label="Tasa: unidades de moneda por dólar"/>
+            <span class="conv-rate-lbl" data-bind="conv-moneda-lbl">Guaraní</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Paso 3: dólar en pesos -->
+      <div>
+        <label class="conv-step-lbl">3 · Dólar hoy (ARS)</label>
+        <div class="input-with-prefix">
+          <span class="input-prefix">$</span>
+          <input type="number" step="any" inputmode="decimal" class="input" data-bind="conv-dolar" placeholder="1475" aria-label="Cotización del dólar en pesos"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resultado -->
+    <div class="conv-result-box mt-4">
+      <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Te sale en pesos</p>
+      <p class="ff-display text-2xl font-bold mt-1" style="color:var(--brand)" data-bind="conv-result">$0</p>
+      <p class="text-[11px] mt-1" style="color:var(--ink-2)" data-bind="conv-detail">Completá los pasos para ver el total</p>
+    </div>
+  </article>
+</template>
+
 <!-- Comparador mensual -->
 <template id="tpl-widget-comparador">
   <article class="widget card-glass p-5">

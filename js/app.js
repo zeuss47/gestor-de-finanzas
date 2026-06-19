@@ -695,8 +695,8 @@ const AJUSTES_DEFAULT = {
   ui: {
     tema: 'auto',
     color_primario: '#2dd4bf',
-    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
-    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','comparador'],
+    widgets_visibles: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','conversor','comparador'],
+    widgets_orden: ['estado_global','sueldo','cuentas','tarjetas','habituales','simulacion_credito','prediccion','ia_local','metas','balance','grafico','resumen_anual','flujo_mensual','categorias','tipo_cambio','calculadora','conversor','comparador'],
     widgets_tamanos: {
       estado_global: 'lg',
       sueldo:        'lg',
@@ -713,6 +713,7 @@ const AJUSTES_DEFAULT = {
       categorias:    'md',
       tipo_cambio:   'md',
       calculadora:   'sm',
+      conversor:     'md',
       comparador:    'md',
     },
   },
@@ -1119,6 +1120,7 @@ const RENDERERS = {
   categorias:         renderCategorias,
   tipo_cambio:        renderTipoCambio,
   calculadora:        renderCalculadora,
+  conversor:          renderConversor,
   comparador:         renderComparador,
   prediccion:         renderPrediccion,
   balance:            renderBalance,
@@ -1139,6 +1141,7 @@ const TPL = {
   categorias:         'tpl-widget-categorias',
   tipo_cambio:        'tpl-widget-tipo_cambio',
   calculadora:        'tpl-widget-calculadora',
+  conversor:          'tpl-widget-conversor',
   comparador:         'tpl-widget-comparador',
   prediccion:         'tpl-widget-prediccion',
   balance:            'tpl-widget-balance',
@@ -2681,6 +2684,56 @@ function renderCalculadora(el) {
   btn.onclick = compute;
   // Enter en cualquier input también calcula
   el.querySelectorAll('input').forEach(i => i.onkeydown = e => { if(e.key==='Enter') compute(); });
+}
+
+/* Conversor de viaje: moneda extranjera → USD → ARS (conversión en cadena).
+   Ej: 217.620 guaraní → US$35,98 → × dólar 1.475 = $53.070,50. */
+function renderConversor(el) {
+  const $ = s => el.querySelector(s);
+  const num = sel => { const v = $(sel)?.valueAsNumber; return Number.isFinite(v) ? v : 0; };
+  const _n = n => (n).toLocaleString('es-AR', { maximumFractionDigits: 2 });
+
+  // Prefill del dólar desde las cotizaciones guardadas (tarjeta/blue/oficial).
+  const cam = state.ajustes?.tipos_cambio || {};
+  const dolarSug = cam.USD_TARJETA?.valor || cam.USD_BLUE?.valor || cam.USD?.valor || 0;
+  const dolarInp = $('[data-bind="conv-dolar"]');
+  if (dolarInp && !dolarInp.value && dolarSug) dolarInp.value = dolarSug;
+
+  let mode = 'usd';
+  const monedaTxt = () => ($('[data-bind="conv-moneda"]')?.value || '').trim() || 'moneda';
+
+  const compute = () => {
+    const monto = num('[data-bind="conv-monto"]');
+    const dolar = num('[data-bind="conv-dolar"]');
+    const usd = mode === 'tasa'
+      ? (() => { const t = num('[data-bind="conv-tasa"]'); return t > 0 ? monto / t : 0; })()
+      : num('[data-bind="conv-usd"]');
+    const pesos = usd * dolar;
+
+    $('[data-bind="conv-result"]').textContent = FMT.format(pesos);
+    const det = (usd > 0 && dolar > 0)
+      ? `US$ ${_n(usd)} × ${FMT.format(dolar)}${monto > 0 ? ` · 1 US$ = ${_n(monto / usd)} ${monedaTxt()}` : ''}`
+      : 'Completá los pasos para ver el total';
+    $('[data-bind="conv-detail"]').textContent = det;
+  };
+
+  // Toggle "Me cobraron US$" / "Sé la tasa"
+  el.querySelectorAll('[data-conv-mode]').forEach(b => b.onclick = () => {
+    mode = b.dataset.convMode;
+    el.querySelectorAll('[data-conv-mode]').forEach(x => x.classList.toggle('active', x === b));
+    const pu = el.querySelector('[data-conv-pane="usd"]'); if (pu) pu.hidden = mode !== 'usd';
+    const pt = el.querySelector('[data-conv-pane="tasa"]'); if (pt) pt.hidden = mode !== 'tasa';
+    compute();
+  });
+
+  // Sincronizar el nombre de la moneda en el modo "tasa" + recalcular
+  const monedaInp = $('[data-bind="conv-moneda"]');
+  if (monedaInp) monedaInp.oninput = () => {
+    const l = $('[data-bind="conv-moneda-lbl"]'); if (l) l.textContent = monedaTxt();
+    compute();
+  };
+  el.querySelectorAll('input[type="number"]').forEach(i => i.oninput = compute);
+  compute();
 }
 
 function renderComparador(el) {
@@ -4488,7 +4541,7 @@ const WIDGET_ICONS = {
   estado_global: '💰', sueldo: '💼', cuentas: '🏦', tarjetas: '💳', habituales: '🔁',
   simulacion_credito: '📊', ia_local: '🧠', metas: '🎯', grafico: '📈',
   resumen_anual: '📅', flujo_mensual: '🌊', categorias: '🍩',
-  tipo_cambio: '💱', calculadora: '🧮', comparador: '⚖', prediccion: '🔮', balance: '📉',
+  tipo_cambio: '💱', calculadora: '🧮', conversor: '🌎', comparador: '⚖', prediccion: '🔮', balance: '📉',
 };
 const WIDGET_LABELS = {
   estado_global: 'Estado global', sueldo: 'Sueldo y recibos', cuentas: 'Cuentas bancarias',
@@ -4496,7 +4549,7 @@ const WIDGET_LABELS = {
   simulacion_credito: 'Capacidad crediticia', ia_local: 'Análisis IA',
   metas: 'Metas de ahorro', grafico: 'Evolución 6 meses', resumen_anual: 'Resumen anual',
   flujo_mensual: 'Flujo mensual', categorias: 'Gastos por categoría', tipo_cambio: 'Tipo de cambio',
-  calculadora: 'Calculadora', comparador: 'Comparador mensual', prediccion: 'Predicción de gasto',
+  calculadora: 'Calculadora', conversor: 'Conversor de viaje', comparador: 'Comparador mensual', prediccion: 'Predicción de gasto',
   balance: 'Balance general',
 };
 
@@ -6301,6 +6354,7 @@ const WIDGET_META = {
   categorias:         { icon: '🍩', titulo: 'Gastos por categoría',    filtra: 'categoria' },
   tipo_cambio:        { icon: '💱', titulo: 'Tipo de cambio',           filtra: 'todos' },
   calculadora:        { icon: '🧮', titulo: 'Calculadora',              filtra: 'todos' },
+  conversor:          { icon: '🌎', titulo: 'Conversor de viaje',       filtra: 'todos' },
   comparador:         { icon: '⚖', titulo: 'Comparador mensual',       filtra: 'todos' },
 };
 

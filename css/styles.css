@@ -3845,6 +3845,34 @@ body.view-analisis #main-widgets::before {
 .aj-diff-down { background: color-mix(in srgb, var(--danger) 10%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border)); color: var(--ink-2); }
 .aj-diff-ok   { background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-muted); }
 
+/* ── Conversor de viaje (widget) ─────────────────────────────── */
+.conv-step-lbl {
+  display: block; font-size: .66rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--ink-muted); margin-bottom: .35rem;
+}
+.conv-row { display: flex; gap: .5rem; }
+.conv-row > input[data-bind="conv-monto"] { flex: 1; min-width: 0; }
+.conv-moneda-inp { width: 7.5rem; flex-shrink: 0; text-align: center; }
+.conv-toggle {
+  display: flex; gap: .25rem; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: .7rem; padding: .2rem;
+}
+.conv-toggle-btn {
+  flex: 1; border: none; background: transparent; color: var(--ink-muted);
+  font-family: inherit; font-size: .74rem; font-weight: 600; padding: .45rem .5rem;
+  border-radius: .5rem; cursor: pointer; transition: background .15s var(--ease-std), color .15s var(--ease-std);
+}
+.conv-toggle-btn.active { background: var(--surface-3); color: var(--ink); box-shadow: var(--shadow-sm); }
+.conv-toggle-btn:hover:not(.active) { color: var(--ink-2); }
+.conv-rate-row { display: flex; align-items: center; gap: .5rem; }
+.conv-rate-row > input { flex: 1; min-width: 0; }
+.conv-rate-lbl { font-size: .78rem; color: var(--ink-2); white-space: nowrap; }
+.conv-result-box {
+  padding: .85rem .95rem; border-radius: var(--r);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 9%, var(--surface-2)), var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--border));
+}
+
 /* Opciones del diálogo de eliminar meta con saldo */
 .md-opts { display: flex; flex-direction: column; gap: .55rem; }
 .md-opt {

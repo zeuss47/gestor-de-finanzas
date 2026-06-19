@@ -1,6 +1,15 @@
 {
   "entradas": [
     {
+      "version": "1.99",
+      "fecha": "2026-06-19",
+      "items": [
+        "Nuevo widget 'Conversor de viaje': calculá cuánto te sale en pesos una compra en el exterior (moneda extranjera → dólar → pesos)",
+        "Dos modos: ingresás los dólares que te cobraron, o la tasa (1 USD = X de la moneda) y lo calcula solo",
+        "El dólar viene pre-cargado con tu cotización guardada (tarjeta/blue) y muestra la tasa implícita"
+      ]
+    },
+    {
       "version": "1.98",
       "fecha": "2026-06-06",
       "items": [
