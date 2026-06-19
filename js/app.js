@@ -2520,7 +2520,7 @@ function renderTipoCambio(el) {
         <div class="flex items-center gap-2 min-w-0">
           <span class="text-lg flex-shrink-0">${c.simbolo}</span>
           <div class="min-w-0">
-            <p class="text-xs font-semibold truncate text-glow-cyan">
+            <p class="text-xs font-semibold truncate text-accent">
               ${escapeHtml(c.nombre)}
               ${esAuto ? '<span class="text-[8px] ml-1 px-1.5 py-0.5 rounded-full" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success)">LIVE</span>' : ''}
             </p>
@@ -5293,7 +5293,7 @@ function abrirSelectorEntidad(tipo, items) {
               <div style="flex:1;height:4px;background:var(--surface-3);border-radius:999px;overflow:hidden">
                 <div style="width:${Math.min(100,pct)}%;height:100%;background:linear-gradient(90deg,var(--success),var(--brand))"></div>
               </div>
-              <span class="text-[10px] font-bold text-glow-cyan">${pct.toFixed(0)}%</span>
+              <span class="text-[10px] font-bold text-accent">${pct.toFixed(0)}%</span>
             </div>
           </div>
           <div class="text-right flex-shrink-0">

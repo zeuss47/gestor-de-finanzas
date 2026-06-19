@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.5",
+      "fecha": "2026-06-19",
+      "items": [
+        "Pulido final del tema Instrumento: el selector rápido de color de cuentas y tarjetas ahora ofrece tonos cálidos acordes (latón, esmeralda, arcilla, ámbar, cobre…).",
+        "Detalles: el botón \"+ Agregar movimiento\" del detalle ya no se parte en dos líneas en el teléfono."
+      ]
+    },
+    {
       "version": "2.4",
       "fecha": "2026-06-19",
       "items": [

@@ -1528,9 +1528,9 @@ html.light #app-header { background: rgba(240,244,255,0.8); }
 
 /* Realce de texto SUTIL (antes neón agresivo). En banca, mínimo glow. */
 .text-neon { color: var(--brand-ink); }
-.text-glow-cyan   { color: var(--brand-ink);   text-shadow: 0 0 1px color-mix(in srgb, var(--brand) 40%, transparent); }
-.text-glow-pink   { color: var(--danger); }
-.text-glow-green  { color: var(--success); }
+.text-accent   { color: var(--brand-ink);   text-shadow: 0 0 1px color-mix(in srgb, var(--brand) 40%, transparent); }
+.text-neg   { color: var(--danger); }
+.text-pos  { color: var(--success); }
 
 /* ── Fix de inputs date/month en tema oscuro ─────────────────── */
 input.input[type="date"],
@@ -5158,3 +5158,7 @@ body.view-analisis #main-widgets::before {
 .ff-display { letter-spacing: -0.01em; }
 .balance-kpis, .balance-kpis > * { min-width: 0; }
 .kpi-card .ff-display, .balance-kpi .val { padding-right: 1px; }
+
+/* ── Footer del drawer: que "+ Agregar movimiento" no envuelva en móvil ── */
+.widget-drawer-footer .btn-primary,
+.widget-drawer-footer .btn-secondary { white-space: nowrap; padding-left: .85rem; padding-right: .85rem; }

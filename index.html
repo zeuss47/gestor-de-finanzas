@@ -874,7 +874,7 @@
       </div>
       <div class="p-2.5 rounded-xl" style="background:linear-gradient(135deg,color-mix(in srgb,var(--brand) 12%,transparent),color-mix(in srgb,var(--brand-2) 6%,transparent));border:1px solid var(--brand)">
         <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Proyectado</p>
-        <p class="ff-display font-bold text-sm mt-0.5 text-glow-cyan" data-bind="pred-futuro">$0</p>
+        <p class="ff-display font-bold text-sm mt-0.5 text-accent" data-bind="pred-futuro">$0</p>
       </div>
       <div class="p-2.5 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
         <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Tendencia/mes</p>
@@ -916,7 +916,7 @@
     <div class="sueldo-hero">
       <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Último neto cobrado</p>
       <div class="flex items-baseline gap-2 mt-1">
-        <p class="ff-display font-bold text-3xl text-glow-green" data-bind="sueldo-actual">$0</p>
+        <p class="ff-display font-bold text-3xl text-pos" data-bind="sueldo-actual">$0</p>
         <span class="text-xs font-semibold" data-bind="sueldo-variacion">—</span>
       </div>
       <p class="text-[10px] mt-1" style="color:var(--ink-2)" data-bind="sueldo-periodo">—</p>
@@ -1005,7 +1005,7 @@
 
     <div class="mt-4 p-3 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
       <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Cada uno paga</p>
-      <p class="ff-display text-2xl font-bold mt-1 text-glow-cyan" data-bind="calc-result">$0</p>
+      <p class="ff-display text-2xl font-bold mt-1 text-accent" data-bind="calc-result">$0</p>
       <p class="text-[10px] mt-1" style="color:var(--ink-muted)" data-bind="calc-detail">—</p>
     </div>
   </article>
@@ -1090,7 +1090,7 @@
       </div>
       <div class="p-3 rounded-xl" style="background:var(--brand-soft);border:1px solid var(--border-2)">
         <p class="text-[10px]" style="color:var(--ink-muted)">Mes actual</p>
-        <p class="ff-display text-lg font-bold mt-1 text-glow-cyan" data-bind="comp-actual">$0</p>
+        <p class="ff-display text-lg font-bold mt-1 text-accent" data-bind="comp-actual">$0</p>
       </div>
     </div>
 
@@ -1554,12 +1554,12 @@
         <label class="form-label">Color de la tarjeta</label>
         <div class="color-presets">
           <label class="color-swatch" style="background:linear-gradient(135deg,#C9A24E,#9A7B33)"><input type="radio" name="color_quick" value="#C9A24E" checked/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)"><input type="radio" name="color_quick" value="#3b82f6"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#6366f1,#4338ca)"><input type="radio" name="color_quick" value="#6366f1"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)"><input type="radio" name="color_quick" value="#8b5cf6"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#22c55e,#15803d)"><input type="radio" name="color_quick" value="#22c55e"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#f59e0b,#b45309)"><input type="radio" name="color_quick" value="#f59e0b"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#f43f5e,#be123c)"><input type="radio" name="color_quick" value="#f43f5e"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#46B98A,#2E8A63)"><input type="radio" name="color_quick" value="#46B98A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#D85C4A,#A8402F)"><input type="radio" name="color_quick" value="#D85C4A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#E0A33A,#B5781E)"><input type="radio" name="color_quick" value="#E0A33A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#B5703A,#8A5328)"><input type="radio" name="color_quick" value="#B5703A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#8E5A7A,#663E58)"><input type="radio" name="color_quick" value="#8E5A7A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#6E8CA8,#4C657D)"><input type="radio" name="color_quick" value="#6E8CA8"/></label>
           <label class="color-swatch color-custom-wrap">
             <input name="color" type="color" value="#C9A24E" class="color-custom" id="ip-color" />
           </label>
@@ -1669,15 +1669,15 @@
       <div class="form-section">
         <label class="form-label">Color</label>
         <div class="color-presets">
-          <label class="color-swatch" style="background:linear-gradient(135deg,#22c55e,#15803d)"><input type="radio" name="color_quick" value="#22c55e" checked/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#2dd4bf,#0d9488)"><input type="radio" name="color_quick" value="#2dd4bf"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)"><input type="radio" name="color_quick" value="#3b82f6"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#6366f1,#4338ca)"><input type="radio" name="color_quick" value="#6366f1"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#f59e0b,#b45309)"><input type="radio" name="color_quick" value="#f59e0b"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#f43f5e,#be123c)"><input type="radio" name="color_quick" value="#f43f5e"/></label>
-          <label class="color-swatch" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)"><input type="radio" name="color_quick" value="#0ea5e9"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#46B98A,#2E8A63)"><input type="radio" name="color_quick" value="#46B98A" checked/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#C9A24E,#9A7B33)"><input type="radio" name="color_quick" value="#C9A24E"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#D85C4A,#A8402F)"><input type="radio" name="color_quick" value="#D85C4A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#E0A33A,#B5781E)"><input type="radio" name="color_quick" value="#E0A33A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#B5703A,#8A5328)"><input type="radio" name="color_quick" value="#B5703A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#8E5A7A,#663E58)"><input type="radio" name="color_quick" value="#8E5A7A"/></label>
+          <label class="color-swatch" style="background:linear-gradient(135deg,#6E8CA8,#4C657D)"><input type="radio" name="color_quick" value="#6E8CA8"/></label>
           <label class="color-swatch color-custom-wrap">
-            <input name="color" type="color" value="#22c55e" class="color-custom" />
+            <input name="color" type="color" value="#46B98A" class="color-custom" />
           </label>
         </div>
       </div>
@@ -1980,7 +1980,7 @@
       <div class="goal-progress-card">
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--ink-muted)">Progreso</span>
-          <span class="ff-display font-bold text-glow-cyan" id="meta-pct">0%</span>
+          <span class="ff-display font-bold text-accent" id="meta-pct">0%</span>
         </div>
         <div class="goal-progress-bar">
           <div class="goal-progress-fill" id="meta-bar" style="width:0%"></div>
@@ -2207,7 +2207,7 @@
       <!-- Recibo total a depositar -->
       <div class="recibo-resumen" id="rec-resumen">
         <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Total a acreditar en cuenta</p>
-        <p class="ff-display text-2xl font-bold text-glow-cyan mt-1" id="rec-total">$0</p>
+        <p class="ff-display text-2xl font-bold text-accent mt-1" id="rec-total">$0</p>
       </div>
     </div>
 
@@ -2499,7 +2499,7 @@
         <div class="grid grid-cols-2 gap-2 mb-2">
           <div>
             <p class="text-[10px]" style="color:var(--ink-muted)">Recomendado seguro</p>
-            <p class="ff-display font-bold text-lg text-glow-cyan" id="td-recomendado">$0</p>
+            <p class="ff-display font-bold text-lg text-accent" id="td-recomendado">$0</p>
           </div>
           <div>
             <p class="text-[10px]" style="color:var(--ink-muted)">Disponible en tarjeta</p>
@@ -2626,7 +2626,7 @@
       <div class="grid grid-cols-3 gap-2 mt-4">
         <div class="hd-kpi">
           <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Total</p>
-          <p class="ff-display font-bold text-base mt-0.5 text-glow-cyan" id="hd-kpi-total">$0</p>
+          <p class="ff-display font-bold text-base mt-0.5 text-accent" id="hd-kpi-total">$0</p>
         </div>
         <div class="hd-kpi">
           <p class="text-[9px] uppercase tracking-widest" style="color:var(--ink-muted)">Movimientos</p>
