@@ -43,12 +43,16 @@ if (Test-Path $versionFile) {
         # Versionado simple: major.minor. Cada commit sube minor en 1.
         # Si la version actual tiene formato viejo (1.0.7), la convertimos a major.minor+1.
         # Cuando minor llega a 99, sube major y reset minor a 0.
-        $parts = $v.version -split '\.'
-        $major = [int]$parts[0]
-        if ($parts.Length -ge 2) { $minor = [int]$parts[1] } else { $minor = 0 }
-        $minor = $minor + 1
-        if ($minor -ge 100) { $major = $major + 1; $minor = 0 }
-        $newVersion = "$major.$minor"
+        # Versionado: la version la define changelog.json (fuente unica) para que
+        # version.json NUNCA diverja del changelog. El build sigue incrementando (SW).
+        $newVersion = $v.version
+        $clFile = "$REPO\changelog.json"
+        if (Test-Path $clFile) {
+            try {
+                $cl = (Get-Content $clFile -Raw -Encoding UTF8 | ConvertFrom-Json)
+                if ($cl.entradas -and $cl.entradas[0].version) { $newVersion = [string]$cl.entradas[0].version }
+            } catch { }
+        }
 
         # Resumen corto de archivos cambiados
         $archivos = ($status -split "`n" | ForEach-Object {

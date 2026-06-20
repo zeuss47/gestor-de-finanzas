@@ -1,7 +1,7 @@
-﻿{
-    "version":  "2.1",
-    "build":  118,
-    "modified":  "2026-06-06T05:35:57Z",
-    "commit":  "M .gitignore, D _pp3/Default/Cache/Cache_Data/data_0, D _pp3/Default/Cache/Cache_Data/data_1, D _...",
-    "notes":  "Auto-update 2026-06-06 02:35"
+{
+  "version": "2.5",
+  "build": 119,
+  "modified": "2026-06-19T12:00:00Z",
+  "commit": "sync version.json<->changelog + redesign Instrumento",
+  "notes": "Version derivada de changelog.json"
 }
