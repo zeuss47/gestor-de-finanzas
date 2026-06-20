@@ -1,7 +1,7 @@
 {
-  "version": "2.5",
-  "build": 119,
-  "modified": "2026-06-19T12:00:00Z",
-  "commit": "sync version.json<->changelog + redesign Instrumento",
+  "version": "2.6",
+  "build": 120,
+  "modified": "2026-06-19T13:00:00Z",
+  "commit": "perf: optimizaciones de fluidez (backdrop-filter, fondo, charts)",
   "notes": "Version derivada de changelog.json"
 }

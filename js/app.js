@@ -7082,6 +7082,9 @@ function _hdSetKPIs(items) {
 // Chart.js no resuelve CSS variables — hay que pasarle colores hex/rgba reales.
 // Leemos las CSS vars del :root al momento del render para que respete el tema activo.
 function _resolverColoresChart() {
+  // Perf: sin animación de entrada en los charts (evita jank al renderizar/cambiar
+  // de tab en gama media). Chokepoint: todos los charts temados pasan por acá.
+  try { if (window.Chart?.defaults) window.Chart.defaults.animation = false; } catch {}
   const root = getComputedStyle(document.documentElement);
   const get = (k, fallback) => (root.getPropertyValue(k) || '').trim() || fallback;
   const esClaro = document.documentElement.classList.contains('light');

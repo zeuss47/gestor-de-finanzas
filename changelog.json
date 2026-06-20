@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.6",
+      "fecha": "2026-06-19",
+      "items": [
+        "Rendimiento: deslizar y navegar más fluido en equipos de gama media.",
+        "Se quitaron desenfoques (blur) que no se veían pero consumían GPU, se aligeraron los fondos y se sacó la animación de entrada de los gráficos. Sin cambios visibles."
+      ]
+    },
+    {
       "version": "2.5",
       "fecha": "2026-06-19",
       "items": [
