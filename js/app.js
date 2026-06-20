@@ -1148,8 +1148,30 @@ const TPL = {
   habituales:         'tpl-widget-habituales',
 };
 
-function renderWidgets() {
+let _lastWidgetsSig = null;
+// Firma de TODO lo que afecta el render de widgets (data base + tema + config).
+// Sesgada a "cambia seguido": ante la duda re-renderiza (un render de más solo
+// cuesta perf; uno de menos dejaría la UI vieja).
+function _widgetsSig() {
+  const h = (arr) => (arr || []).length + ':' + (arr || []).reduce((a, x) => a + (x.updated_at || 0), 0);
+  const a = state.ajustes || {};
+  return [
+    h(state.gastos), h(state.ingresos), h(state.cuentas), h(state.tarjetas), h(state.metas),
+    document.documentElement.classList.contains('light') ? 'L' : 'D',
+    JSON.stringify(a.ui || {}), a.sensibilidad_ia || '',
+    JSON.stringify(a.tipos_cambio || {}), JSON.stringify(a.estrategia_inversora || {}),
+    new Date().toISOString().slice(0, 10),
+  ].join('|');
+}
+function renderWidgets(force = false) {
   const root = document.getElementById('main-widgets');
+  if (!root) return;
+  // Perf: si la data/tema/config no cambió desde el último render, NO rebuildeamos
+  // el DOM ni recreamos los charts (cada render clona un canvas nuevo). Esto evita
+  // el rebuild redundante tras un auto-sync que no trajo cambios, por ejemplo.
+  const sig = _widgetsSig();
+  if (!force && sig === _lastWidgetsSig && root.children.length > 0) return;
+  _lastWidgetsSig = sig;
   root.innerHTML = '';
   const ordenGuardado = state.ajustes?.ui?.widgets_orden?.length
     ? state.ajustes.ui.widgets_orden
@@ -1207,7 +1229,7 @@ function renderWidgets() {
             delete state.ajustes.ui.widgets_alturas[id];
             if (state.ajustes.ui.widgets_rows) delete state.ajustes.ui.widgets_rows[id];
             await DB.put('ajustes', state.ajustes);
-            renderWidgets();
+            renderWidgets(true);
             toast('Tamaño restaurado');
           });
         }
@@ -1356,7 +1378,7 @@ async function cambiarTamanoWidget(widgetId, size) {
     const tpl = document.getElementById(TPL[widgetId]);
     if (tpl && RENDERERS[widgetId]) {
       // Mejor: re-renderizar TODO porque algunos widgets tienen chart
-      renderWidgets();
+      renderWidgets(true);
     }
   }, 250);
 }
@@ -4619,7 +4641,7 @@ function renderWidgetsToggle() {
     [arr[idx], arr[j]] = [arr[j], arr[idx]];
     await DB.put('ajustes', aj);
     renderWidgetsToggle();
-    renderWidgets();
+    renderWidgets(true);
   };
   cont.querySelectorAll('[data-wt-up]').forEach(b => b.onclick = () => mover(b.dataset.wtUp, -1));
   cont.querySelectorAll('[data-wt-down]').forEach(b => b.onclick = () => mover(b.dataset.wtDown, +1));
@@ -7956,6 +7978,17 @@ async function init() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.getElementById('utils-drawer')?.classList.contains('open')) cerrarUtilidades();
   });
+
+  // Perf: pausar animaciones mientras se hace scroll (libera GPU/CPU en gama media).
+  // Captura el scroll de CUALQUIER contenedor (capture:true) y debounce al frenar.
+  let _scrollTO;
+  const _onScroll = () => {
+    const b = document.body;
+    if (!b.classList.contains('is-scrolling')) b.classList.add('is-scrolling');
+    clearTimeout(_scrollTO);
+    _scrollTO = setTimeout(() => b.classList.remove('is-scrolling'), 140);
+  };
+  document.addEventListener('scroll', _onScroll, { capture: true, passive: true });
 
   document.querySelectorAll('[data-quick]').forEach(b => b.onclick = () => quickAction(b.dataset.quick));
 

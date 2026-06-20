@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.7",
+      "fecha": "2026-06-19",
+      "items": [
+        "Más rendimiento: las animaciones se pausan mientras deslizás (vuelven al soltar) y la app evita rehacer trabajo si los datos no cambiaron.",
+        "Transiciones más eficientes (solo animan lo necesario). Sin cambios visibles."
+      ]
+    },
+    {
       "version": "2.6",
       "fecha": "2026-06-19",
       "items": [

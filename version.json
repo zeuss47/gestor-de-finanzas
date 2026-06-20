@@ -1,7 +1,7 @@
 {
-  "version": "2.6",
-  "build": 120,
-  "modified": "2026-06-19T13:00:00Z",
-  "commit": "perf: optimizaciones de fluidez (backdrop-filter, fondo, charts)",
+  "version": "2.7",
+  "build": 121,
+  "modified": "2026-06-19T14:00:00Z",
+  "commit": "perf: scroll-pause + guard de re-render + transiciones",
   "notes": "Version derivada de changelog.json"
 }
