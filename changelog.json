@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.22",
+      "fecha": "2026-06-21",
+      "items": [
+        "Arreglo importante: en el teléfono no se podía tocar nada del tablero. Una capa invisible del menú de rueda quedaba sobre toda la pantalla bloqueando los toques. Ahora solo intercepta cuando la rueda está abierta."
+      ]
+    },
+    {
       "version": "2.21",
       "fecha": "2026-06-21",
       "items": [

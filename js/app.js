@@ -5528,10 +5528,7 @@ function toggleWheel(force) {
   menu.classList.toggle('open', willOpen);
   menu.setAttribute('aria-hidden', willOpen ? 'false' : 'true');
   trig?.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-  if (ov) {
-    if (willOpen) { ov.hidden = false; requestAnimationFrame(() => ov.classList.add('open')); }
-    else { ov.classList.remove('open'); setTimeout(() => { ov.hidden = true; }, 220); }
-  }
+  if (ov) ov.classList.toggle('open', willOpen);   // pointer-events/opacity via CSS
 }
 
 /** Construye los ítems del menú de rueda: Cargar PDF + habituales + presets,

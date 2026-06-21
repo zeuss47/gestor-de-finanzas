@@ -873,8 +873,12 @@ html.light #bottom-nav::before { background: #eef2ff; }
   background: color-mix(in srgb, var(--bg) 50%, transparent);
   -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
   opacity: 0; transition: opacity .2s ease;
+  /* CLAVE: en móvil `.mobile-only{display:revert}` derrota al atributo [hidden]
+     (queda display:block), así que NO podemos depender de `hidden` para no tapar
+     la pantalla. Gateamos los clics por pointer-events según la clase .open. */
+  pointer-events: none;
 }
-#wheel-overlay.open { opacity: 1; }
+#wheel-overlay.open { opacity: 1; pointer-events: auto; }
 #wheel-menu {
   position: fixed; right: 16px; bottom: 104px; z-index: 36;
   width: 52px; height: 52px;
