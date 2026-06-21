@@ -1,7 +1,7 @@
 {
-  "version": "2.16",
-  "build": 130,
-  "modified": "2026-06-21T15:00:00Z",
-  "commit": "mapa integrado en pestana Productos + recuerda ultima ubicacion (no siempre BsAs)",
+  "version": "2.17",
+  "build": 131,
+  "modified": "2026-06-21T16:00:00Z",
+  "commit": "historial: fix hover pegado + fantasmeo; barra acciones rapidas rediseñada/elevada",
   "notes": "Version derivada de changelog.json"
 }

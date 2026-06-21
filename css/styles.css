@@ -632,7 +632,9 @@ html.light #bottom-nav::before { background: #eef2ff; }
   gap: .5rem; margin: .2rem .15rem .15rem;
   padding-bottom: .35rem; border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 2;
-  background: linear-gradient(var(--bg, #050614) 70%, transparent);
+  /* Fondo OPACO: con un gradiente a transparente, las filas (translúcidas)
+     se "fantasmeaban" al pasar por debajo del header sticky. */
+  background: var(--bg, #0E0E11);
 }
 .mov-period-fecha {
   font-family: 'IBM Plex Mono', sans-serif; font-weight: 700; font-size: .82rem;
@@ -651,7 +653,13 @@ html.light #bottom-nav::before { background: #eef2ff; }
   transition: border-color .15s, background .15s;
   position: relative;
 }
-.mov-row-gasto:hover { border-color: var(--border-2); background: var(--surface-2); }
+/* Hover SOLO en dispositivos con puntero real: en touch el :hover se quedaba
+   "pegado" tras tocar una fila y la dejaba resaltada (se veía como un glitch). */
+@media (hover: hover) and (pointer: fine) {
+  .mov-row-gasto:hover { border-color: var(--border-2); background: var(--surface-2); }
+}
+/* Feedback de tap para touch (reemplaza al hover) */
+.mov-row-gasto:active { background: var(--surface-2); }
 .mov-row-icon {
   width: 36px; height: 36px; border-radius: .7rem; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -842,22 +850,54 @@ html.light #bottom-nav::before { background: #eef2ff; }
   #btn-add, #btn-add::before { animation: none; }
 }
 
-/* ── Quick actions ────────────────────────────────────────────── */
+/* ── Quick actions ─────────────────────────────────────────────
+   Barra horizontal flotante (Cargar PDF + habituales + presets) sobre el
+   FAB y el nav inferior. Rediseño: se eleva para despejar el FAB central,
+   telón degradado para separarla del contenido, y bordes con difuminado
+   (mask) para que los chips entren/salgan suaves en vez de cortarse. */
+#qa-wrap {
+  bottom: 5.6rem;                 /* sube ~10px para despejar el FAB central */
+}
+#qa-wrap::before {                /* telón: degradado del fondo hacia arriba */
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: -1.4rem;
+  height: calc(100% + 2.4rem); z-index: -1; pointer-events: none;
+  background: linear-gradient(to top,
+    var(--bg) 38%,
+    color-mix(in srgb, var(--bg) 55%, transparent) 74%,
+    transparent 100%);
+}
+#quick-actions {
+  scroll-snap-type: x proximity;
+  scroll-padding-left: 1rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
+}
+#quick-actions::-webkit-scrollbar { display: none; }
 .quick-btn {
   flex-shrink: 0;
-  padding: .45rem .9rem;
+  scroll-snap-align: start;
+  display: inline-flex; align-items: center; gap: .35rem;
+  min-height: 40px;               /* objetivo táctil cómodo */
+  padding: .5rem .95rem;
   border-radius: 999px;
-  background: var(--surface);
-  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--bg) 78%, var(--surface-3));
   border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0,0,0,.28);
   font-size: .8125rem;
+  font-weight: 500;
   font-family: inherit;
   color: var(--ink);
   cursor: pointer;
   white-space: nowrap;
-  transition: background .2s, border-color .2s, color .2s;
+  transition: background .2s, border-color .2s, color .2s, transform .12s;
 }
-.quick-btn:hover { background: var(--surface-3); border-color: var(--brand-ink); color: var(--brand-ink); }
+.quick-btn:active { transform: scale(.95); }
+@media (hover: hover) and (pointer: fine) {
+  .quick-btn:hover { background: var(--surface-3); border-color: var(--brand-ink); color: var(--brand-ink); }
+}
 /* #qa-habituales usa display:contents para que sus chips fluyan en la fila */
 #qa-habituales { display: contents; }
 .quick-habitual { display: inline-flex; align-items: center; gap: .35rem; }
@@ -1299,7 +1339,9 @@ body, #main-area, #main-widgets,
   transition: background var(--transition-micro), border-color var(--transition-micro), transform var(--transition-micro);
 }
 .mov-item:active { transform: scale(.99); }
-.mov-item:hover  { background: var(--surface-2); border-color: var(--border-2); }
+@media (hover: hover) and (pointer: fine) {
+  .mov-item:hover  { background: var(--surface-2); border-color: var(--border-2); }
+}
 
 /* ── Header ──────────────────────────────────────────────────── */
 #app-header {

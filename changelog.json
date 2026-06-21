@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.17",
+      "fecha": "2026-06-21",
+      "items": [
+        "Historial: se arregló el efecto raro donde una fila quedaba resaltada después de tocarla (el hover se quedaba pegado en el teléfono) y el leve fantasmeo al desplazar. Ahora las filas se ven parejas.",
+        "Barra de acciones rápidas (Cargar PDF + habituales): rediseñada y elevada para no chocar con el botón +; los chips ahora se desvanecen en los bordes en vez de cortarse, con scroll más suave y mejor toque."
+      ]
+    },
+    {
       "version": "2.16",
       "fecha": "2026-06-21",
       "items": [
