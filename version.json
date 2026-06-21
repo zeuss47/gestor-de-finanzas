@@ -1,7 +1,7 @@
 {
-  "version": "2.7",
-  "build": 121,
-  "modified": "2026-06-19T14:00:00Z",
-  "commit": "perf: scroll-pause + guard de re-render + transiciones",
+  "version": "2.8",
+  "build": 122,
+  "modified": "2026-06-19T15:00:00Z",
+  "commit": "utils: acordeon + fix calc AR + lista de registro",
   "notes": "Version derivada de changelog.json"
 }

@@ -2691,55 +2691,72 @@ async function guardarEditorTiposCambio() {
 }
 
 function renderCalculadora(el) {
-  const btn = el.querySelector('[data-action="calc-go"]');
-  if (!btn) return;
   const compute = () => {
-    const monto    = parseFloat(el.querySelector('[data-bind="calc-monto"]').value) || 0;
-    const personas = Math.max(1, parseInt(el.querySelector('[data-bind="calc-personas"]').value) || 1);
-    const propina  = parseFloat(el.querySelector('[data-bind="calc-propina"]').value) || 0;
-    const total    = monto * (1 + propina/100);
+    const monto    = _numAR(el.querySelector('[data-bind="calc-monto"]').value);
+    const personas = Math.max(1, Math.round(_numAR(el.querySelector('[data-bind="calc-personas"]').value)) || 1);
+    const propina  = _numAR(el.querySelector('[data-bind="calc-propina"]').value);
+    const total    = monto * (1 + propina / 100);
     const cada     = total / personas;
     el.querySelector('[data-bind="calc-result"]').textContent = FMT.format(cada);
     el.querySelector('[data-bind="calc-detail"]').textContent =
       `Total ${FMT.format(total)} ÷ ${personas} personas (propina ${propina}%)`;
   };
-  btn.onclick = compute;
-  // Enter en cualquier input también calcula
-  el.querySelectorAll('input').forEach(i => i.onkeydown = e => { if(e.key==='Enter') compute(); });
+  const btn = el.querySelector('[data-action="calc-go"]');
+  if (btn) btn.onclick = compute;
+  // Cálculo en vivo al tipear + Enter
+  el.querySelectorAll('input').forEach(i => {
+    i.oninput = compute;
+    i.onkeydown = e => { if (e.key === 'Enter') compute(); };
+  });
+  compute();
 }
 
 /* Conversor de viaje: moneda extranjera → USD → ARS (conversión en cadena).
    Ej: 217.620 guaraní → US$35,98 → × dólar 1.475 = $53.070,50. */
+/* Parser robusto de números en formato AR (todo manual):
+   "1.475"→1475, "217.620"→217620, "35,98"→35.98, "35.98"→35.98, "6.048"→6048. */
+function _numAR(str) {
+  let s = String(str == null ? '' : str).trim().replace(/\s/g, '').replace(/[^\d.,-]/g, '');
+  if (!s) return 0;
+  if (s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.');          // coma = decimal; puntos = miles
+  } else {
+    const dots = (s.match(/\./g) || []).length;
+    if (dots > 1) s = s.replace(/\./g, '');               // varios puntos = miles
+    else if (/^\d{1,3}\.\d{3}$/.test(s)) s = s.replace('.', ''); // "1.475"/"217.620" = miles
+    // un punto con ≠3 decimales → decimal real (35.98), se deja
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function renderConversor(el) {
   const $ = s => el.querySelector(s);
-  const num = sel => { const v = $(sel)?.valueAsNumber; return Number.isFinite(v) ? v : 0; };
+  const num = sel => _numAR($(sel)?.value);
   const _n = n => (n).toLocaleString('es-AR', { maximumFractionDigits: 2 });
-
-  // Prefill del dólar desde las cotizaciones guardadas (tarjeta/blue/oficial).
-  const cam = state.ajustes?.tipos_cambio || {};
-  const dolarSug = cam.USD_TARJETA?.valor || cam.USD_BLUE?.valor || cam.USD?.valor || 0;
-  const dolarInp = $('[data-bind="conv-dolar"]');
-  if (dolarInp && !dolarInp.value && dolarSug) dolarInp.value = dolarSug;
-
   let mode = 'usd';
   const monedaTxt = () => ($('[data-bind="conv-moneda"]')?.value || '').trim() || 'moneda';
 
-  const compute = () => {
+  // Calcula sin tocar el DOM (todos los valores se ingresan a mano).
+  const calc = () => {
     const monto = num('[data-bind="conv-monto"]');
     const dolar = num('[data-bind="conv-dolar"]');
     const usd = mode === 'tasa'
       ? (() => { const t = num('[data-bind="conv-tasa"]'); return t > 0 ? monto / t : 0; })()
       : num('[data-bind="conv-usd"]');
-    const pesos = usd * dolar;
-
-    $('[data-bind="conv-result"]').textContent = FMT.format(pesos);
-    const det = (usd > 0 && dolar > 0)
-      ? `US$ ${_n(usd)} × ${FMT.format(dolar)}${monto > 0 ? ` · 1 US$ = ${_n(monto / usd)} ${monedaTxt()}` : ''}`
-      : 'Completá los pasos para ver el total';
-    $('[data-bind="conv-detail"]').textContent = det;
+    return { monto, dolar, usd, pesos: usd * dolar };
   };
 
-  // Toggle "Me cobraron US$" / "Sé la tasa"
+  const compute = () => {
+    const { monto, dolar, usd, pesos } = calc();
+    $('[data-bind="conv-result"]').textContent = FMT.format(pesos);
+    $('[data-bind="conv-detail"]').textContent = (usd > 0 && dolar > 0)
+      ? `US$ ${_n(usd)} × ${FMT.format(dolar)}${monto > 0 ? ` · 1 US$ = ${_n(monto / usd)} ${monedaTxt()}` : ''}`
+      : 'Completá los pasos para ver el total';
+    const g = $('[data-bind="conv-guardar"]'); if (g) g.disabled = !(pesos > 0);
+  };
+
+  // Toggle modo
   el.querySelectorAll('[data-conv-mode]').forEach(b => b.onclick = () => {
     mode = b.dataset.convMode;
     el.querySelectorAll('[data-conv-mode]').forEach(x => x.classList.toggle('active', x === b));
@@ -2748,13 +2765,56 @@ function renderConversor(el) {
     compute();
   });
 
-  // Sincronizar el nombre de la moneda en el modo "tasa" + recalcular
   const monedaInp = $('[data-bind="conv-moneda"]');
   if (monedaInp) monedaInp.oninput = () => {
     const l = $('[data-bind="conv-moneda-lbl"]'); if (l) l.textContent = monedaTxt();
     compute();
   };
-  el.querySelectorAll('input[type="number"]').forEach(i => i.oninput = compute);
+  // Recalcular al tipear en los campos numéricos (excluye desc/moneda que tienen data-no-calc)
+  el.querySelectorAll('input').forEach(i => { if (!i.dataset.noCalc) i.oninput = compute; });
+
+  // ── Lista de registro (ej. precios en el súper) — persiste en localStorage ──
+  const LS_KEY = 'gf_conv_lista';
+  const getLista = () => { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } };
+  const setLista = (l) => { try { localStorage.setItem(LS_KEY, JSON.stringify(l)); } catch {} };
+  const renderLista = () => {
+    const cont = $('[data-bind="conv-lista"]'); if (!cont) return;
+    const l = getLista();
+    const totalEl = $('[data-bind="conv-lista-total"]');
+    if (!l.length) {
+      cont.innerHTML = `<p class="conv-lista-empty">Tu lista está vacía. Calculá un precio y tocá "Agregar a la lista".</p>`;
+      if (totalEl) totalEl.textContent = '';
+      return;
+    }
+    cont.innerHTML = l.map((it, i) => `
+      <div class="conv-lista-item">
+        <div class="conv-lista-info">
+          <span class="conv-lista-desc">${escapeHtml(it.desc || ('Ítem ' + (i + 1)))}</span>
+          <span class="conv-lista-sub">${_n(it.monto)} ${escapeHtml(it.moneda)} → ${FMT.format(it.pesos)}</span>
+        </div>
+        <button type="button" class="conv-lista-del" data-del="${i}" aria-label="Quitar de la lista">✕</button>
+      </div>`).join('');
+    const total = l.reduce((a, x) => a + (x.pesos || 0), 0);
+    if (totalEl) totalEl.textContent = `Total ${FMT.format(total)} · ${l.length} ítem${l.length === 1 ? '' : 's'}`;
+    cont.querySelectorAll('[data-del]').forEach(btn => btn.onclick = () => {
+      const arr = getLista(); arr.splice(+btn.dataset.del, 1); setLista(arr); renderLista();
+    });
+  };
+  $('[data-bind="conv-guardar"]')?.addEventListener('click', () => {
+    const { monto, dolar, usd, pesos } = calc();
+    if (!(pesos > 0)) return;
+    const desc = ($('[data-bind="conv-desc"]')?.value || '').trim();
+    const arr = getLista();
+    arr.push({ desc, monto, moneda: monedaTxt(), usd, dolar, pesos, ts: Date.now() });
+    setLista(arr); renderLista();
+    // Limpiar solo lo del ítem (mantener moneda/tasa/dólar para el siguiente precio)
+    ['conv-desc', 'conv-monto', 'conv-usd'].forEach(k => { const i = $(`[data-bind="${k}"]`); if (i) i.value = ''; });
+    compute();
+    if (typeof toast === 'function') toast('✓ Agregado a la lista');
+  });
+  $('[data-bind="conv-lista-clear"]')?.addEventListener('click', () => { setLista([]); renderLista(); });
+
+  renderLista();
   compute();
 }
 
@@ -2765,10 +2825,38 @@ function abrirUtilidades() {
   const content = document.getElementById('utils-content');
   if (content) {
     content.innerHTML = '';
-    [['calculadora', renderCalculadora], ['conversor', renderConversor]].forEach(([id, fn]) => {
+    // Cada herramienta es un acordeón colapsable (se abren por separado).
+    const items = [
+      { id: 'calculadora', ic: '🧮', titulo: 'Calculadora', sub: 'Dividir gastos (split)', fn: renderCalculadora },
+      { id: 'conversor',   ic: '🌎', titulo: 'Conversor de viaje', sub: 'Multi-moneda + lista', fn: renderConversor },
+    ];
+    items.forEach(({ id, ic, titulo, sub, fn }) => {
       const tpl = document.getElementById('tpl-widget-' + id);
       const art = tpl?.content?.firstElementChild?.cloneNode(true);
-      if (art) { content.appendChild(art); try { fn(art); } catch (e) { console.warn('util render', id, e); } }
+      if (!art) return;
+      // El acordeón ya muestra el título → quitamos el header interno (evita duplicar textos).
+      art.querySelector('header')?.remove();
+      art.classList.remove('card-glass', 'p-5');
+      art.classList.add('util-acc-inner');
+      const acc = document.createElement('div');
+      acc.className = 'util-acc';
+      acc.dataset.open = 'false';
+      acc.innerHTML =
+        `<button type="button" class="util-acc-head" aria-expanded="false">
+           <span class="util-acc-ic" aria-hidden="true">${ic}</span>
+           <span class="util-acc-titles"><b>${titulo}</b><small>${sub}</small></span>
+           <svg class="util-acc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+         </button>
+         <div class="util-acc-body"><div class="util-acc-bodyinner"></div></div>`;
+      acc.querySelector('.util-acc-bodyinner').appendChild(art);
+      const head = acc.querySelector('.util-acc-head');
+      head.addEventListener('click', () => {
+        const willOpen = acc.dataset.open !== 'true';
+        acc.dataset.open = willOpen ? 'true' : 'false';
+        head.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      });
+      content.appendChild(acc);
+      try { fn(art); } catch (e) { console.warn('util render', id, e); }
     });
   }
   document.getElementById('utils-overlay')?.classList.add('open');

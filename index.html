@@ -995,10 +995,10 @@
     </header>
 
     <div class="space-y-2">
-      <input type="number" placeholder="Monto total" class="input" data-bind="calc-monto" step="0.01"/>
+      <input type="text" inputmode="decimal" placeholder="Monto total" class="input" data-bind="calc-monto"/>
       <div class="grid grid-cols-2 gap-2">
-        <input type="number" placeholder="Personas" class="input" data-bind="calc-personas" min="1" value="2"/>
-        <input type="number" placeholder="% propina" class="input" data-bind="calc-propina" min="0" max="100" value="0"/>
+        <input type="text" inputmode="numeric" placeholder="Personas" class="input" data-bind="calc-personas" value="2"/>
+        <input type="text" inputmode="decimal" placeholder="% propina" class="input" data-bind="calc-propina" value="0"/>
       </div>
       <button class="btn-primary w-full" data-action="calc-go">⚡ Calcular</button>
     </div>
@@ -1026,8 +1026,8 @@
       <div>
         <label class="conv-step-lbl">1 · Gasté en el exterior</label>
         <div class="conv-row">
-          <input type="number" step="any" inputmode="decimal" class="input" data-bind="conv-monto" placeholder="217620" aria-label="Monto gastado en moneda extranjera"/>
-          <input type="text" class="input conv-moneda-inp" data-bind="conv-moneda" value="Guaraní" aria-label="Nombre de la moneda"/>
+          <input type="text" inputmode="decimal" class="input" data-bind="conv-monto" placeholder="217620" aria-label="Monto gastado en moneda extranjera"/>
+          <input type="text" class="input conv-moneda-inp" data-bind="conv-moneda" value="Guaraní" data-no-calc aria-label="Nombre de la moneda"/>
         </div>
       </div>
 
@@ -1041,13 +1041,13 @@
         <div data-conv-pane="usd" class="mt-2">
           <div class="input-with-prefix">
             <span class="input-prefix">US$</span>
-            <input type="number" step="any" inputmode="decimal" class="input" data-bind="conv-usd" placeholder="35,98" aria-label="Monto en dólares"/>
+            <input type="text" inputmode="decimal" class="input" data-bind="conv-usd" placeholder="35,98" aria-label="Monto en dólares"/>
           </div>
         </div>
         <div data-conv-pane="tasa" class="mt-2" hidden>
           <div class="conv-rate-row">
             <span class="conv-rate-lbl">1 US$ =</span>
-            <input type="number" step="any" inputmode="decimal" class="input" data-bind="conv-tasa" placeholder="6048" aria-label="Tasa: unidades de moneda por dólar"/>
+            <input type="text" inputmode="decimal" class="input" data-bind="conv-tasa" placeholder="6048" aria-label="Tasa: unidades de moneda por dólar"/>
             <span class="conv-rate-lbl" data-bind="conv-moneda-lbl">Guaraní</span>
           </div>
         </div>
@@ -1058,7 +1058,7 @@
         <label class="conv-step-lbl">3 · Dólar hoy (ARS)</label>
         <div class="input-with-prefix">
           <span class="input-prefix">$</span>
-          <input type="number" step="any" inputmode="decimal" class="input" data-bind="conv-dolar" placeholder="1475" aria-label="Cotización del dólar en pesos"/>
+          <input type="text" inputmode="decimal" class="input" data-bind="conv-dolar" placeholder="1475" aria-label="Cotización del dólar en pesos"/>
         </div>
       </div>
     </div>
@@ -1068,6 +1068,22 @@
       <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Te sale en pesos</p>
       <p class="ff-display text-2xl font-bold mt-1" style="color:var(--brand-ink)" data-bind="conv-result">$0</p>
       <p class="text-[11px] mt-1" style="color:var(--ink-2)" data-bind="conv-detail">Completá los pasos para ver el total</p>
+    </div>
+
+    <!-- Guardar en la lista (ej. precios en el súper) -->
+    <div class="conv-save mt-3">
+      <input type="text" class="input" data-bind="conv-desc" data-no-calc placeholder="¿Qué es? (ej. Leche) — opcional"/>
+      <button type="button" class="btn-primary w-full mt-2" data-bind="conv-guardar" disabled>+ Agregar a la lista</button>
+    </div>
+
+    <!-- Lista de registro -->
+    <div class="conv-lista-wrap mt-3">
+      <div class="conv-lista-head">
+        <span class="conv-lista-title">Mi lista</span>
+        <button type="button" class="conv-lista-clear" data-bind="conv-lista-clear">Vaciar</button>
+      </div>
+      <div class="conv-lista" data-bind="conv-lista"></div>
+      <p class="conv-lista-total" data-bind="conv-lista-total"></p>
     </div>
   </article>
 </template>

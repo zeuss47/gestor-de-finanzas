@@ -1,6 +1,15 @@
 {
   "entradas": [
     {
+      "version": "2.8",
+      "fecha": "2026-06-19",
+      "items": [
+        "Menú de Utilidades: la Calculadora y el Conversor de viaje ahora son secciones plegables que abrís por separado.",
+        "Conversor: arreglado el cálculo con formato argentino (coma decimal y puntos de miles); todos los valores se cargan a mano (sin autocompletar el dólar).",
+        "Conversor: nueva lista — guardá cada conversión con un nombre (ej. precios en el súper) y mirá el total."
+      ]
+    },
+    {
       "version": "2.7",
       "fecha": "2026-06-19",
       "items": [

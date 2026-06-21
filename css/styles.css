@@ -2258,6 +2258,9 @@ html.light select.input { color-scheme: light; }
   z-index: 1;
 }
 .input-with-prefix .input { padding-left: 2rem; }
+/* Prefijo "US$" (3 caracteres) es más ancho que "$": más sangría para que el
+   valor no se solape con el prefijo. */
+.input-with-prefix input[data-bind="conv-usd"] { padding-left: 3.7rem; }
 
 /* Grid de métodos de pago */
 .method-grid {
@@ -3772,6 +3775,54 @@ body.view-analisis #main-widgets::before {
   background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 9%, var(--surface-2)), var(--surface-2));
   border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--border));
 }
+
+/* ── Menú de Utilidades: acordeones colapsables ──────────────── */
+.util-acc {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.util-acc-head {
+  width: 100%; display: flex; align-items: center; gap: .7rem;
+  padding: .9rem 1rem; background: transparent; border: none; cursor: pointer;
+  color: var(--ink); text-align: left;
+  transition: color .15s var(--ease-std), background .15s var(--ease-std);
+}
+.util-acc-head:hover { background: var(--surface-2); }
+.util-acc-ic { font-size: 1.15rem; flex-shrink: 0; }
+.util-acc-titles { display: flex; flex-direction: column; line-height: 1.2; margin-right: auto; min-width: 0; }
+.util-acc-titles b { font-family: 'IBM Plex Mono', monospace; font-size: .9rem; font-weight: 600; white-space: nowrap; }
+.util-acc-titles small { font-size: .68rem; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.util-acc-chev { width: 1.1rem; height: 1.1rem; color: var(--ink-muted); flex-shrink: 0; transition: transform .25s var(--ease-std); }
+.util-acc[data-open="true"] .util-acc-chev { transform: rotate(180deg); }
+.util-acc[data-open="true"] .util-acc-head { color: var(--brand-ink); }
+/* Colapso fluido sin números mágicos (grid 0fr→1fr) */
+.util-acc-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s var(--ease-std); }
+.util-acc[data-open="true"] .util-acc-body { grid-template-rows: 1fr; }
+.util-acc-bodyinner { overflow: hidden; min-height: 0; }
+.util-acc-inner { padding: .25rem 1rem 1.1rem; }
+
+/* ── Conversor: guardar + lista de registro ──────────────────── */
+.conv-save { display: flex; flex-direction: column; }
+.conv-lista-wrap { border-top: 1px solid var(--border); padding-top: .85rem; }
+.conv-lista-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .55rem; }
+.conv-lista-title { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); font-weight: 600; }
+.conv-lista-clear { background: none; border: none; color: var(--danger); font-size: .68rem; cursor: pointer; padding: .1rem .2rem; }
+.conv-lista { display: flex; flex-direction: column; gap: .4rem; }
+.conv-lista-empty { font-size: .74rem; color: var(--ink-muted); line-height: 1.4; }
+.conv-lista-item {
+  display: flex; align-items: center; gap: .5rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: .7rem; padding: .5rem .65rem;
+}
+.conv-lista-info { display: flex; flex-direction: column; min-width: 0; margin-right: auto; }
+.conv-lista-desc { font-size: .82rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv-lista-sub { font-family: 'IBM Plex Mono', monospace; font-size: .72rem; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv-lista-del { background: none; border: none; color: var(--ink-muted); cursor: pointer; font-size: .85rem; padding: .25rem .4rem; flex-shrink: 0; border-radius: 6px; }
+.conv-lista-del:hover { color: var(--danger); background: var(--surface-3); }
+.conv-lista-total { font-family: 'IBM Plex Mono', monospace; font-size: .8rem; font-weight: 700; color: var(--brand-ink); margin-top: .65rem; text-align: right; }
 
 /* Opciones del diálogo de eliminar meta con saldo */
 .md-opts { display: flex; flex-direction: column; gap: .55rem; }
