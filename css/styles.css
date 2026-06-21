@@ -880,7 +880,7 @@ html.light #bottom-nav::before { background: #eef2ff; }
 }
 #wheel-overlay.open { opacity: 1; pointer-events: auto; }
 #wheel-menu {
-  position: fixed; right: 16px; bottom: 104px; z-index: 36;
+  position: fixed; right: 16px; bottom: 76px; z-index: 36;   /* más abajo, cerca del nav */
   width: 52px; height: 52px;
 }
 /* Trigger de la rueda: usa el mismo estilo ORBE que el +. Al abrir se intensifica
@@ -911,7 +911,7 @@ html.light #bottom-nav::before { background: #eef2ff; }
 }
 #wheel-menu.open .wheel-item {
   transform: translate(var(--tx, 0), var(--ty, 0)) scale(1);
-  opacity: 1; pointer-events: auto;
+  opacity: var(--op, 1); pointer-events: auto;
 }
 #wheel-menu.wheel-instant .wheel-item { transition: none !important; }
 .wheel-item:active { filter: brightness(1.12); }

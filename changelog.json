@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.23",
+      "fecha": "2026-06-21",
+      "items": [
+        "La rueda de acciones ahora es una rueda de selección: el botón quedó más abajo, los íconos no se solapan aunque agregues muchos (los que no entran quedan fuera de pantalla) y podés girarla arrastrando para acceder al resto.",
+        "En el teléfono ahora podés deslizar de costado para cambiar entre Inicio, Historial, Tarjetas y Metas."
+      ]
+    },
+    {
       "version": "2.22",
       "fecha": "2026-06-21",
       "items": [

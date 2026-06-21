@@ -1,7 +1,7 @@
 {
-  "version": "2.22",
-  "build": 136,
-  "modified": "2026-06-21T20:00:00Z",
-  "commit": "fix: overlay de la rueda bloqueaba clics del dashboard en movil (gate por pointer-events)",
+  "version": "2.23",
+  "build": 137,
+  "modified": "2026-06-21T20:30:00Z",
+  "commit": "rueda de seleccion rotable + trigger mas abajo + swipe horizontal para cambiar de tab",
   "notes": "Version derivada de changelog.json"
 }

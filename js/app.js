@@ -5518,22 +5518,54 @@ async function quitarGastoHabitual(habitualId) {
   await reloadAll();
 }
 
-/** Abre/cierra el menú de rueda (acciones rápidas radiales). */
+/* Estado de la RUEDA de selección rotable. Espaciado angular FIJO (los ítems no
+   se solapan aunque haya muchos); si no entran en la ventana visible, el sobrante
+   queda fuera de pantalla y se accede ROTANDO (arrastrando). */
+let _wheelRot = 0, _wheelGeo = null, _wheelDragged = false;
+const WHEEL_STEP = 26;        // grados entre ítems (fijo → sin solape)
+const WHEEL_R = 158;          // radio del arco
+const WHEEL_START = -8;       // ítem base, apenas bajo la horizontal-izquierda
+const WHEEL_VIS = 104;        // amplitud de la ventana visible (de -8° a ~96°)
+
+/** Recalcula posición (--tx/--ty) y opacidad (--op) de cada ítem según _wheelRot.
+    Los ítems fuera de la ventana visible se desvanecen (no se solapan ni tapan). */
+function _applyWheelLayout(instant) {
+  const wrap = document.getElementById('wheel-items');
+  const menu = document.getElementById('wheel-menu');
+  if (!wrap || !_wheelGeo) return;
+  if (instant && menu) menu.classList.add('wheel-instant');
+  wrap.querySelectorAll('.wheel-item').forEach((btn, i) => {
+    const deg = WHEEL_START + i * WHEEL_STEP + _wheelRot;
+    const phi = deg * Math.PI / 180;
+    const tx = -WHEEL_R * Math.cos(phi);   // dx<0 → izquierda
+    const ty = -WHEEL_R * Math.sin(phi);   // dy<0 → arriba
+    let op = 1;
+    if (deg < WHEEL_START - 6)      op = Math.max(0, 1 + (deg - (WHEEL_START - 6)) / 20);
+    else if (deg > WHEEL_START + WHEEL_VIS) op = Math.max(0, 1 - (deg - (WHEEL_START + WHEEL_VIS)) / 20);
+    btn.style.setProperty('--tx', tx.toFixed(1) + 'px');
+    btn.style.setProperty('--ty', ty.toFixed(1) + 'px');
+    btn.style.setProperty('--op', op.toFixed(2));
+    btn.style.pointerEvents = op > 0.5 ? 'auto' : 'none';
+  });
+  if (instant && menu) requestAnimationFrame(() => menu.classList.remove('wheel-instant'));
+}
+
+/** Abre/cierra el menú de rueda. Al abrir resetea la rotación. */
 function toggleWheel(force) {
   const menu = document.getElementById('wheel-menu');
   const ov   = document.getElementById('wheel-overlay');
   const trig = document.getElementById('wheel-trigger');
   if (!menu) return;
   const willOpen = (force !== undefined) ? force : !menu.classList.contains('open');
+  if (willOpen) { _wheelRot = 0; _applyWheelLayout(false); }
   menu.classList.toggle('open', willOpen);
   menu.setAttribute('aria-hidden', willOpen ? 'false' : 'true');
   trig?.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
   if (ov) ov.classList.toggle('open', willOpen);   // pointer-events/opacity via CSS
 }
 
-/** Construye los ítems del menú de rueda: Cargar PDF + habituales + presets,
-    posicionados en un arco a la izquierda (sesgado hacia arriba). Reemplaza a
-    la antigua barra horizontal. Se re-llama en cada reloadAll (contadores). */
+/** Construye los ítems del menú de rueda: Cargar PDF + habituales + presets.
+    Espaciado fijo + rotación → rueda de selección. Se re-llama en cada reloadAll. */
 function renderWheel() {
   const wrap = document.getElementById('wheel-items');
   if (!wrap) return;
@@ -5546,7 +5578,6 @@ function renderWheel() {
     { ic: '🚌', lbl: 'Transporte', slug: 'transporte' },
     { ic: '🎬', lbl: 'Ocio',       slug: 'ocio' },
   ];
-  // Cada ítem: { ic, lbl, color, count, accion(), hold()? , cierra }
   const items = [
     { ic: '📄', lbl: 'Cargar PDF', accent: 'var(--brand-ink)', cierra: true,
       accion: () => document.getElementById('dlg-documentos')?.showModal() },
@@ -5559,35 +5590,30 @@ function renderWheel() {
     ...presets.map(p => ({ ic: p.ic, lbl: p.lbl, cierra: true, accion: () => quickAction(p.slug) })),
   ];
 
-  // Geometría: arco a la izquierda del trigger, sesgado hacia arriba para no
-  // chocar con el nav inferior. φ desde la izquierda (0°) girando hacia arriba.
   const N = items.length;
-  const R = Math.max(150, Math.min(230, 96 + N * 16));
-  const startDeg = -8;                                    // ítem inferior, apenas bajo la horizontal-izq
-  // No pasar de ~90° (vertical) para que el ítem superior no se vaya a la derecha.
-  const totalDeg = Math.min(98, N > 1 ? (N - 1) * 15 : 0);
+  // Si todos entran en la ventana visible, rotMin=0 (no hace falta girar);
+  // si no, rotMin negativo permite traer los sobrantes a la vista.
+  const rotMin = Math.min(0, -((N - 1) * WHEEL_STEP - WHEEL_VIS));
+  _wheelGeo = { N, rotMin };
+  _wheelRot = Math.max(rotMin, Math.min(0, _wheelRot));   // re-clamp si cambió N
 
   const wasOpen = document.getElementById('wheel-menu')?.classList.contains('open');
-  if (wasOpen) document.getElementById('wheel-menu').classList.add('wheel-instant');
 
   wrap.innerHTML = items.map((it, i) => {
-    const phi = (startDeg + (N > 1 ? totalDeg * i / (N - 1) : 0)) * Math.PI / 180;
-    const tx = -R * Math.cos(phi);    // dx<0 → izquierda
-    const ty = -R * Math.sin(phi);    // dy<0 → arriba
     const accent = it.color || it.accent || 'var(--border-2)';
     return `<button class="wheel-item" type="button" data-i="${i}" aria-label="${escapeHtml(it.lbl)}"
-      style="--tx:${tx.toFixed(0)}px; --ty:${ty.toFixed(0)}px; transition-delay:${i * 26}ms; border-color:${accent}">
+      style="transition-delay:${i * 22}ms; border-color:${accent}">
       <span aria-hidden="true">${escapeHtml(it.ic)}</span>
       ${it.count > 0 ? `<span class="qa-count" style="background:${it.color || 'var(--brand)'}">${it.count}</span>` : ''}
       <span class="wheel-lbl">${escapeHtml(it.lbl)}</span>
     </button>`;
   }).join('');
 
-  if (wasOpen) requestAnimationFrame(() => document.getElementById('wheel-menu')?.classList.remove('wheel-instant'));
+  _applyWheelLayout(wasOpen);   // posiciona; instantáneo si ya estaba abierta
 
   wrap.querySelectorAll('.wheel-item').forEach((btn, i) => {
     const it = items[i];
-    btn.onclick = () => { if (it.cierra) toggleWheel(false); it.accion?.(); };
+    btn.onclick = () => { if (_wheelDragged) return; if (it.cierra) toggleWheel(false); it.accion?.(); };
     if (it.hold) btn.oncontextmenu = (e) => { e.preventDefault(); it.hold(); };
   });
 }
@@ -8549,11 +8575,58 @@ async function init() {
   };
   document.addEventListener('scroll', _onScroll, { capture: true, passive: true });
 
-  // Menú de rueda (acciones rápidas radiales desde el borde derecho)
+  // Menú de rueda (rueda de selección rotable desde el borde derecho)
   document.getElementById('wheel-trigger')?.addEventListener('click', () => toggleWheel());
-  document.getElementById('wheel-overlay')?.addEventListener('click', () => toggleWheel(false));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleWheel(false); });
+  // Arrastre vertical sobre el overlay = girar la rueda; tap (sin arrastrar) = cerrar.
+  const _ovEl = document.getElementById('wheel-overlay');
+  if (_ovEl) {
+    let active = false, startY = 0, startRot = 0;
+    _ovEl.addEventListener('pointerdown', (e) => {
+      active = true; _wheelDragged = false; startY = e.clientY; startRot = _wheelRot;
+      try { _ovEl.setPointerCapture(e.pointerId); } catch {}
+    });
+    _ovEl.addEventListener('pointermove', (e) => {
+      if (!active || !_wheelGeo) return;
+      const dy = e.clientY - startY;
+      if (Math.abs(dy) > 6) _wheelDragged = true;
+      _wheelRot = Math.max(_wheelGeo.rotMin, Math.min(0, startRot + dy * 0.42));
+      _applyWheelLayout(true);
+    });
+    const _end = () => { if (!active) return; active = false; if (!_wheelDragged) toggleWheel(false); };
+    _ovEl.addEventListener('pointerup', _end);
+    _ovEl.addEventListener('pointercancel', () => { active = false; });
+  }
   renderWheel();
+
+  // ── Swipe horizontal (móvil) para cambiar de pestaña ──────────────
+  // Inicio ↔ Historial ↔ Tarjetas ↔ Metas. Ignora gestos sobre elementos con
+  // scroll horizontal propio, inputs, mapa, la rueda, o con un diálogo abierto.
+  (() => {
+    const ORDEN = ['home', 'gastos', 'tarjetas', 'metas'];
+    let sx = 0, sy = 0, st = 0, track = false;
+    const navVisible = () => {
+      const n = document.getElementById('bottom-nav');
+      return n && getComputedStyle(n).display !== 'none';
+    };
+    const bloqueado = (t) => !t || (t.closest && t.closest(
+      'input, textarea, select, .leaflet-container, #wheel-menu, #wheel-overlay, .conv-row, [data-no-swipe], .overflow-x-auto, .prod-super-chips, .mov-filtros-row'));
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1 || !navVisible() || document.querySelector('dialog[open]')
+          || document.getElementById('wheel-menu')?.classList.contains('open') || bloqueado(e.target)) { track = false; return; }
+      track = true; const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now();
+    }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      if (!track) return; track = false;
+      const t = e.changedTouches[0]; const dx = t.clientX - sx, dy = t.clientY - sy, dt = Date.now() - st;
+      if (dt > 600 || Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.5) return;  // gesto horizontal claro
+      const idx = ORDEN.indexOf(currentTab);
+      if (idx < 0) return;
+      const next = dx < 0 ? idx + 1 : idx - 1;   // izq → siguiente, der → anterior
+      if (next < 0 || next >= ORDEN.length) return;
+      document.querySelector(`[data-tab="${ORDEN[next]}"]`)?.click();
+    }, { passive: true });
+  })();
 
   // Navegación por tabs (corregida)
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
