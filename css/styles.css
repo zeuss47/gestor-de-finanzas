@@ -3882,6 +3882,14 @@ body.view-analisis #main-widgets::before {
 .prod-precio-row.mejor .prod-precio-val { color: var(--success); }
 .prod-precio-fecha { font-size: .66rem; color: var(--ink-muted); white-space: nowrap; }
 .prod-del-prod { margin-top: .5rem; display: inline-block; }
+/* Chips de supermercado (grilla tipo categorías): el elegido se tiñe con su color */
+.prod-super-chips { margin-top: .35rem; }
+.prod-super-chips .cat-chip:has(input:checked) {
+  background: color-mix(in srgb, var(--chip-color) 16%, transparent);
+  border-color: var(--chip-color);
+  color: var(--ink);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--chip-color) 40%, transparent);
+}
 
 /* ---- Mapa de compras (Leaflet) ---- */
 .mapa-tool { display: flex; flex-direction: column; }

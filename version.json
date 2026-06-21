@@ -1,7 +1,7 @@
 {
-  "version": "2.14",
-  "build": 128,
-  "modified": "2026-06-21T13:00:00Z",
-  "commit": "Fase 3: mapa de compras (Leaflet + OSM) con ubicacion GPS y ranking por cercania",
+  "version": "2.15",
+  "build": 129,
+  "modified": "2026-06-21T14:00:00Z",
+  "commit": "productos: selector de super como chips de categoria (grilla con icono+nombre)",
   "notes": "Version derivada de changelog.json"
 }

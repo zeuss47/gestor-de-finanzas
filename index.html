@@ -1126,9 +1126,10 @@
 
       <!-- Paso 3: súper + precio -->
       <div>
-        <label class="conv-step-lbl">3 · Supermercado y precio</label>
-        <select class="input w-full" data-bind="prod-super" data-no-calc aria-label="Supermercado"></select>
-        <div class="input-with-prefix w-full mt-2">
+        <label class="conv-step-lbl">3 · ¿En qué supermercado?</label>
+        <div class="chip-row-big prod-super-chips" data-bind="prod-super-chips" role="radiogroup" aria-label="Supermercado"></div>
+        <label class="conv-step-lbl" style="margin-top:.7rem">Precio</label>
+        <div class="input-with-prefix w-full">
           <span class="input-prefix">$</span>
           <input type="text" inputmode="decimal" class="input w-full" data-bind="prod-precio" placeholder="Precio"/>
         </div>

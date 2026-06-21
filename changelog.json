@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.15",
+      "fecha": "2026-06-21",
+      "items": [
+        "Productos: elegir el supermercado ahora es una grilla de chips con ícono y nombre (como las categorías de gasto), en vez de un desplegable. El elegido se resalta con el color del súper."
+      ]
+    },
+    {
       "version": "2.14",
       "fecha": "2026-06-21",
       "items": [

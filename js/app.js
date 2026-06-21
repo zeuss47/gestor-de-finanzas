@@ -3006,8 +3006,20 @@ function renderProductos(el) {
   }
   const supers = () => state.ajustes?.catalogos?.supermercados || [];
   const superById = id => supers().find(s => s.id === id) || { nombre: id || '-', color: '#94a3b8', icono: '🏬' };
-  const selSuper = $('[data-bind="prod-super"]');
-  if (selSuper) selSuper.innerHTML = supers().map(s => `<option value="${s.id}">${s.icono || ''} ${escapeHtml(s.nombre)}</option>`).join('');
+  const chipsSuper = $('[data-bind="prod-super-chips"]');
+  const renderSuperChips = () => {
+    if (!chipsSuper) return;
+    const prev = chipsSuper.querySelector('input:checked')?.value;
+    const lista = supers();
+    const sel = prev || lista[0]?.id;
+    chipsSuper.innerHTML = lista.map(s => `
+      <label class="cat-chip" style="--chip-color:${s.color || 'var(--brand)'}">
+        <input type="radio" name="prod_super" value="${s.id}"${s.id === sel ? ' checked' : ''}>
+        <span>${escapeHtml(s.icono || '🛒')}<br>${escapeHtml(s.nombre)}</span>
+      </label>`).join('');
+  };
+  renderSuperChips();
+  const selectedSuper = () => chipsSuper?.querySelector('input:checked')?.value || supers()[0]?.id;
   let productos = [], precios = [], prodActual = null;
   const actualizarGuardar = () => {
     const nombre = ($('[data-bind="prod-nombre"]')?.value || '').trim();
@@ -3061,7 +3073,7 @@ function renderProductos(el) {
   const guardar = async () => {
     const codigo = ($('[data-bind="prod-codigo"]')?.value || '').trim();
     const nombre = ($('[data-bind="prod-nombre"]')?.value || '').trim();
-    const superId = selSuper?.value || (supers()[0]?.id);
+    const superId = selectedSuper();
     const precio = _numAR($('[data-bind="prod-precio"]')?.value);
     if (!nombre || !(precio > 0)) { if (typeof toast === 'function') toast('Completá nombre y precio'); return; }
     // Buscar el producto por código; si no, por nombre exacto (así re-cargar el mismo
