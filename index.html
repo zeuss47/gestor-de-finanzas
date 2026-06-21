@@ -995,18 +995,26 @@
     </header>
 
     <div class="space-y-2">
-      <input type="text" inputmode="decimal" placeholder="Monto total" class="input" data-bind="calc-monto"/>
+      <input type="text" class="input" data-bind="calc-concepto" data-no-calc placeholder="¿Qué gasto? (ej. Cena) — opcional"/>
       <div class="grid grid-cols-2 gap-2">
+        <input type="text" inputmode="decimal" placeholder="Monto total" class="input" data-bind="calc-monto"/>
         <input type="text" inputmode="numeric" placeholder="Personas" class="input" data-bind="calc-personas" value="2"/>
-        <input type="text" inputmode="decimal" placeholder="% propina" class="input" data-bind="calc-propina" value="0"/>
       </div>
-      <button class="btn-primary w-full" data-action="calc-go">⚡ Calcular</button>
+      <div class="calc-preview">
+        <span>Cada uno paga</span>
+        <b class="ff-display" data-bind="calc-cada">$0</b>
+      </div>
+      <button type="button" class="btn-primary w-full" data-action="calc-confirmar">✓ Confirmar división</button>
     </div>
 
-    <div class="mt-4 p-3 rounded-xl" style="background:var(--surface-2);border:1px solid var(--border)">
-      <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted)">Cada uno paga</p>
-      <p class="ff-display text-2xl font-bold mt-1 text-accent" data-bind="calc-result">$0</p>
-      <p class="text-[10px] mt-1" style="color:var(--ink-muted)" data-bind="calc-detail">—</p>
+    <!-- Lista por persona: quién tiene que aportar y si pagó (registro) -->
+    <div class="calc-lista-wrap mt-3" data-bind="calc-lista-wrap" hidden>
+      <div class="calc-lista-head">
+        <span class="calc-lista-titulo" data-bind="calc-lista-titulo">División</span>
+        <button type="button" class="conv-lista-clear" data-bind="calc-nueva">Nueva</button>
+      </div>
+      <div class="calc-lista" data-bind="calc-lista"></div>
+      <p class="calc-resumen" data-bind="calc-resumen"></p>
     </div>
   </article>
 </template>

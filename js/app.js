@@ -2691,24 +2691,72 @@ async function guardarEditorTiposCambio() {
 }
 
 function renderCalculadora(el) {
-  const compute = () => {
-    const monto    = _numAR(el.querySelector('[data-bind="calc-monto"]').value);
-    const personas = Math.max(1, Math.round(_numAR(el.querySelector('[data-bind="calc-personas"]').value)) || 1);
-    const propina  = _numAR(el.querySelector('[data-bind="calc-propina"]').value);
-    const total    = monto * (1 + propina / 100);
-    const cada     = total / personas;
-    el.querySelector('[data-bind="calc-result"]').textContent = FMT.format(cada);
-    el.querySelector('[data-bind="calc-detail"]').textContent =
-      `Total ${FMT.format(total)} ÷ ${personas} personas (propina ${propina}%)`;
+  const $ = s => el.querySelector(s);
+  const num = sel => _numAR($(sel)?.value);
+  const LS = 'gf_split';
+  const get = () => { try { return JSON.parse(localStorage.getItem(LS) || 'null'); } catch { return null; } };
+  const save = (s) => { try { s ? localStorage.setItem(LS, JSON.stringify(s)) : localStorage.removeItem(LS); } catch {} };
+
+  const preview = () => {
+    const total = num('[data-bind="calc-monto"]');
+    const n = Math.max(1, Math.round(num('[data-bind="calc-personas"]')) || 1);
+    const c = $('[data-bind="calc-cada"]'); if (c) c.textContent = FMT.format(total / n);
   };
-  const btn = el.querySelector('[data-action="calc-go"]');
-  if (btn) btn.onclick = compute;
-  // Cálculo en vivo al tipear + Enter
-  el.querySelectorAll('input').forEach(i => {
-    i.oninput = compute;
-    i.onkeydown = e => { if (e.key === 'Enter') compute(); };
+
+  const renderLista = () => {
+    const sp = get();
+    const wrap = $('[data-bind="calc-lista-wrap"]');
+    if (!wrap) return;
+    if (!sp || !sp.personas?.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    $('[data-bind="calc-lista-titulo"]').textContent = `${sp.concepto || 'División'} · ${FMT.format(sp.cada)} c/u`;
+    const cont = $('[data-bind="calc-lista"]');
+    cont.innerHTML = sp.personas.map((per, i) => `
+      <div class="calc-persona">
+        <input type="text" class="input calc-persona-nombre" data-nombre="${i}" value="${escapeHtml(per.nombre || ('Persona ' + (i + 1)))}" aria-label="Nombre de la persona"/>
+        <span class="calc-persona-monto">${FMT.format(sp.cada)}</span>
+        <button type="button" class="calc-pago ${per.pago ? 'pagado' : ''}" data-pago="${i}">${per.pago ? '✓ Pagó' : '○ Debe'}</button>
+      </div>`).join('');
+    const pagaron = sp.personas.filter(per => per.pago).length;
+    const falta = (sp.personas.length - pagaron) * sp.cada;
+    $('[data-bind="calc-resumen"]').innerHTML =
+      `Pagaron <b>${pagaron}/${sp.personas.length}</b> · Falta <b>${FMT.format(falta)}</b> · Total ${FMT.format(sp.total)}`;
+    cont.querySelectorAll('[data-pago]').forEach(b => b.onclick = () => {
+      const s = get(); if (!s) return; const i = +b.dataset.pago;
+      s.personas[i].pago = !s.personas[i].pago; save(s); renderLista();
+    });
+    cont.querySelectorAll('[data-nombre]').forEach(inp => inp.oninput = () => {
+      const s = get(); if (!s) return; s.personas[+inp.dataset.nombre].nombre = inp.value; save(s);
+    });
+  };
+
+  $('[data-action="calc-confirmar"]')?.addEventListener('click', () => {
+    const total = num('[data-bind="calc-monto"]');
+    const n = Math.max(1, Math.round(num('[data-bind="calc-personas"]')) || 1);
+    if (!(total > 0)) { if (typeof toast === 'function') toast('Ingresá el monto a dividir'); return; }
+    const concepto = ($('[data-bind="calc-concepto"]')?.value || '').trim();
+    const prev = get();
+    const personas = Array.from({ length: n }, (_, i) => ({
+      nombre: prev?.personas?.[i]?.nombre || ('Persona ' + (i + 1)),
+      pago: false,
+    }));
+    save({ concepto, total, cada: total / n, personas, ts: Date.now() });
+    renderLista();
+    if (typeof toast === 'function') toast('✓ División confirmada');
   });
-  compute();
+  $('[data-bind="calc-nueva"]')?.addEventListener('click', () => { save(null); renderLista(); });
+
+  el.querySelectorAll('input').forEach(i => { if (!i.dataset.noCalc) { i.oninput = preview; i.onkeydown = e => { if (e.key === 'Enter') $('[data-action="calc-confirmar"]')?.click(); }; } });
+
+  // Retomar la última división guardada (prefill + lista)
+  const sp = get();
+  if (sp) {
+    if ($('[data-bind="calc-concepto"]')) $('[data-bind="calc-concepto"]').value = sp.concepto || '';
+    if ($('[data-bind="calc-monto"]')) $('[data-bind="calc-monto"]').value = String(sp.total);
+    if ($('[data-bind="calc-personas"]')) $('[data-bind="calc-personas"]').value = String(sp.personas.length);
+  }
+  preview();
+  renderLista();
 }
 
 /* Conversor de viaje: moneda extranjera → USD → ARS (conversión en cadena).
@@ -2759,6 +2807,17 @@ function renderConversor(el) {
   const esUSD = () => monedaCode() === 'USD';
   let mode = 'usd';
 
+  // Recordar (a mano) la tasa de cada moneda y el dólar para autocompletar.
+  const LS_RATES = 'gf_conv_rates', LS_DOLAR = 'gf_conv_dolar';
+  const getRates = () => { try { return JSON.parse(localStorage.getItem(LS_RATES) || '{}'); } catch { return {}; } };
+  const setRate = (code, v) => { const r = getRates(); if (v > 0) r[code] = v; else delete r[code]; try { localStorage.setItem(LS_RATES, JSON.stringify(r)); } catch {} };
+  const setMode = (m) => {
+    mode = m;
+    el.querySelectorAll('[data-conv-mode]').forEach(x => x.classList.toggle('active', x.dataset.convMode === m));
+    const pu = $('[data-conv-pane="usd"]'); if (pu) pu.hidden = m !== 'usd';
+    const pt = $('[data-conv-pane="tasa"]'); if (pt) pt.hidden = m !== 'tasa';
+  };
+
   // Conversión en cadena: origen → USD → ARS. Si el origen ES USD, el monto ya es USD.
   const calc = () => {
     const monto = num('[data-bind="conv-monto"]');
@@ -2790,24 +2849,29 @@ function renderConversor(el) {
     const step2 = $('[data-conv-step="usd"]'); if (step2) step2.hidden = esUSD();
     const lbl = $('[data-bind="conv-moneda-lbl"]'); if (lbl) lbl.textContent = code;
     const mInp = $('[data-bind="conv-monto"]'); if (mInp) mInp.placeholder = esUSD() ? 'Monto en US$' : `Monto en ${code}`;
+    // Autocompletar la tasa guardada de esta moneda → modo "Sé la tasa".
+    if (!esUSD()) {
+      const r = getRates()[code];
+      const tInp = $('[data-bind="conv-tasa"]'); if (tInp) tInp.value = r ? String(r) : '';
+      if (r > 0) setMode('tasa');
+    }
     compute();
   };
   if (sel) sel.onchange = () => {
-    // la tasa/usd/monto son de la moneda anterior → limpiar al cambiar
-    ['conv-tasa', 'conv-usd', 'conv-monto'].forEach(k => { const i = $(`[data-bind="${k}"]`); if (i) i.value = ''; });
+    // monto/usd son de la moneda anterior → limpiar (la tasa la recupera aplicarMoneda)
+    ['conv-usd', 'conv-monto'].forEach(k => { const i = $(`[data-bind="${k}"]`); if (i) i.value = ''; });
     aplicarMoneda();
   };
 
   // Toggle "Me cobraron US$" / "Sé la tasa"
-  el.querySelectorAll('[data-conv-mode]').forEach(b => b.onclick = () => {
-    mode = b.dataset.convMode;
-    el.querySelectorAll('[data-conv-mode]').forEach(x => x.classList.toggle('active', x === b));
-    const pu = $('[data-conv-pane="usd"]'); if (pu) pu.hidden = mode !== 'usd';
-    const pt = $('[data-conv-pane="tasa"]'); if (pt) pt.hidden = mode !== 'tasa';
-    compute();
-  });
+  el.querySelectorAll('[data-conv-mode]').forEach(b => b.onclick = () => { setMode(b.dataset.convMode); compute(); });
 
-  el.querySelectorAll('input').forEach(i => { if (!i.dataset.noCalc) i.oninput = compute; });
+  // Al tipear: guardar la tasa de la moneda actual y el dólar (para autocompletar luego).
+  el.querySelectorAll('input').forEach(i => { if (!i.dataset.noCalc) i.oninput = () => {
+    if (i.dataset.bind === 'conv-tasa') setRate(monedaCode(), _numAR(i.value));
+    if (i.dataset.bind === 'conv-dolar') { const d = _numAR(i.value); try { d > 0 ? localStorage.setItem(LS_DOLAR, String(d)) : localStorage.removeItem(LS_DOLAR); } catch {} }
+    compute();
+  }; });
 
   // ── Lista de registro (precios) — persiste en localStorage ──
   const LS_KEY = 'gf_conv_lista';
@@ -2848,6 +2912,10 @@ function renderConversor(el) {
     if (typeof toast === 'function') toast('✓ Agregado a la lista');
   });
   $('[data-bind="conv-lista-clear"]')?.addEventListener('click', () => { setLista([]); renderLista(); });
+
+  // Autocompletar el dólar guardado (último valor manual)
+  const dInp = $('[data-bind="conv-dolar"]');
+  if (dInp && !dInp.value) { try { const d = localStorage.getItem(LS_DOLAR); if (d) dInp.value = d; } catch {} }
 
   aplicarMoneda();
   renderLista();

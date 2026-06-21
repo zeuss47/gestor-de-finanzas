@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.11",
+      "fecha": "2026-06-19",
+      "items": [
+        "Conversor: recuerda la tasa de cada moneda y el dólar que cargaste. Al elegir una moneda se autocompletan, así solo ingresás el monto y lo agregás a la lista.",
+        "Calculadora de dividir gastos: al Confirmar genera una lista con cada persona (nombre editable + lo que aporta + casilla 'pagó') para llevar el registro de quién pagó. Queda guardado."
+      ]
+    },
+    {
       "version": "2.10",
       "fecha": "2026-06-19",
       "items": [

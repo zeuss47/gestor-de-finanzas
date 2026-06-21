@@ -3832,6 +3832,30 @@ body.view-analisis #main-widgets::before {
 .conv-lista-del:hover { color: var(--danger); background: var(--surface-3); }
 .conv-lista-total { font-family: 'IBM Plex Mono', monospace; font-size: .8rem; font-weight: 700; color: var(--brand-ink); margin-top: .65rem; text-align: right; }
 
+/* ── Calculadora: dividir gastos + lista por persona ─────────── */
+.calc-preview {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: .6rem .85rem; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: .7rem;
+}
+.calc-preview > span { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+.calc-preview b { font-size: 1.2rem; color: var(--brand-ink); }
+.calc-lista-wrap { border-top: 1px solid var(--border); padding-top: .85rem; }
+.calc-lista-titulo { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-muted); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: .5rem; }
+.calc-lista { display: flex; flex-direction: column; gap: .45rem; }
+.calc-persona { display: flex; align-items: center; gap: .5rem; }
+.calc-persona-nombre { flex: 1; min-width: 0; padding: .4rem .6rem !important; font-size: .82rem; }
+.calc-persona-monto { font-family: 'IBM Plex Mono', monospace; font-size: .76rem; color: var(--ink-2); white-space: nowrap; flex-shrink: 0; }
+.calc-pago {
+  flex-shrink: 0; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--ink-muted); font-size: .7rem; font-weight: 600; padding: .38rem .55rem;
+  border-radius: .6rem; cursor: pointer; white-space: nowrap;
+  transition: background .15s var(--ease-std), color .15s var(--ease-std), border-color .15s var(--ease-std);
+}
+.calc-pago.pagado { background: var(--success-bg); color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, var(--border)); }
+.calc-resumen { font-size: .78rem; color: var(--ink-2); margin-top: .7rem; }
+.calc-resumen b { color: var(--ink); font-weight: 700; }
+
 /* Opciones del diálogo de eliminar meta con saldo */
 .md-opts { display: flex; flex-direction: column; gap: .55rem; }
 .md-opt {
