@@ -2943,6 +2943,7 @@ function abrirUtilidades() {
       { id: 'calculadora', ic: '🧮', titulo: 'Calculadora', sub: 'Dividir gastos (split)', fn: renderCalculadora },
       { id: 'conversor',   ic: '🌎', titulo: 'Conversor de viaje', sub: 'Multi-moneda + lista', fn: renderConversor },
       { id: 'productos',   ic: '🏷️', titulo: 'Productos', sub: 'Precios por súper + comparar', fn: renderProductos },
+      { id: 'mapa',        ic: '🗺️', titulo: 'Mapa de compras', sub: 'Ubicá tus súper + cercanía', fn: renderMapa },
     ];
     items.forEach(({ id, ic, titulo, sub, fn }) => {
       const tpl = document.getElementById('tpl-widget-' + id);
@@ -2980,6 +2981,7 @@ function abrirUtilidades() {
 }
 function cerrarUtilidades() {
   if (typeof _prodScanStop === 'function') { try { _prodScanStop(); } catch {} }
+  if (typeof _mapaDestroy === 'function') { try { _mapaDestroy(); } catch {} _mapaDestroy = null; }
   document.getElementById('utils-overlay')?.classList.remove('open');
   const d = document.getElementById('utils-drawer');
   if (d) { d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); }
@@ -3106,6 +3108,156 @@ function renderProductos(el) {
   cargar();
 }
 function _prodSync() { try { if (typeof notificarCambioLocal === 'function') notificarCambioLocal(); } catch {} }
+
+let _mapaDestroy = null;
+/* Herramienta Mapa (Fase 3): muestra los supermercados ubicados como pines en un
+   mapa Leaflet/OpenStreetMap. Permití ubicar cada súper (GPS o tocando el mapa),
+   ver sus productos/precios en el popup, y rankear los súper por cercanía +
+   cantidad de productos donde están más baratos. La ubicación se guarda en
+   catalogos.supermercados (sincroniza vía config.json, sin PAT). */
+function renderMapa(art) {
+  const $ = s => art.querySelector(s);
+  const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(s || '') : (s || ''));
+  const supers = () => state.ajustes?.catalogos?.supermercados || [];
+  let productos = [], precios = [];
+  let map = null, userMarker = null, markers = [];
+
+  const curPrice = (pid, sid) => {
+    const xs = precios.filter(x => x.producto_id === pid && x.supermercado_id === sid);
+    return xs.length ? Math.min(...xs.map(x => x.precio)) : null;
+  };
+  const cheapestSuper = (pid) => {
+    let best = null, bs = null;
+    for (const s of supers()) { const p = curPrice(pid, s.id); if (p != null && (best == null || p < best)) { best = p; bs = s.id; } }
+    return bs;
+  };
+  const haversine = (la1, lo1, la2, lo2) => {
+    const R = 6371, dLa = (la2 - la1) * Math.PI / 180, dLo = (lo2 - lo1) * Math.PI / 180;
+    const a = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dLo / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+  const fmtDist = d => d == null ? '' : (d < 1 ? Math.round(d * 1000) + ' m' : d.toFixed(1) + ' km');
+
+  const fillSelect = () => {
+    const sel = $('[data-bind="mapa-super"]'); if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">— elegí un súper —</option>` +
+      supers().map(s => `<option value="${s.id}">${s.icono || ''} ${esc(s.nombre)}${s.lat != null ? ' ✓' : ''}</option>`).join('');
+    if (prev) sel.value = prev;
+  };
+
+  const pinIcon = (s) => window.L.divIcon({
+    className: 'mapa-pin', iconSize: [30, 38], iconAnchor: [15, 36], popupAnchor: [0, -32],
+    html: `<div class="mapa-pin-dot" style="background:${s.color || '#94a3b8'}">${s.icono || '🛒'}</div>`,
+  });
+  const userIcon = () => window.L.divIcon({ className: 'mapa-pin', iconSize: [18, 18], iconAnchor: [9, 9], html: `<div class="mapa-pin-me"></div>` });
+
+  const popupHtml = (s) => {
+    const items = productos.map(p => ({ p, price: curPrice(p.id, s.id) })).filter(o => o.price != null);
+    if (!items.length) return `<div class="mapa-pop"><b>${s.icono || ''} ${esc(s.nombre)}</b><div class="mapa-pop-empty">Sin precios cargados acá.</div></div>`;
+    const rows = items.sort((a, b) => (a.p.nombre || '').localeCompare(b.p.nombre || '')).slice(0, 14).map(o => {
+      const best = cheapestSuper(o.p.id) === s.id;
+      return `<div class="mapa-pop-row${best ? ' mejor' : ''}"><span>${esc(o.p.nombre)}</span><b>${FMT.format(o.price)}${best ? ' ⭐' : ''}</b></div>`;
+    }).join('');
+    return `<div class="mapa-pop"><b>${s.icono || ''} ${esc(s.nombre)}</b>${rows}</div>`;
+  };
+
+  const drawMarkers = () => {
+    if (!map) return;
+    markers.forEach(m => map.removeLayer(m)); markers = [];
+    supers().forEach(s => {
+      if (s.lat == null || s.lng == null) return;
+      const m = window.L.marker([s.lat, s.lng], { icon: pinIcon(s) }).addTo(map).bindPopup(popupHtml(s));
+      markers.push(m);
+    });
+  };
+  const fitToSupers = (animate = true) => {
+    if (!map) return;
+    const pts = supers().filter(s => s.lat != null && s.lng != null).map(s => [s.lat, s.lng]);
+    if (pts.length === 1) map.setView(pts[0], 15, { animate });
+    else if (pts.length > 1) map.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
+  };
+
+  const setSuperLoc = async (sid, lat, lng) => {
+    const s = supers().find(x => x.id === sid); if (!s) return;
+    s.lat = +(+lat).toFixed(6); s.lng = +(+lng).toFixed(6);
+    await DB.put('ajustes', state.ajustes).catch(() => {});
+    fillSelect(); drawMarkers();
+    if (typeof toast === 'function') toast('📍 ' + s.nombre + ' ubicado');
+    try { if (typeof notificarCambioLocal === 'function') notificarCambioLocal(); } catch {}
+  };
+
+  const renderRanking = (uLat, uLng) => {
+    const cont = $('[data-bind="mapa-ranking"]'); if (!cont) return;
+    const cnt = {};
+    for (const p of productos) { const bs = cheapestSuper(p.id); if (bs) cnt[bs] = (cnt[bs] || 0) + 1; }
+    const rows = supers().map(s => ({
+      s, baratos: cnt[s.id] || 0,
+      items: productos.filter(p => curPrice(p.id, s.id) != null).length,
+      dist: (s.lat != null && uLat != null) ? haversine(uLat, uLng, s.lat, s.lng) : null,
+    })).filter(r => r.items > 0 || r.s.lat != null);
+    rows.sort((a, b) => (b.baratos - a.baratos) || ((a.dist ?? 1e9) - (b.dist ?? 1e9)));
+    if (!rows.length) { cont.innerHTML = `<p class="conv-lista-empty">Cargá precios en Productos y ubicá tus súper para ver el ranking.</p>`; return; }
+    cont.innerHTML = rows.map(r => `<div class="mapa-rank-row"><span class="mapa-rank-ic" style="color:${r.s.color || '#94a3b8'}">${r.s.icono || '🛒'}</span><span class="mapa-rank-name">${esc(r.s.nombre)}</span><span class="mapa-rank-meta">${r.baratos > 0 ? `<b>${r.baratos}</b> +barato${r.baratos > 1 ? 's' : ''}` : `${r.items} prod.`}${r.dist != null ? ' · ' + fmtDist(r.dist) : ''}</span></div>`).join('');
+  };
+
+  const onMapClick = (e) => {
+    const sid = $('[data-bind="mapa-super"]')?.value;
+    if (!sid) { if (typeof toast === 'function') toast('Elegí un súper para ubicarlo'); return; }
+    setSuperLoc(sid, e.latlng.lat, e.latlng.lng);
+  };
+
+  const initMap = () => {
+    if (map || !window.L) return;
+    const el = $('[data-bind="mapa"]'); if (!el) return;
+    map = window.L.map(el, { zoomControl: true }).setView([-34.6037, -58.3816], 12); // default: Buenos Aires
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    map.on('click', onMapClick);
+    drawMarkers(); fitToSupers(false);
+  };
+
+  // Botones
+  $('[data-action="mapa-gps"]')?.addEventListener('click', () => {
+    const sid = $('[data-bind="mapa-super"]')?.value;
+    if (!sid) { if (typeof toast === 'function') toast('Elegí un súper'); return; }
+    if (!navigator.geolocation) { if (typeof toast === 'function') toast('Tu dispositivo no da ubicación'); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => { setSuperLoc(sid, pos.coords.latitude, pos.coords.longitude); initMap(); map && map.setView([pos.coords.latitude, pos.coords.longitude], 15); },
+      () => { if (typeof toast === 'function') toast('No pude obtener tu ubicación'); },
+      { enableHighAccuracy: true, timeout: 8000 });
+  });
+  $('[data-action="mapa-me"]')?.addEventListener('click', () => {
+    if (!navigator.geolocation) { if (typeof toast === 'function') toast('Tu dispositivo no da ubicación'); return; }
+    navigator.geolocation.getCurrentPosition(pos => {
+      const la = pos.coords.latitude, lo = pos.coords.longitude;
+      initMap();
+      if (userMarker) userMarker.setLatLng([la, lo]); else userMarker = window.L.marker([la, lo], { icon: userIcon() }).addTo(map).bindPopup('Estás acá');
+      map.setView([la, lo], 14);
+      renderRanking(la, lo);
+    }, () => { if (typeof toast === 'function') toast('No pude obtener tu ubicación'); }, { enableHighAccuracy: true, timeout: 8000 });
+  });
+
+  // Init perezoso: el acordeón arranca colapsado (alto 0); el mapa necesita
+  // tamaño visible. Inicializamos al abrirlo y recalculamos el tamaño.
+  const acc = art.closest('.util-acc');
+  if (acc) {
+    const obs = new MutationObserver(() => {
+      if (acc.dataset.open === 'true') {
+        initMap();
+        setTimeout(() => map && map.invalidateSize(), 80);
+        setTimeout(() => { map && map.invalidateSize(); fitToSupers(false); }, 380);
+      }
+    });
+    obs.observe(acc, { attributes: true, attributeFilter: ['data-open'] });
+    _mapaDestroy = () => { try { obs.disconnect(); } catch {} try { map && map.remove(); } catch {} map = null; };
+  }
+
+  const cargar = async () => {
+    productos = await DB.live('productos'); precios = await DB.live('precios');
+    fillSelect(); drawMarkers(); renderRanking(null, null);
+  };
+  cargar();
+}
 
 function renderComparador(el) {
   const hoy = new Date();

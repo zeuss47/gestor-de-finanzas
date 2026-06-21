@@ -20,6 +20,9 @@
   <!-- Tailwind CSS — generado con CLI v3 (sin CDN, sin warning de producción) -->
   <link rel="stylesheet" href="./css/tailwind.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <!-- Leaflet (mapas con OpenStreetMap, sin API key) — usado en Utilidades → Mapa -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- CSS en 3 capas: base compartida → escritorio → móvil.
        Editá desktop.css o mobile.css por separado; cada uno conserva su @media
        y NO puede romper el diseño del otro modo. -->
@@ -1140,6 +1143,37 @@
         <input type="search" class="input prod-filtro" data-bind="prod-filtro" placeholder="Buscar…" aria-label="Filtrar productos"/>
       </div>
       <div class="prod-lista" data-bind="prod-lista"></div>
+    </div>
+  </article>
+</template>
+
+<!-- Mapa de compras (Leaflet + OpenStreetMap) -->
+<template id="tpl-widget-mapa">
+  <article class="widget card-glass p-5">
+    <header class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold">🗺️ Mapa de compras</h3>
+    </header>
+    <div class="mapa-tool">
+      <p class="conv-step-lbl">Ubicá tus supermercados</p>
+      <div class="mapa-loc-row">
+        <select class="input" data-bind="mapa-super" aria-label="Supermercado a ubicar"></select>
+        <button type="button" class="btn-secondary mapa-gps-btn" data-action="mapa-gps" title="Usar mi ubicación actual">📍 Acá estoy</button>
+      </div>
+      <p class="mapa-hint" data-bind="mapa-hint">Elegí un súper y tocá el mapa donde está, o usá «📍 Acá estoy».</p>
+
+      <div class="mapa-canvas-wrap">
+        <div class="mapa-canvas" data-bind="mapa"></div>
+        <button type="button" class="mapa-me-btn" data-action="mapa-me" title="Centrar en mi ubicación">📍 Mi ubicación</button>
+      </div>
+
+      <div class="mapa-ranking-wrap mt-3">
+        <div class="prod-lista-head">
+          <span class="conv-lista-title">Mejores lugares cerca tuyo</span>
+        </div>
+        <div class="mapa-ranking" data-bind="mapa-ranking">
+          <p class="conv-lista-empty">Tocá «📍 Mi ubicación» para ordenar tus súper por cercanía y precios.</p>
+        </div>
+      </div>
     </div>
   </article>
 </template>

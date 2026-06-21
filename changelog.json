@@ -1,6 +1,15 @@
 {
   "entradas": [
     {
+      "version": "2.14",
+      "fecha": "2026-06-21",
+      "items": [
+        "Nuevo: Mapa de compras (Utilidades → Mapa). Ubicá cada supermercado con tu GPS («📍 Acá estoy») o tocando el mapa, y se guardan en tu catálogo.",
+        "Tocá un pin para ver los productos y precios de ese súper (⭐ marca dónde está más barato cada uno).",
+        "«📍 Mi ubicación» ordena tus supermercados por cercanía y por cuántos productos tienen más baratos. Usa OpenStreetMap (sin costo)."
+      ]
+    },
+    {
       "version": "2.13",
       "fecha": "2026-06-21",
       "items": [

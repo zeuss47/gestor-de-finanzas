@@ -15,7 +15,7 @@
  *  4. MESSAGE SKIP_WAITING: el cliente decide cuando activar el SW nuevo.
  */
 
-const VERSION = 'v3.3.0-pages-b127';
+const VERSION = 'v3.3.0-pages-b128';
 const SHELL_CACHE = `shell-${VERSION}`;
 
 // Base scope dinamico: el SW se registra en su propio directorio,
@@ -44,6 +44,8 @@ const SHELL_FILES = [
   BASE + 'icons/icon-512.png',
   // CDN externos (cache-first del navegador):
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css',
 ];
 
 /* ---------- INSTALL ---------- */

@@ -1,7 +1,7 @@
 {
-  "version": "2.13",
-  "build": 127,
-  "modified": "2026-06-21T12:00:00Z",
-  "commit": "supermercados en Ajustes->Catalogos + fix precio visible en movil",
+  "version": "2.14",
+  "build": 128,
+  "modified": "2026-06-21T13:00:00Z",
+  "commit": "Fase 3: mapa de compras (Leaflet + OSM) con ubicacion GPS y ranking por cercania",
   "notes": "Version derivada de changelog.json"
 }

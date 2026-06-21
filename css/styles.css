@@ -3883,6 +3883,45 @@ body.view-analisis #main-widgets::before {
 .prod-precio-fecha { font-size: .66rem; color: var(--ink-muted); white-space: nowrap; }
 .prod-del-prod { margin-top: .5rem; display: inline-block; }
 
+/* ---- Mapa de compras (Leaflet) ---- */
+.mapa-tool { display: flex; flex-direction: column; }
+.mapa-loc-row { display: flex; gap: .5rem; align-items: stretch; }
+.mapa-loc-row .input { flex: 1; min-width: 0; }
+.mapa-gps-btn { flex-shrink: 0; white-space: nowrap; }
+.mapa-hint { font-size: .72rem; color: var(--ink-muted); margin: .4rem 0 .2rem; }
+.mapa-canvas-wrap { position: relative; }
+.mapa-canvas { height: 300px; width: 100%; border-radius: .9rem; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); z-index: 0; }
+.mapa-me-btn {
+  position: absolute; right: .55rem; bottom: .55rem; z-index: 500;
+  background: var(--surface-1); color: var(--ink); border: 1px solid var(--border);
+  border-radius: .7rem; padding: .4rem .65rem; font-size: .72rem; font-family: inherit; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25); transition: background-color .15s ease, border-color .15s ease;
+}
+.mapa-me-btn:hover { border-color: var(--brand-ink); }
+/* Pines */
+.mapa-pin { background: none; border: none; }
+.mapa-pin-dot {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; line-height: 1; font-size: 15px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4); border: 2px solid #fff;
+}
+.mapa-pin-me { width: 16px; height: 16px; border-radius: 50%; background: #2563eb; border: 2px solid #fff; box-shadow: 0 0 0 4px rgba(37,99,235,.3); }
+/* Popup */
+.leaflet-popup-content .mapa-pop { font-family: inherit; min-width: 160px; }
+.mapa-pop > b { display: block; margin-bottom: .35rem; font-size: .85rem; }
+.mapa-pop-row { display: flex; justify-content: space-between; gap: .8rem; font-size: .76rem; padding: .18rem 0; border-bottom: 1px solid var(--border); }
+.mapa-pop-row:last-child { border-bottom: none; }
+.mapa-pop-row.mejor b { color: var(--success); }
+.mapa-pop-empty { font-size: .74rem; color: var(--ink-muted); }
+/* Ranking */
+.mapa-ranking-wrap { border-top: 1px solid var(--border); padding-top: .85rem; }
+.mapa-rank-row { display: flex; align-items: center; gap: .6rem; padding: .45rem 0; border-bottom: 1px solid var(--border); }
+.mapa-rank-row:last-child { border-bottom: none; }
+.mapa-rank-ic { font-size: 1.05rem; flex-shrink: 0; }
+.mapa-rank-name { flex: 1; min-width: 0; font-weight: 600; font-size: .85rem; }
+.mapa-rank-meta { font-size: .74rem; color: var(--ink-muted); white-space: nowrap; }
+.mapa-rank-meta b { color: var(--success); }
+
 /* Opciones del diálogo de eliminar meta con saldo */
 .md-opts { display: flex; flex-direction: column; gap: .55rem; }
 .md-opt {
