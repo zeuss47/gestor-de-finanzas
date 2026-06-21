@@ -800,33 +800,20 @@ html.light #bottom-nav::before { background: #eef2ff; }
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent), 0 8px 26px rgba(0,0,0,.28) !important;
 }
 
-/* ── Botón ORBE (dorado, mate) ─────────────────────────────────────
-   Esfera con gradiente radial. SIN glow/brillo: sombra estática solo para dar
-   volumen + un reflejo apenas perceptible. Compartido por #btn-add y la rueda. */
+/* ── Botón ORBE (color sólido, sin gradiente ni brillo) ────────────
+   Color plano var(--brand). Compartido por #btn-add y el trigger de la rueda. */
 .orb-btn {
   position: relative;
   border: none; cursor: pointer; color: #fff8ec; overflow: visible;
-  background:
-    radial-gradient(circle at 70% 28%,
-      #f2dfa8 0%, var(--brand) 14%, #b8893a 30%, #6e521d 52%, #3a2c11 74%, #211907 100%);
-  box-shadow:
-    inset -6px -8px 18px rgba(20,12,0,.5),
-    inset 5px 6px 16px rgba(255,228,160,.10),
-    0 5px 14px rgba(0,0,0,.42);
+  background: var(--brand);
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
   transition: transform .22s cubic-bezier(.34,1.56,.64,1), filter .2s;
 }
-/* Reflejo mínimo: un único punto especular estático arriba-derecha (sin giro). */
-.orb-btn::before {
-  content: ''; position: absolute; pointer-events: none;
-  top: 20%; left: 56%; width: 20%; height: 20%; border-radius: 50%;
-  background: radial-gradient(circle,
-    rgba(255,247,224,.5) 0%, rgba(255,240,205,.16) 42%, transparent 70%);
-  filter: blur(.5px);
-}
+.orb-btn::before { display: none; }
 @media (hover: hover) and (pointer: fine) {
-  .orb-btn:hover { filter: brightness(1.06) saturate(1.03); }
+  .orb-btn:hover { filter: brightness(1.08); }
 }
-.orb-btn:active { transform: scale(.92); filter: brightness(1.1) saturate(1.06); }
+.orb-btn:active { transform: scale(.92); filter: brightness(1.1); }
 
 /* btn-add central (acción primaria): usa el estilo orbe; el "+" gira al tocar. */
 #btn-add { position: relative; z-index: 2; cursor: pointer; }   /* sobre el cradle */

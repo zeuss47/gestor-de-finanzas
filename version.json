@@ -1,7 +1,7 @@
-{
-  "version": "2.29",
-  "build": 143,
-  "modified": "2026-06-21T22:50:00Z",
-  "commit": "anim de swipe entre tabs + swipe der en Inicio abre Utilidades + FAB centrado + pop del +",
-  "notes": "Version derivada de changelog.json"
+﻿{
+    "version":  "2.29",
+    "build":  144,
+    "modified":  "2026-06-21T21:40:44Z",
+    "commit":  "M css/styles.css, M css/tailwind.css, M js/app.js",
+    "notes":  "Auto-update 2026-06-21 18:40"
 }

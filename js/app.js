@@ -8616,7 +8616,7 @@ async function init() {
       if (!active || !_wheelGeo) return;
       const dy = e.clientY - startY;
       if (Math.abs(dy) > 6) _wheelDragged = true;
-      _wheelRot = Math.max(_wheelGeo.rotMin, Math.min(0, startRot + dy * 0.42));
+      _wheelRot = Math.max(_wheelGeo.rotMin, Math.min(0, startRot - dy * 0.42));
       _applyWheelLayout(true);
     });
     el.addEventListener('pointerup', () => { if (!active) return; active = false; if (closeOnTap && !_wheelDragged) toggleWheel(false); });
