@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.20",
+      "fecha": "2026-06-21",
+      "items": [
+        "Los botones + y de la rueda ahora tienen estilo de 'orbe' luminoso azul: esfera con glow, un reflejo brillante que gira lento y un sutil efecto de respiración. Al presionarlos/abrir la rueda se encienden con más intensidad."
+      ]
+    },
+    {
       "version": "2.19",
       "fecha": "2026-06-21",
       "items": [

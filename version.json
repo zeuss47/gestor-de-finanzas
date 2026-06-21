@@ -1,7 +1,7 @@
 {
-  "version": "2.19",
-  "build": 133,
-  "modified": "2026-06-21T18:00:00Z",
-  "commit": "rediseño botones + (brass satinado sobrio) y rueda (vidrio oscuro/aro brass, se enciende al abrir)",
+  "version": "2.20",
+  "build": 134,
+  "modified": "2026-06-21T19:00:00Z",
+  "commit": "botones + y rueda con estilo orbe luminoso (glow azul, rim giratorio, respiracion)",
   "notes": "Version derivada de changelog.json"
 }
