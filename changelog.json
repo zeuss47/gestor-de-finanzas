@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.28",
+      "fecha": "2026-06-21",
+      "items": [
+        "Botones + y rueda: se quitó el reflejo que giraba; queda solo un punto mínimo de brillo estático."
+      ]
+    },
+    {
       "version": "2.27",
       "fecha": "2026-06-21",
       "items": [

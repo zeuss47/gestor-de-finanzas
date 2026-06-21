@@ -1,7 +1,7 @@
 {
-  "version": "2.27",
-  "build": 141,
-  "modified": "2026-06-21T22:00:00Z",
-  "commit": "animacion de la rueda acorde al radio: duracion proporcional + ease-out sin overshoot",
+  "version": "2.28",
+  "build": 142,
+  "modified": "2026-06-21T22:20:00Z",
+  "commit": "orbe: sin reflejo giratorio, solo un punto especular estatico minimo",
   "notes": "Version derivada de changelog.json"
 }

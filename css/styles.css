@@ -803,7 +803,6 @@ html.light #bottom-nav::before { background: #eef2ff; }
 /* ── Botón ORBE (dorado, mate) ─────────────────────────────────────
    Esfera con gradiente radial. SIN glow/brillo: sombra estática solo para dar
    volumen + un reflejo apenas perceptible. Compartido por #btn-add y la rueda. */
-@keyframes orb-spin { to { transform: rotate(360deg); } }
 .orb-btn {
   position: relative;
   border: none; cursor: pointer; color: #fff8ec; overflow: visible;
@@ -816,17 +815,13 @@ html.light #bottom-nav::before { background: #eef2ff; }
     0 5px 14px rgba(0,0,0,.42);
   transition: transform .22s cubic-bezier(.34,1.56,.64,1), filter .2s;
 }
-/* Reflejo cálido MUY tenue (apenas un sutil sheen que gira lento) */
+/* Reflejo mínimo: un único punto especular estático arriba-derecha (sin giro). */
 .orb-btn::before {
-  content: ''; position: absolute; inset: -1px; border-radius: 50%; pointer-events: none;
-  background: conic-gradient(from 0deg,
-    transparent 0deg, rgba(255,236,190,0) 34deg,
-    rgba(255,236,190,.14) 74deg, rgba(214,176,92,.04) 120deg,
-    transparent 160deg, transparent 360deg);
-  -webkit-mask: radial-gradient(circle, transparent 57%, #000 70%);
-          mask: radial-gradient(circle, transparent 57%, #000 70%);
-  filter: blur(1.4px);
-  animation: orb-spin 12s linear infinite;
+  content: ''; position: absolute; pointer-events: none;
+  top: 20%; left: 56%; width: 20%; height: 20%; border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255,247,224,.5) 0%, rgba(255,240,205,.16) 42%, transparent 70%);
+  filter: blur(.5px);
 }
 @media (hover: hover) and (pointer: fine) {
   .orb-btn:hover { filter: brightness(1.06) saturate(1.03); }
