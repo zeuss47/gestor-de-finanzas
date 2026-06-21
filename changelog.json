@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.13",
+      "fecha": "2026-06-21",
+      "items": [
+        "Supermercados: ahora se administran desde Ajustes → Catálogos igual que las categorías (agregar, renombrar, color, ícono, ordenar, eliminar).",
+        "Productos: el supermercado y el precio van en líneas separadas para que el monto se vea completo en el teléfono."
+      ]
+    },
+    {
       "version": "2.12",
       "fecha": "2026-06-19",
       "items": [

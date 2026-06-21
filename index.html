@@ -1124,12 +1124,10 @@
       <!-- Paso 3: súper + precio -->
       <div>
         <label class="conv-step-lbl">3 · Supermercado y precio</label>
-        <div class="conv-row">
-          <select class="input" data-bind="prod-super" data-no-calc aria-label="Supermercado"></select>
-          <div class="input-with-prefix" style="flex:1">
-            <span class="input-prefix">$</span>
-            <input type="text" inputmode="decimal" class="input" data-bind="prod-precio" placeholder="Precio"/>
-          </div>
+        <select class="input w-full" data-bind="prod-super" data-no-calc aria-label="Supermercado"></select>
+        <div class="input-with-prefix w-full mt-2">
+          <span class="input-prefix">$</span>
+          <input type="text" inputmode="decimal" class="input w-full" data-bind="prod-precio" placeholder="Precio"/>
         </div>
       </div>
       <button type="button" class="btn-primary w-full" data-bind="prod-guardar" disabled>+ Guardar precio</button>
@@ -3216,6 +3214,19 @@
           <div id="cat-ingreso-list" class="space-y-1.5"></div>
           <button type="button" id="add-cat-ingreso" class="btn-secondary w-full text-xs mt-2">
             + Agregar categoría de ingreso
+          </button>
+        </fieldset>
+
+        <fieldset class="space-y-2 mt-5">
+          <legend class="flex items-center gap-2">
+            <span>🛒</span> Supermercados
+          </legend>
+          <p class="text-xs mb-2" style="color:var(--ink-muted)">
+            Tus supermercados para registrar y comparar precios (Utilidades → Productos).
+          </p>
+          <div id="cat-supermercado-list" class="space-y-1.5"></div>
+          <button type="button" id="add-cat-supermercado" class="btn-secondary w-full text-xs mt-2">
+            + Agregar supermercado
           </button>
         </fieldset>
 

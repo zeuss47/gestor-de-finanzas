@@ -1,7 +1,7 @@
 {
-  "version": "2.12",
-  "build": 126,
-  "modified": "2026-06-19T19:00:00Z",
-  "commit": "productos: escaner codigo barras + precios por super + comparador",
+  "version": "2.13",
+  "build": 127,
+  "modified": "2026-06-21T12:00:00Z",
+  "commit": "supermercados en Ajustes->Catalogos + fix precio visible en movil",
   "notes": "Version derivada de changelog.json"
 }

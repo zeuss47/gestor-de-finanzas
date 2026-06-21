@@ -4901,6 +4901,7 @@ function abrirSettings() {
   // Render catálogos y cuentas
   renderCatalogoSettings('gasto');
   renderCatalogoSettings('ingreso');
+  renderCatalogoSettings('supermercado');
   renderHabitualesSettings();
   renderCuentasSettings();
   renderTarjetasSettings();
@@ -8851,6 +8852,10 @@ async function init() {
     state.ajustes.catalogos.categorias_ingreso.push({ id: '', nombre: 'Nuevo', icono: '✨', color: '#22c55e' });
     renderCatalogoSettings('ingreso');
   });
+  document.getElementById('add-cat-supermercado')?.addEventListener('click', () => {
+    _catArr('supermercado').push({ id: '', nombre: 'Nuevo súper', icono: '🛒', color: '#C9A24E' });
+    renderCatalogoSettings('supermercado');
+  });
   document.getElementById('add-cuenta-btn')?.addEventListener('click', () => {
     openDialog('dlg-cuenta');
   });
@@ -8990,9 +8995,18 @@ const COLOR_POOL = [
   '#64748b','#475569','#334155','#1e293b',
 ];
 
+// Devuelve el array del catálogo según el tipo (gasto/ingreso → categorias_X;
+// supermercado → supermercados). Crea el array si falta.
+function _catArr(tp) {
+  state.ajustes.catalogos = state.ajustes.catalogos || {};
+  const c = state.ajustes.catalogos;
+  if (tp === 'supermercado') return (c.supermercados = c.supermercados || []);
+  const k = `categorias_${tp}`;
+  return (c[k] = c[k] || []);
+}
 function renderCatalogoSettings(tipo) {
-  const lista = state.ajustes?.catalogos?.[`categorias_${tipo}`] || [];
-  const contId = tipo === 'gasto' ? 'cat-gasto-list' : 'cat-ingreso-list';
+  const lista = _catArr(tipo);
+  const contId = `cat-${tipo}-list`;
   const cont = document.getElementById(contId);
   if (!cont) return;
   cont.innerHTML = '';
@@ -9009,7 +9023,7 @@ function renderCatalogoSettings(tipo) {
       <span class="catalog-item-emoji" data-action="emoji" data-idx="${idx}" data-tipo="${tipo}" style="border-color:${cat.color}33;background:${cat.color}11">${cat.icono}</span>
       <div style="flex:1;min-width:0">
         <input class="catalog-item-name" type="text" value="${escapeHtml(cat.nombre)}" data-idx="${idx}" data-tipo="${tipo}" maxlength="32" placeholder="Nombre"/>
-        <div class="subcat-list catalog-subcat-list" data-idx="${idx}" data-tipo="${tipo}">
+        <div class="subcat-list catalog-subcat-list" data-idx="${idx}" data-tipo="${tipo}" ${tipo === 'supermercado' ? 'hidden' : ''}>
           ${subcats.map((s, si) => `<span class="subcat-chip">${escapeHtml(s)}<button type="button" data-action="delsubcat" data-idx="${idx}" data-tipo="${tipo}" data-si="${si}" title="Eliminar subcategoría">✕</button></span>`).join('')}
           <button type="button" class="subcat-chip" data-action="addsubcat" data-idx="${idx}" data-tipo="${tipo}" style="cursor:pointer;border-style:dashed;color:var(--brand-ink)">+ subcategoría</button>
         </div>
@@ -9029,7 +9043,7 @@ function renderCatalogoSettings(tipo) {
     inp.oninput = (e) => {
       const idx = parseInt(e.target.dataset.idx);
       const tp = e.target.dataset.tipo;
-      const arr = state.ajustes.catalogos[`categorias_${tp}`];
+      const arr = _catArr(tp);
       arr[idx].nombre = e.target.value;
       if (!arr[idx].id) arr[idx].id = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_');
     };
@@ -9050,7 +9064,7 @@ function renderCatalogoSettings(tipo) {
     btn.onclick = (e) => {
       const idx = parseInt(btn.dataset.idx);
       const tp = btn.dataset.tipo;
-      const arr = state.ajustes.catalogos[`categorias_${tp}`];
+      const arr = _catArr(tp);
       const delta = btn.dataset.action === 'up' ? -1 : 1;
       const newIdx = idx + delta;
       if (newIdx < 0 || newIdx >= arr.length) return;
@@ -9083,7 +9097,7 @@ function renderCatalogoSettings(tipo) {
       const targetIdx = parseInt(it.dataset.idx);
       const tp = it.dataset.tipo;
       if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
-      const arr = state.ajustes.catalogos[`categorias_${tp}`];
+      const arr = _catArr(tp);
       const [moved] = arr.splice(dragSrcIdx, 1);
       arr.splice(targetIdx, 0, moved);
       dragSrcIdx = null;
@@ -9096,7 +9110,7 @@ function renderCatalogoSettings(tipo) {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.idx);
       const tp = btn.dataset.tipo;
-      const arr = state.ajustes.catalogos[`categorias_${tp}`];
+      const arr = _catArr(tp);
       const [removida] = arr.splice(idx, 1);
       renderCatalogoSettings(tp);
       toastUndo('Categoría eliminada', () => {
@@ -9113,7 +9127,7 @@ function renderCatalogoSettings(tipo) {
       const tp = btn.dataset.tipo;
       const nombre = prompt('Nombre de la subcategoría:');
       if (!nombre?.trim()) return;
-      const cat = state.ajustes.catalogos[`categorias_${tp}`][idx];
+      const cat = _catArr(tp)[idx];
       if (!Array.isArray(cat.subcategorias)) cat.subcategorias = [];
       if (!cat.subcategorias.includes(nombre.trim())) cat.subcategorias.push(nombre.trim());
       renderCatalogoSettings(tp);
@@ -9124,7 +9138,7 @@ function renderCatalogoSettings(tipo) {
       const idx = parseInt(btn.dataset.idx);
       const tp  = btn.dataset.tipo;
       const si  = parseInt(btn.dataset.si);
-      const cat = state.ajustes.catalogos[`categorias_${tp}`][idx];
+      const cat = _catArr(tp)[idx];
       if (!Array.isArray(cat.subcategorias)) return;
       cat.subcategorias.splice(si, 1);
       renderCatalogoSettings(tp);
