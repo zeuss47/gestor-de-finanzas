@@ -1006,7 +1006,7 @@ async function reloadAll() {
   });
 
   renderWidgets();
-  renderQuickHabituales();
+  renderWheel();
   if (currentTab === 'gastos') renderMovimientos();
   actualizarSidebar();
   actualizarKpiStrip();
@@ -5518,22 +5518,80 @@ async function quitarGastoHabitual(habitualId) {
   await reloadAll();
 }
 
-/** Renderiza los chips-contador de habituales en la barra de acción rápida. */
-function renderQuickHabituales() {
-  const cont = document.getElementById('qa-habituales');
-  if (!cont) return;
+/** Abre/cierra el menú de rueda (acciones rápidas radiales). */
+function toggleWheel(force) {
+  const menu = document.getElementById('wheel-menu');
+  const ov   = document.getElementById('wheel-overlay');
+  const trig = document.getElementById('wheel-trigger');
+  if (!menu) return;
+  const willOpen = (force !== undefined) ? force : !menu.classList.contains('open');
+  menu.classList.toggle('open', willOpen);
+  menu.setAttribute('aria-hidden', willOpen ? 'false' : 'true');
+  trig?.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  if (ov) {
+    if (willOpen) { ov.hidden = false; requestAnimationFrame(() => ov.classList.add('open')); }
+    else { ov.classList.remove('open'); setTimeout(() => { ov.hidden = true; }, 220); }
+  }
+}
+
+/** Construye los ítems del menú de rueda: Cargar PDF + habituales + presets,
+    posicionados en un arco a la izquierda (sesgado hacia arriba). Reemplaza a
+    la antigua barra horizontal. Se re-llama en cada reloadAll (contadores). */
+function renderWheel() {
+  const wrap = document.getElementById('wheel-items');
+  if (!wrap) return;
   const habituales = getHabituales();
-  cont.innerHTML = habituales.map(h => {
-    const n = _conteoHabitualMes(h.id);
-    return `<button class="quick-btn quick-habitual" data-habitual="${escapeHtml(h.id)}"
-      style="${n>0?`border-color:${h.color};`:''}" title="${escapeHtml(h.nombre)} · ${FMT.format(h.valor||0)} c/u">
-      ${escapeHtml(h.icono||'🔁')} ${escapeHtml(h.nombre)}${n>0?`<span class="qa-count" style="background:${h.color}">${n}</span>`:''}
+  const presets = [
+    { ic: '🥤', lbl: 'Kiosco',     slug: 'kiosco' },
+    { ic: '⛽', lbl: 'Nafta',      slug: 'combustible' },
+    { ic: '🛒', lbl: 'Súper',      slug: 'super' },
+    { ic: '💡', lbl: 'Servicios',  slug: 'servicios' },
+    { ic: '🚌', lbl: 'Transporte', slug: 'transporte' },
+    { ic: '🎬', lbl: 'Ocio',       slug: 'ocio' },
+  ];
+  // Cada ítem: { ic, lbl, color, count, accion(), hold()? , cierra }
+  const items = [
+    { ic: '📄', lbl: 'Cargar PDF', accent: 'var(--brand-ink)', cierra: true,
+      accion: () => document.getElementById('dlg-documentos')?.showModal() },
+    ...habituales.map(h => ({
+      ic: h.icono || '🔁', lbl: h.nombre, color: h.color,
+      count: _conteoHabitualMes(h.id), cierra: false,
+      accion: () => registrarGastoHabitual(h.id),
+      hold:   () => quitarGastoHabitual(h.id),
+    })),
+    ...presets.map(p => ({ ic: p.ic, lbl: p.lbl, cierra: true, accion: () => quickAction(p.slug) })),
+  ];
+
+  // Geometría: arco a la izquierda del trigger, sesgado hacia arriba para no
+  // chocar con el nav inferior. φ desde la izquierda (0°) girando hacia arriba.
+  const N = items.length;
+  const R = Math.max(150, Math.min(230, 96 + N * 16));
+  const startDeg = -8;                                    // ítem inferior, apenas bajo la horizontal-izq
+  // No pasar de ~90° (vertical) para que el ítem superior no se vaya a la derecha.
+  const totalDeg = Math.min(98, N > 1 ? (N - 1) * 15 : 0);
+
+  const wasOpen = document.getElementById('wheel-menu')?.classList.contains('open');
+  if (wasOpen) document.getElementById('wheel-menu').classList.add('wheel-instant');
+
+  wrap.innerHTML = items.map((it, i) => {
+    const phi = (startDeg + (N > 1 ? totalDeg * i / (N - 1) : 0)) * Math.PI / 180;
+    const tx = -R * Math.cos(phi);    // dx<0 → izquierda
+    const ty = -R * Math.sin(phi);    // dy<0 → arriba
+    const accent = it.color || it.accent || 'var(--border-2)';
+    return `<button class="wheel-item" type="button" data-i="${i}" aria-label="${escapeHtml(it.lbl)}"
+      style="--tx:${tx.toFixed(0)}px; --ty:${ty.toFixed(0)}px; transition-delay:${i * 26}ms; border-color:${accent}">
+      <span aria-hidden="true">${escapeHtml(it.ic)}</span>
+      ${it.count > 0 ? `<span class="qa-count" style="background:${it.color || 'var(--brand)'}">${it.count}</span>` : ''}
+      <span class="wheel-lbl">${escapeHtml(it.lbl)}</span>
     </button>`;
   }).join('');
-  cont.querySelectorAll('[data-habitual]').forEach(btn => {
-    btn.onclick = () => registrarGastoHabitual(btn.dataset.habitual);
-    // Mantener apretado / click derecho resta uno
-    btn.oncontextmenu = (e) => { e.preventDefault(); quitarGastoHabitual(btn.dataset.habitual); };
+
+  if (wasOpen) requestAnimationFrame(() => document.getElementById('wheel-menu')?.classList.remove('wheel-instant'));
+
+  wrap.querySelectorAll('.wheel-item').forEach((btn, i) => {
+    const it = items[i];
+    btn.onclick = () => { if (it.cierra) toggleWheel(false); it.accion?.(); };
+    if (it.hold) btn.oncontextmenu = (e) => { e.preventDefault(); it.hold(); };
   });
 }
 
@@ -8494,7 +8552,11 @@ async function init() {
   };
   document.addEventListener('scroll', _onScroll, { capture: true, passive: true });
 
-  document.querySelectorAll('[data-quick]').forEach(b => b.onclick = () => quickAction(b.dataset.quick));
+  // Menú de rueda (acciones rápidas radiales desde el borde derecho)
+  document.getElementById('wheel-trigger')?.addEventListener('click', () => toggleWheel());
+  document.getElementById('wheel-overlay')?.addEventListener('click', () => toggleWheel(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleWheel(false); });
+  renderWheel();
 
   // Navegación por tabs (corregida)
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {

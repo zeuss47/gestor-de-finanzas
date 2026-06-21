@@ -482,22 +482,20 @@
     <div id="mm-lista" class="space-y-3"></div>
   </section>
 
-  <!-- QUICK ACTIONS (solo mobile) -->
-  <section id="qa-wrap" class="mobile-only fixed bottom-20 left-0 right-0 z-20 pointer-events-none">
-    <div class="max-w-md mx-auto px-4">
-      <div class="flex gap-2 overflow-x-auto pb-2 pointer-events-auto" id="quick-actions">
-        <button id="qa-docs" class="quick-btn" style="border-color:var(--brand-ink);color:var(--brand-ink)">📄 Cargar PDF</button>
-        <!-- Contadores de gastos habituales (dinámico) -->
-        <span id="qa-habituales" class="contents"></span>
-        <button data-quick="kiosco"      class="quick-btn">🥤 Kiosco</button>
-        <button data-quick="combustible" class="quick-btn">⛽ Nafta</button>
-        <button data-quick="super"       class="quick-btn">🛒 Súper</button>
-        <button data-quick="servicios"   class="quick-btn">💡 Servicios</button>
-        <button data-quick="transporte"  class="quick-btn">🚌 Transporte</button>
-        <button data-quick="ocio"        class="quick-btn">🎬 Ocio</button>
-      </div>
-    </div>
-  </section>
+  <!-- MENÚ DE RUEDA — acciones rápidas radiales desde el borde derecho (solo mobile) -->
+  <div id="wheel-overlay" class="mobile-only" hidden></div>
+  <div id="wheel-menu" class="mobile-only" aria-hidden="true">
+    <div id="wheel-items"></div>
+    <button id="wheel-trigger" type="button" aria-label="Acciones rápidas" aria-expanded="false" aria-haspopup="true">
+      <svg class="wheel-trigger-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="2.4"/>
+        <circle cx="12" cy="4.4" r="1.5"/><circle cx="12" cy="19.6" r="1.5"/>
+        <circle cx="4.4" cy="12" r="1.5"/><circle cx="19.6" cy="12" r="1.5"/>
+        <line x1="12" y1="6.8" x2="12" y2="9.6"/><line x1="12" y1="14.4" x2="12" y2="17.2"/>
+        <line x1="6.8" y1="12" x2="9.6" y2="12"/><line x1="14.4" y1="12" x2="17.2" y2="12"/>
+      </svg>
+    </button>
+  </div>
 
   <!-- BOTTOM NAV (solo mobile) -->
   <nav class="mobile-only" id="bottom-nav">

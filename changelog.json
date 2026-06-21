@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.18",
+      "fecha": "2026-06-21",
+      "items": [
+        "La barra de acciones rápidas de abajo se reemplazó por un MENÚ DE RUEDA: un botón circular en el borde derecho que, al tocarlo, despliega las acciones (Cargar PDF, habituales y atajos) en un arco radial.",
+        "Tocá un habitual y suma sin cerrar la rueda (con su contador del mes); Cargar PDF y los atajos abren su pantalla. Se cierra tocando afuera, el botón o Escape."
+      ]
+    },
+    {
       "version": "2.17",
       "fecha": "2026-06-21",
       "items": [

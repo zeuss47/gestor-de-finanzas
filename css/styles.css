@@ -850,62 +850,70 @@ html.light #bottom-nav::before { background: #eef2ff; }
   #btn-add, #btn-add::before { animation: none; }
 }
 
-/* ── Quick actions ─────────────────────────────────────────────
-   Barra horizontal flotante (Cargar PDF + habituales + presets) sobre el
-   FAB y el nav inferior. Rediseño: se eleva para despejar el FAB central,
-   telón degradado para separarla del contenido, y bordes con difuminado
-   (mask) para que los chips entren/salgan suaves en vez de cortarse. */
-#qa-wrap {
-  bottom: 5.6rem;                 /* sube ~10px para despejar el FAB central */
+/* ── Menú de RUEDA (acciones rápidas radiales, borde derecho) ──────
+   Reemplaza la antigua barra horizontal. Un botón circular fijado al borde
+   derecho; al tocarlo, los ítems (Cargar PDF + habituales + presets) florecen
+   en un arco hacia la izquierda (sesgado hacia arriba) con stagger. */
+#wheel-overlay {
+  position: fixed; inset: 0; z-index: 34;
+  background: color-mix(in srgb, var(--bg) 50%, transparent);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  opacity: 0; transition: opacity .2s ease;
 }
-#qa-wrap::before {                /* telón: degradado del fondo hacia arriba */
-  content: '';
-  position: absolute; left: 0; right: 0; bottom: -1.4rem;
-  height: calc(100% + 2.4rem); z-index: -1; pointer-events: none;
-  background: linear-gradient(to top,
-    var(--bg) 38%,
-    color-mix(in srgb, var(--bg) 55%, transparent) 74%,
-    transparent 100%);
+#wheel-overlay.open { opacity: 1; }
+#wheel-menu {
+  position: fixed; right: 14px; bottom: 104px; z-index: 36;
+  width: 58px; height: 58px;
 }
-#quick-actions {
-  scroll-snap-type: x proximity;
-  scroll-padding-left: 1rem;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
-          mask-image: linear-gradient(90deg, transparent 0, #000 1.1rem, #000 calc(100% - 1.1rem), transparent 100%);
+#wheel-trigger {
+  position: relative; z-index: 2;
+  width: 58px; height: 58px; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer; color: #fff;
+  border: 2px solid rgba(255,255,255,.28);
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 50%),
+    linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+  box-shadow: 0 8px 22px rgba(0,0,0,.42);
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1), filter .2s;
 }
-#quick-actions::-webkit-scrollbar { display: none; }
-.quick-btn {
-  flex-shrink: 0;
-  scroll-snap-align: start;
-  display: inline-flex; align-items: center; gap: .35rem;
-  min-height: 40px;               /* objetivo táctil cómodo */
-  padding: .5rem .95rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg) 78%, var(--surface-3));
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 14px rgba(0,0,0,.28);
-  font-size: .8125rem;
-  font-weight: 500;
-  font-family: inherit;
-  color: var(--ink);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .2s, border-color .2s, color .2s, transform .12s;
+#wheel-trigger:active { transform: scale(.92); }
+#wheel-menu.open #wheel-trigger { transform: rotate(45deg); filter: brightness(1.05); }
+.wheel-trigger-ic { width: 26px; height: 26px; transition: transform .3s ease; }
+#wheel-items { position: absolute; right: 0; bottom: 0; width: 58px; height: 58px; pointer-events: none; }
+.wheel-item {
+  position: absolute; right: 5px; bottom: 5px;     /* centro ≈ centro del trigger */
+  width: 48px; height: 48px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 1.25rem; line-height: 1;
+  border: 1px solid var(--border-2);
+  background: color-mix(in srgb, var(--bg) 82%, var(--surface-3));
+  box-shadow: 0 6px 16px rgba(0,0,0,.38);
+  color: var(--ink); cursor: pointer;
+  transform: translate(0, 0) scale(.3); opacity: 0; pointer-events: none;
+  transition: transform .34s cubic-bezier(.34,1.56,.64,1), opacity .2s ease;
 }
-.quick-btn:active { transform: scale(.95); }
-@media (hover: hover) and (pointer: fine) {
-  .quick-btn:hover { background: var(--surface-3); border-color: var(--brand-ink); color: var(--brand-ink); }
+#wheel-menu.open .wheel-item {
+  transform: translate(var(--tx, 0), var(--ty, 0)) scale(1);
+  opacity: 1; pointer-events: auto;
 }
-/* #qa-habituales usa display:contents para que sus chips fluyan en la fila */
-#qa-habituales { display: contents; }
-.quick-habitual { display: inline-flex; align-items: center; gap: .35rem; }
-.quick-habitual .qa-count {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 18px; height: 18px; padding: 0 .3rem;
-  border-radius: 999px; font-size: .68rem; font-weight: 800; color: #fff;
-  background: var(--brand); line-height: 1;
+#wheel-menu.wheel-instant .wheel-item { transition: none !important; }
+.wheel-item:active { filter: brightness(1.12); }
+.wheel-item .wheel-lbl {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  margin-top: 3px; font-size: .58rem; font-weight: 700; white-space: nowrap;
+  color: var(--ink); background: color-mix(in srgb, var(--bg) 72%, transparent);
+  padding: 1px 5px; border-radius: 6px; pointer-events: none;
+}
+.wheel-item .qa-count {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 18px; height: 18px; padding: 0 .25rem;
+  display: grid; place-items: center;
+  border-radius: 999px; font-size: .62rem; font-weight: 800; color: #fff;
+  background: var(--brand); line-height: 1; border: 1.5px solid var(--bg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wheel-item { transition: opacity .15s ease; }
+  #wheel-trigger { transition: none; }
 }
 
 /* ── Widget de gastos habituales ──────────────────────────────── */

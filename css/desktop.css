@@ -49,7 +49,8 @@
      y con la "Adición rápida" del panel derecho). Esta regla gana sobre la base
      (#bottom-nav{display:grid!important}) porque desktop.css se carga después. */
   #bottom-nav,
-  #qa-wrap { display: none !important; }
+  #wheel-menu,
+  #wheel-overlay { display: none !important; }
 
   /* ---- Helpers de visibilidad por modo ---- */
   .desktop-only { display: revert; }
