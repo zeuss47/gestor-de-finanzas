@@ -5598,6 +5598,8 @@ function renderWheel() {
   _wheelRot = Math.max(rotMin, Math.min(0, _wheelRot));   // re-clamp si cambió N
 
   const wasOpen = document.getElementById('wheel-menu')?.classList.contains('open');
+  // Duración de la animación proporcional al radio → velocidad constante (≈465px/s).
+  wrap.style.setProperty('--wheel-dur', (WHEEL_R / 460).toFixed(2) + 's');
 
   wrap.innerHTML = items.map((it, i) => {
     const accent = it.color || it.accent || 'var(--border-2)';

@@ -895,7 +895,10 @@ html.light #bottom-nav::before { background: #eef2ff; }
   box-shadow: 0 6px 16px rgba(0,0,0,.38);
   color: var(--ink); cursor: pointer;
   transform: translate(0, 0) scale(.3); opacity: 0; pointer-events: none;
-  transition: transform .34s cubic-bezier(.34,1.56,.64,1), opacity .2s ease;
+  /* Duración proporcional al radio (--wheel-dur, la fija el JS según WHEEL_R) →
+     misma velocidad sin importar el tamaño; ease-out sin rebote → aterriza
+     exactamente en el radio, no se pasa. */
+  transition: transform var(--wheel-dur, .38s) cubic-bezier(.22, 1, .36, 1), opacity .22s ease;
 }
 #wheel-menu.open .wheel-item {
   transform: translate(var(--tx, 0), var(--ty, 0)) scale(1);

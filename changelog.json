@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.27",
+      "fecha": "2026-06-21",
+      "items": [
+        "Se ajustó la animación de apertura de la rueda para que sea acorde a su tamaño: los íconos salen a velocidad pareja y se detienen justo en su lugar, sin rebotar ni pasarse."
+      ]
+    },
+    {
       "version": "2.26",
       "fecha": "2026-06-21",
       "items": [
