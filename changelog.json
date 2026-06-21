@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.26",
+      "fecha": "2026-06-21",
+      "items": [
+        "Se les quitó el brillo/halo a los botones + y de la rueda: ahora son dorados mate, con apenas un leve reflejo."
+      ]
+    },
+    {
       "version": "2.25",
       "fecha": "2026-06-21",
       "items": [
