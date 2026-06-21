@@ -1,6 +1,15 @@
 {
   "entradas": [
     {
+      "version": "2.12",
+      "fecha": "2026-06-19",
+      "items": [
+        "Nueva herramienta 'Productos' en Utilidades: escaneá el código de barras con la cámara (o ingresalo a mano) y registrá el precio en cada supermercado.",
+        "Comparador: cada producto muestra dónde está más barato. El nombre se autocompleta con Open Food Facts; los supermercados son una lista editable.",
+        "Tu registro de productos y precios se sincroniza con tu GitHub, como el resto de tus datos."
+      ]
+    },
+    {
       "version": "2.11",
       "fecha": "2026-06-19",
       "items": [

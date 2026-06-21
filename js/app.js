@@ -2942,6 +2942,7 @@ function abrirUtilidades() {
     const items = [
       { id: 'calculadora', ic: '🧮', titulo: 'Calculadora', sub: 'Dividir gastos (split)', fn: renderCalculadora },
       { id: 'conversor',   ic: '🌎', titulo: 'Conversor de viaje', sub: 'Multi-moneda + lista', fn: renderConversor },
+      { id: 'productos',   ic: '🏷️', titulo: 'Productos', sub: 'Precios por súper + comparar', fn: renderProductos },
     ];
     items.forEach(({ id, ic, titulo, sub, fn }) => {
       const tpl = document.getElementById('tpl-widget-' + id);
@@ -2978,11 +2979,133 @@ function abrirUtilidades() {
   document.body.style.overflow = 'hidden';
 }
 function cerrarUtilidades() {
+  if (typeof _prodScanStop === 'function') { try { _prodScanStop(); } catch {} }
   document.getElementById('utils-overlay')?.classList.remove('open');
   const d = document.getElementById('utils-drawer');
   if (d) { d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); }
   document.body.style.overflow = '';
 }
+
+let _prodScanStop = null;
+/* Herramienta Productos: escanear código de barras (BarcodeDetector) → buscar
+   nombre (local u Open Food Facts) → registrar precio por supermercado, con
+   comparador (precio más barato por producto). Persiste en IndexedDB. */
+function renderProductos(el) {
+  const $ = s => el.querySelector(s);
+  if (state.ajustes?.catalogos && !state.ajustes.catalogos.supermercados) {
+    state.ajustes.catalogos.supermercados = [
+      { id: 'carrefour', nombre: 'Carrefour', icono: '🛒', color: '#0b4ea2' },
+      { id: 'coto', nombre: 'Coto', icono: '🛒', color: '#e30613' },
+      { id: 'dia', nombre: 'Día', icono: '🛒', color: '#d52b1e' },
+      { id: 'jumbo', nombre: 'Jumbo', icono: '🛒', color: '#00a14b' },
+      { id: 'otro', nombre: 'Otro', icono: '🏬', color: '#94a3b8' },
+    ];
+    DB.put('ajustes', state.ajustes).catch(() => {});
+  }
+  const supers = () => state.ajustes?.catalogos?.supermercados || [];
+  const superById = id => supers().find(s => s.id === id) || { nombre: id || '-', color: '#94a3b8', icono: '🏬' };
+  const selSuper = $('[data-bind="prod-super"]');
+  if (selSuper) selSuper.innerHTML = supers().map(s => `<option value="${s.id}">${s.icono || ''} ${escapeHtml(s.nombre)}</option>`).join('');
+  let productos = [], precios = [], prodActual = null;
+  const actualizarGuardar = () => {
+    const nombre = ($('[data-bind="prod-nombre"]')?.value || '').trim();
+    const precio = _numAR($('[data-bind="prod-precio"]')?.value);
+    const g = $('[data-bind="prod-guardar"]'); if (g) g.disabled = !(nombre && precio > 0);
+  };
+  const renderLista = () => {
+    const cont = $('[data-bind="prod-lista"]'); if (!cont) return;
+    const filtro = ($('[data-bind="prod-filtro"]')?.value || '').toLowerCase().trim();
+    const lista = productos.filter(p => !filtro || (p.nombre || '').toLowerCase().includes(filtro)).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+    if (!lista.length) { cont.innerHTML = `<p class="conv-lista-empty">Sin productos todavía. Escaneá o cargá uno y guardá su precio.</p>`; return; }
+    cont.innerHTML = lista.map(p => {
+      const prx = precios.filter(x => x.producto_id === p.id).sort((a, b) => a.precio - b.precio);
+      const min = prx[0]; const minS = min ? superById(min.supermercado_id) : null;
+      const filas = prx.map((x, i) => {
+        const sp = superById(x.supermercado_id);
+        return `<div class="prod-precio-row ${i === 0 && prx.length > 1 ? 'mejor' : ''}"><span class="prod-precio-super"><b style="color:${sp.color}">${sp.icono}</b> ${escapeHtml(sp.nombre)}</span><span class="prod-precio-val">${FMT.format(x.precio)}</span><span class="prod-precio-fecha">${x.fecha || ''}</span><button type="button" class="conv-lista-del" data-delprecio="${x.id}" aria-label="Borrar precio">✕</button></div>`;
+      }).join('');
+      return `<div class="prod-item"><button type="button" class="prod-item-head" data-toggle="${p.id}"><span class="prod-item-nombre">${escapeHtml(p.nombre)}</span><span class="prod-item-min">${min ? FMT.format(min.precio) : '-'}${minS ? ' · ' + escapeHtml(minS.nombre) : ''}</span><span class="prod-item-chev">▾</span></button><div class="prod-item-body" hidden>${filas || '<p class="conv-lista-empty">Sin precios.</p>'}<button type="button" class="conv-lista-clear prod-del-prod" data-delprod="${p.id}">Borrar producto</button></div></div>`;
+    }).join('');
+    cont.querySelectorAll('[data-toggle]').forEach(h => h.onclick = () => { const body = h.nextElementSibling; if (!body) return; body.hidden = !body.hidden; h.querySelector('.prod-item-chev')?.classList.toggle('abierto', !body.hidden); });
+    cont.querySelectorAll('[data-delprecio]').forEach(b => b.onclick = async () => { await DB.softDelete('precios', b.dataset.delprecio); await cargar(); _prodSync(); });
+    cont.querySelectorAll('[data-delprod]').forEach(b => b.onclick = async () => { const pid = b.dataset.delprod; await DB.softDelete('productos', pid); for (const x of precios.filter(x => x.producto_id === pid)) await DB.softDelete('precios', x.id); await cargar(); _prodSync(); });
+  };
+  const cargar = async () => { productos = await DB.live('productos'); precios = await DB.live('precios'); renderLista(); };
+  const buscarOFF = async (codigo) => {
+    try {
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 4000);  // no colgar si OFF no responde
+      const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(codigo)}.json?fields=product_name,brands`, { signal: ctl.signal });
+      clearTimeout(to);
+      const j = await r.json();
+      if (j.status === 1 && j.product) return [j.product.product_name, j.product.brands].filter(Boolean).join(' · ') || null;
+    } catch {}
+    return null;
+  };
+  const buscar = async () => {
+    const codigo = ($('[data-bind="prod-codigo"]')?.value || '').trim();
+    const hint = $('[data-bind="prod-hint"]');
+    if (!codigo) { if (hint) hint.textContent = ''; return; }
+    const existe = productos.find(p => p.codigo === codigo);
+    if (existe) { prodActual = existe; $('[data-bind="prod-nombre"]').value = existe.nombre || ''; if (hint) hint.textContent = '✓ Ya lo tenés registrado.'; }
+    else {
+      prodActual = null; if (hint) hint.textContent = 'Buscando nombre…';
+      const nombre = await buscarOFF(codigo);
+      if (nombre) { $('[data-bind="prod-nombre"]').value = nombre; if (hint) hint.textContent = 'Nombre encontrado (editalo si querés).'; }
+      else if (hint) hint.textContent = 'No lo encontré: ponele un nombre a mano.';
+    }
+    actualizarGuardar();
+  };
+  const guardar = async () => {
+    const codigo = ($('[data-bind="prod-codigo"]')?.value || '').trim();
+    const nombre = ($('[data-bind="prod-nombre"]')?.value || '').trim();
+    const superId = selSuper?.value || (supers()[0]?.id);
+    const precio = _numAR($('[data-bind="prod-precio"]')?.value);
+    if (!nombre || !(precio > 0)) { if (typeof toast === 'function') toast('Completá nombre y precio'); return; }
+    // Buscar el producto por código; si no, por nombre exacto (así re-cargar el mismo
+    // producto en otro súper le suma un precio en vez de duplicarlo). Sin estado previo.
+    let prod = (codigo && productos.find(p => p.codigo === codigo))
+            || productos.find(p => (p.nombre || '').toLowerCase() === nombre.toLowerCase())
+            || null;
+    if (!prod) { prod = { id: uuid(), codigo: codigo || null, nombre, updated_at: nowTs() }; await DB.put('productos', prod); }
+    else if ((codigo && prod.codigo !== codigo) || prod.nombre !== nombre) { if (codigo) prod.codigo = codigo; prod.nombre = nombre; prod.updated_at = nowTs(); await DB.put('productos', prod); }
+    await DB.put('precios', { id: uuid(), producto_id: prod.id, supermercado_id: superId, precio, fecha: new Date().toISOString().slice(0, 10), updated_at: nowTs() });
+    if (typeof toast === 'function') toast('✓ Precio guardado');
+    ['prod-codigo', 'prod-nombre', 'prod-precio'].forEach(k => { const i = $(`[data-bind="${k}"]`); if (i) i.value = ''; });
+    const hint = $('[data-bind="prod-hint"]'); if (hint) hint.textContent = '';
+    actualizarGuardar(); await cargar(); _prodSync();
+  };
+  let stream = null, scanning = false;
+  const stopScan = () => { scanning = false; if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } const v = $('[data-bind="prod-video"]'); if (v) { v.hidden = true; v.srcObject = null; } const btn = $('[data-action="prod-scan"]'); if (btn) btn.textContent = '📷 Escanear'; };
+  _prodScanStop = stopScan;
+  const startScan = async () => {
+    if (scanning) { stopScan(); return; }
+    if (!('BarcodeDetector' in window)) { if (typeof toast === 'function') toast('Tu navegador no soporta escaneo. Ingresá el código a mano.'); return; }
+    const video = $('[data-bind="prod-video"]');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+      video.srcObject = stream; video.hidden = false; await video.play();
+      const det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
+      scanning = true;
+      const btn = $('[data-action="prod-scan"]'); if (btn) btn.textContent = '✕ Cerrar cámara';
+      const tick = async () => {
+        if (!scanning) return;
+        try { const codes = await det.detect(video); if (codes && codes[0]) { const code = codes[0].rawValue; stopScan(); $('[data-bind="prod-codigo"]').value = code; buscar(); return; } } catch {}
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    } catch (e) { if (typeof toast === 'function') toast('No se pudo abrir la cámara'); stopScan(); }
+  };
+  $('[data-action="prod-scan"]')?.addEventListener('click', startScan);
+  $('[data-action="prod-buscar"]')?.addEventListener('click', buscar);
+  $('[data-bind="prod-codigo"]')?.addEventListener('keydown', e => { if (e.key === 'Enter') buscar(); });
+  $('[data-bind="prod-guardar"]')?.addEventListener('click', guardar);
+  $('[data-bind="prod-nombre"]')?.addEventListener('input', actualizarGuardar);
+  $('[data-bind="prod-precio"]')?.addEventListener('input', actualizarGuardar);
+  $('[data-bind="prod-filtro"]')?.addEventListener('input', renderLista);
+  cargar();
+}
+function _prodSync() { try { if (typeof notificarCambioLocal === 'function') notificarCambioLocal(); } catch {} }
 
 function renderComparador(el) {
   const hoy = new Date();

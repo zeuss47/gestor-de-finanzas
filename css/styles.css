@@ -3856,6 +3856,33 @@ body.view-analisis #main-widgets::before {
 .calc-resumen { font-size: .78rem; color: var(--ink-2); margin-top: .7rem; }
 .calc-resumen b { color: var(--ink); font-weight: 700; }
 
+/* ── Productos: escáner + precios por supermercado + comparador ── */
+.prod-video { width: 100%; max-height: 240px; border-radius: var(--r); background: #000; margin-bottom: .5rem; object-fit: cover; }
+.prod-code-row { display: flex; gap: .4rem; align-items: stretch; }
+.prod-code-row .prod-scan-btn { flex-shrink: 0; white-space: nowrap; }
+.prod-code-row > input { flex: 1; min-width: 0; }
+.prod-code-row > .btn-secondary { flex-shrink: 0; }
+.prod-hint { font-size: .72rem; color: var(--ink-muted); margin-top: .3rem; min-height: 1em; }
+.prod-lista-wrap { border-top: 1px solid var(--border); padding-top: .85rem; }
+.prod-lista-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .55rem; }
+.prod-filtro { width: 9rem; flex-shrink: 0; padding: .35rem .6rem !important; font-size: .8rem; }
+.prod-lista { display: flex; flex-direction: column; gap: .4rem; }
+.prod-item { background: var(--surface-2); border: 1px solid var(--border); border-radius: .8rem; overflow: hidden; }
+.prod-item-head { width: 100%; display: flex; align-items: center; gap: .5rem; padding: .55rem .7rem; background: transparent; border: none; cursor: pointer; text-align: left; color: var(--ink); }
+.prod-item-nombre { flex: 1; min-width: 0; font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prod-item-min { font-family: 'IBM Plex Mono', monospace; font-size: .76rem; color: var(--success); white-space: nowrap; flex-shrink: 0; }
+.prod-item-chev { color: var(--ink-muted); flex-shrink: 0; transition: transform .2s var(--ease-std); font-size: .75rem; }
+.prod-item-chev.abierto { transform: rotate(180deg); }
+.prod-item-body { padding: .2rem .7rem .7rem; border-top: 1px solid var(--border); }
+.prod-precio-row { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid var(--border); }
+.prod-precio-row:last-of-type { border-bottom: none; }
+.prod-precio-row.mejor { background: var(--success-bg); margin: 0 -.4rem; padding: .4rem; border-radius: .5rem; border-bottom: none; }
+.prod-precio-super { font-size: .8rem; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prod-precio-val { font-family: 'IBM Plex Mono', monospace; font-size: .8rem; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.prod-precio-row.mejor .prod-precio-val { color: var(--success); }
+.prod-precio-fecha { font-size: .66rem; color: var(--ink-muted); white-space: nowrap; }
+.prod-del-prod { margin-top: .5rem; display: inline-block; }
+
 /* Opciones del diálogo de eliminar meta con saldo */
 .md-opts { display: flex; flex-direction: column; gap: .55rem; }
 .md-opt {

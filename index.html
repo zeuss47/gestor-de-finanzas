@@ -1094,6 +1094,58 @@
   </article>
 </template>
 
+<!-- Productos: escáner de código de barras + precios por supermercado -->
+<template id="tpl-widget-productos">
+  <article class="widget card-glass p-5">
+    <header class="flex items-center justify-between mb-4">
+      <h2 class="ff-display text-sm font-semibold uppercase tracking-wider" style="color:var(--ink-muted)">Productos</h2>
+      <span class="badge badge-brand">Precios</span>
+    </header>
+
+    <div class="space-y-3">
+      <!-- Paso 1: código -->
+      <div>
+        <label class="conv-step-lbl">1 · Escaneá o ingresá el código</label>
+        <video class="prod-video" data-bind="prod-video" playsinline muted hidden></video>
+        <button type="button" class="btn-secondary w-full prod-scan-btn" data-action="prod-scan">📷 Escanear con la cámara</button>
+        <div class="prod-code-row mt-2">
+          <input type="text" inputmode="numeric" class="input" data-bind="prod-codigo" placeholder="o ingresá el código a mano"/>
+          <button type="button" class="btn-secondary" data-action="prod-buscar">Buscar</button>
+        </div>
+      </div>
+
+      <!-- Paso 2: producto -->
+      <div>
+        <label class="conv-step-lbl">2 · Producto</label>
+        <input type="text" class="input" data-bind="prod-nombre" placeholder="Nombre del producto"/>
+        <p class="prod-hint" data-bind="prod-hint"></p>
+      </div>
+
+      <!-- Paso 3: súper + precio -->
+      <div>
+        <label class="conv-step-lbl">3 · Supermercado y precio</label>
+        <div class="conv-row">
+          <select class="input" data-bind="prod-super" data-no-calc aria-label="Supermercado"></select>
+          <div class="input-with-prefix" style="flex:1">
+            <span class="input-prefix">$</span>
+            <input type="text" inputmode="decimal" class="input" data-bind="prod-precio" placeholder="Precio"/>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn-primary w-full" data-bind="prod-guardar" disabled>+ Guardar precio</button>
+    </div>
+
+    <!-- Lista de productos + comparador -->
+    <div class="prod-lista-wrap mt-3">
+      <div class="prod-lista-head">
+        <span class="conv-lista-title">Mis productos</span>
+        <input type="search" class="input prod-filtro" data-bind="prod-filtro" placeholder="Buscar…" aria-label="Filtrar productos"/>
+      </div>
+      <div class="prod-lista" data-bind="prod-lista"></div>
+    </div>
+  </article>
+</template>
+
 <!-- Comparador mensual -->
 <template id="tpl-widget-comparador">
   <article class="widget card-glass p-5">

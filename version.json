@@ -1,7 +1,7 @@
 {
-  "version": "2.11",
-  "build": 125,
-  "modified": "2026-06-19T18:00:00Z",
-  "commit": "conversor recuerda tasa + calc dividir con lista por persona",
+  "version": "2.12",
+  "build": 126,
+  "modified": "2026-06-19T19:00:00Z",
+  "commit": "productos: escaner codigo barras + precios por super + comparador",
   "notes": "Version derivada de changelog.json"
 }
