@@ -5523,7 +5523,7 @@ async function quitarGastoHabitual(habitualId) {
    queda fuera de pantalla y se accede ROTANDO (arrastrando). */
 let _wheelRot = 0, _wheelGeo = null, _wheelDragged = false;
 const WHEEL_STEP = 26;        // grados entre ítems (fijo → sin solape)
-const WHEEL_R = 158;          // radio del arco
+const WHEEL_R = 178;          // radio del arco
 const WHEEL_START = -8;       // ítem base, apenas bajo la horizontal-izquierda
 const WHEEL_VIS = 104;        // amplitud de la ventana visible (de -8° a ~96°)
 

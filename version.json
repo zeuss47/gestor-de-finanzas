@@ -1,7 +1,7 @@
 {
-  "version": "2.24",
-  "build": 138,
-  "modified": "2026-06-21T21:00:00Z",
-  "commit": "fix: rueda giraba el fondo en vez de rotar (touch-action:none + drag en zona items)",
+  "version": "2.25",
+  "build": 139,
+  "modified": "2026-06-21T21:20:00Z",
+  "commit": "rueda mas grande (trigger 60px, items 54px, radio 178)",
   "notes": "Version derivada de changelog.json"
 }

@@ -885,13 +885,13 @@ html.light #bottom-nav::before { background: #eef2ff; }
 #wheel-items, .wheel-item { touch-action: none; }
 #wheel-menu {
   position: fixed; right: 16px; bottom: 76px; z-index: 36;   /* más abajo, cerca del nav */
-  width: 52px; height: 52px;
+  width: 60px; height: 60px;
 }
 /* Trigger de la rueda: usa el mismo estilo ORBE que el +. Al abrir se intensifica
    (más brillo/saturación) y gira. Es algo más chico que el + (jerarquía). */
 #wheel-trigger {
   z-index: 2;
-  width: 52px; height: 52px; border-radius: 50%;
+  width: 60px; height: 60px; border-radius: 50%;
   display: grid; place-items: center;
 }
 #wheel-trigger:active { transform: scale(.9); }
@@ -899,13 +899,13 @@ html.light #bottom-nav::before { background: #eef2ff; }
   transform: rotate(90deg) scale(1.03);
   filter: brightness(1.08) saturate(1.07);
 }
-.wheel-trigger-ic { width: 22px; height: 22px; transition: transform .3s ease; position: relative; z-index: 1; }
-#wheel-items { position: absolute; right: 0; bottom: 0; width: 52px; height: 52px; pointer-events: none; }
+.wheel-trigger-ic { width: 25px; height: 25px; transition: transform .3s ease; position: relative; z-index: 1; }
+#wheel-items { position: absolute; right: 0; bottom: 0; width: 60px; height: 60px; pointer-events: none; }
 .wheel-item {
-  position: absolute; right: 2px; bottom: 2px;     /* centro ≈ centro del trigger */
-  width: 48px; height: 48px; border-radius: 50%;
+  position: absolute; right: 3px; bottom: 3px;     /* centro ≈ centro del trigger */
+  width: 54px; height: 54px; border-radius: 50%;
   display: grid; place-items: center;
-  font-size: 1.25rem; line-height: 1;
+  font-size: 1.4rem; line-height: 1;
   border: 1px solid var(--border-2);
   background: color-mix(in srgb, var(--bg) 82%, var(--surface-3));
   box-shadow: 0 6px 16px rgba(0,0,0,.38);

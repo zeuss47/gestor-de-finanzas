@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.25",
+      "fecha": "2026-06-21",
+      "items": [
+        "La rueda de acciones es un poco más grande (botón e íconos), para tocarla más cómodo."
+      ]
+    },
+    {
       "version": "2.24",
       "fecha": "2026-06-21",
       "items": [
