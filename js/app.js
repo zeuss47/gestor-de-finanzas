@@ -2942,8 +2942,7 @@ function abrirUtilidades() {
     const items = [
       { id: 'calculadora', ic: '🧮', titulo: 'Calculadora', sub: 'Dividir gastos (split)', fn: renderCalculadora },
       { id: 'conversor',   ic: '🌎', titulo: 'Conversor de viaje', sub: 'Multi-moneda + lista', fn: renderConversor },
-      { id: 'productos',   ic: '🏷️', titulo: 'Productos', sub: 'Precios por súper + comparar', fn: renderProductos },
-      { id: 'mapa',        ic: '🗺️', titulo: 'Mapa de compras', sub: 'Ubicá tus súper + cercanía', fn: renderMapa },
+      { id: 'productos',   ic: '🏷️', titulo: 'Productos', sub: 'Precios, comparar y mapa', fn: renderProductos },
     ];
     items.forEach(({ id, ic, titulo, sub, fn }) => {
       const tpl = document.getElementById('tpl-widget-' + id);
@@ -3044,7 +3043,7 @@ function renderProductos(el) {
     cont.querySelectorAll('[data-delprecio]').forEach(b => b.onclick = async () => { await DB.softDelete('precios', b.dataset.delprecio); await cargar(); _prodSync(); });
     cont.querySelectorAll('[data-delprod]').forEach(b => b.onclick = async () => { const pid = b.dataset.delprod; await DB.softDelete('productos', pid); for (const x of precios.filter(x => x.producto_id === pid)) await DB.softDelete('precios', x.id); await cargar(); _prodSync(); });
   };
-  const cargar = async () => { productos = await DB.live('productos'); precios = await DB.live('precios'); renderLista(); };
+  const cargar = async () => { productos = await DB.live('productos'); precios = await DB.live('precios'); renderLista(); if (typeof _mapaRefresh === 'function') { try { _mapaRefresh(); } catch {} } };
   const buscarOFF = async (codigo) => {
     try {
       const ctl = new AbortController();
@@ -3117,22 +3116,27 @@ function renderProductos(el) {
   $('[data-bind="prod-nombre"]')?.addEventListener('input', actualizarGuardar);
   $('[data-bind="prod-precio"]')?.addEventListener('input', actualizarGuardar);
   $('[data-bind="prod-filtro"]')?.addEventListener('input', renderLista);
+  renderMapa(el);   // el mapa vive dentro de la misma pestaña Productos
   cargar();
 }
 function _prodSync() { try { if (typeof notificarCambioLocal === 'function') notificarCambioLocal(); } catch {} }
 
-let _mapaDestroy = null;
-/* Herramienta Mapa (Fase 3): muestra los supermercados ubicados como pines en un
-   mapa Leaflet/OpenStreetMap. Permití ubicar cada súper (GPS o tocando el mapa),
-   ver sus productos/precios en el popup, y rankear los súper por cercanía +
-   cantidad de productos donde están más baratos. La ubicación se guarda en
-   catalogos.supermercados (sincroniza vía config.json, sin PAT). */
+let _mapaDestroy = null, _mapaRefresh = null;
+/* Mapa de compras (Fase 3): integrado dentro de la pestaña Productos. Muestra los
+   supermercados ubicados como pines en un mapa Leaflet/OpenStreetMap, permite
+   ubicarlos (GPS o tocando el mapa), ver sus productos/precios en el popup, y
+   rankear los súper por cercanía + cantidad de productos más baratos. La ubicación
+   se guarda en catalogos.supermercados (sincroniza vía config.json, sin PAT).
+   El centro/zoom de la última vista se recuerda en localStorage (gf_mapa_center)
+   → al reabrir, el mapa arranca donde lo dejaste, no siempre en Buenos Aires. */
 function renderMapa(art) {
   const $ = s => art.querySelector(s);
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(s || '') : (s || ''));
   const supers = () => state.ajustes?.catalogos?.supermercados || [];
   let productos = [], precios = [];
-  let map = null, userMarker = null, markers = [];
+  let map = null, userMarker = null, markers = [], _lastUser = null;
+  const loadCenter = () => { try { const c = JSON.parse(localStorage.getItem('gf_mapa_center') || 'null'); return (c && isFinite(c.lat) && isFinite(c.lng)) ? c : null; } catch { return null; } };
+  const saveCenter = () => { if (!map) return; const c = map.getCenter(); try { localStorage.setItem('gf_mapa_center', JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() })); } catch {} };
 
   const curPrice = (pid, sid) => {
     const xs = precios.filter(x => x.producto_id === pid && x.supermercado_id === sid);
@@ -3222,10 +3226,19 @@ function renderMapa(art) {
   const initMap = () => {
     if (map || !window.L) return;
     const el = $('[data-bind="mapa"]'); if (!el) return;
-    map = window.L.map(el, { zoomControl: true }).setView([-34.6037, -58.3816], 12); // default: Buenos Aires
+    const saved = loadCenter();
+    map = window.L.map(el, { zoomControl: true });
     window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
     map.on('click', onMapClick);
-    drawMarkers(); fitToSupers(false);
+    drawMarkers();
+    // Prioridad de encuadre: última vista guardada → súper ya ubicados → Buenos Aires.
+    if (saved) map.setView([saved.lat, saved.lng], saved.zoom || 14);
+    else {
+      const conLoc = supers().some(s => s.lat != null);
+      if (conLoc) fitToSupers(false);
+      else map.setView([-34.6037, -58.3816], 12);
+    }
+    map.on('moveend', saveCenter);
   };
 
   // Botones
@@ -3242,6 +3255,7 @@ function renderMapa(art) {
     if (!navigator.geolocation) { if (typeof toast === 'function') toast('Tu dispositivo no da ubicación'); return; }
     navigator.geolocation.getCurrentPosition(pos => {
       const la = pos.coords.latitude, lo = pos.coords.longitude;
+      _lastUser = { la, lo };
       initMap();
       if (userMarker) userMarker.setLatLng([la, lo]); else userMarker = window.L.marker([la, lo], { icon: userIcon() }).addTo(map).bindPopup('Estás acá');
       map.setView([la, lo], 14);
@@ -3257,7 +3271,7 @@ function renderMapa(art) {
       if (acc.dataset.open === 'true') {
         initMap();
         setTimeout(() => map && map.invalidateSize(), 80);
-        setTimeout(() => { map && map.invalidateSize(); fitToSupers(false); }, 380);
+        setTimeout(() => map && map.invalidateSize(), 380);
       }
     });
     obs.observe(acc, { attributes: true, attributeFilter: ['data-open'] });
@@ -3266,8 +3280,9 @@ function renderMapa(art) {
 
   const cargar = async () => {
     productos = await DB.live('productos'); precios = await DB.live('precios');
-    fillSelect(); drawMarkers(); renderRanking(null, null);
+    fillSelect(); drawMarkers(); renderRanking(_lastUser?.la ?? null, _lastUser?.lo ?? null);
   };
+  _mapaRefresh = cargar;   // Productos llama esto al guardar un precio → mapa al día
   cargar();
 }
 

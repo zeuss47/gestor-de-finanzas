@@ -1145,17 +1145,12 @@
       </div>
       <div class="prod-lista" data-bind="prod-lista"></div>
     </div>
-  </article>
-</template>
 
-<!-- Mapa de compras (Leaflet + OpenStreetMap) -->
-<template id="tpl-widget-mapa">
-  <article class="widget card-glass p-5">
-    <header class="flex items-center justify-between mb-4">
-      <h3 class="font-semibold">🗺️ Mapa de compras</h3>
-    </header>
-    <div class="mapa-tool">
-      <p class="conv-step-lbl">Ubicá tus supermercados</p>
+    <!-- Mapa de compras (Leaflet + OpenStreetMap), integrado con Productos -->
+    <div class="mapa-tool prod-mapa-sec">
+      <div class="prod-lista-head">
+        <span class="conv-lista-title">🗺️ Mapa de compras</span>
+      </div>
       <div class="mapa-loc-row">
         <select class="input" data-bind="mapa-super" aria-label="Supermercado a ubicar"></select>
         <button type="button" class="btn-secondary mapa-gps-btn" data-action="mapa-gps" title="Usar mi ubicación actual">📍 Acá estoy</button>

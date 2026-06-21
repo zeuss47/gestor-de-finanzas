@@ -1,7 +1,7 @@
 {
-  "version": "2.15",
-  "build": 129,
-  "modified": "2026-06-21T14:00:00Z",
-  "commit": "productos: selector de super como chips de categoria (grilla con icono+nombre)",
+  "version": "2.16",
+  "build": 130,
+  "modified": "2026-06-21T15:00:00Z",
+  "commit": "mapa integrado en pestana Productos + recuerda ultima ubicacion (no siempre BsAs)",
   "notes": "Version derivada de changelog.json"
 }

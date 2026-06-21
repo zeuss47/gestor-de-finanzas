@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.16",
+      "fecha": "2026-06-21",
+      "items": [
+        "El mapa ahora está dentro de la pestaña Productos (antes era una sección aparte): cargás precios y los ubicás en el mapa en un mismo lugar, y al guardar un precio el mapa y el ranking se actualizan solos.",
+        "El mapa recuerda dónde lo dejaste: al abrirlo arranca en tu última ubicación (ya no aparece siempre en Buenos Aires)."
+      ]
+    },
+    {
       "version": "2.15",
       "fecha": "2026-06-21",
       "items": [

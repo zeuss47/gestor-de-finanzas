@@ -3893,6 +3893,7 @@ body.view-analisis #main-widgets::before {
 
 /* ---- Mapa de compras (Leaflet) ---- */
 .mapa-tool { display: flex; flex-direction: column; }
+.prod-mapa-sec { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .mapa-loc-row { display: flex; gap: .5rem; align-items: stretch; }
 .mapa-loc-row .input { flex: 1; min-width: 0; }
 .mapa-gps-btn { flex-shrink: 0; white-space: nowrap; }
