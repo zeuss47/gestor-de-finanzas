@@ -1,6 +1,16 @@
 {
   "entradas": [
     {
+      "version": "2.29",
+      "fecha": "2026-06-21",
+      "items": [
+        "Al deslizar para cambiar de pestaña, la pantalla entra con una animación de desplazamiento.",
+        "Estando en Inicio, deslizá hacia la derecha para abrir el panel de Utilidades.",
+        "El botón + quedó centrado en su aro (antes se veía corrido respecto a la sombra).",
+        "Al tocar el botón +, ahora hace una animación y la pantalla de carga entra con transición."
+      ]
+    },
+    {
       "version": "2.28",
       "fecha": "2026-06-21",
       "items": [

@@ -614,6 +614,7 @@ const FMT = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS',
 
 /* ============ Estado de navegación por tabs ============ */
 let currentTab = 'home';
+let _tabAnimDir = 0;   // dirección de la animación de cambio de pestaña (swipe)
 let _movMesFiltro = '';
 let _movCatFiltro = '';      // categoría activa en filtro historial
 let _movSubcatFiltro = '';   // subcategoría activa en filtro historial
@@ -623,6 +624,19 @@ const WIDGETS_ANALISIS = new Set([
   'prediccion', 'ia_local', 'comparador', 'flujo_mensual',
   'categorias', 'resumen_anual', 'grafico', 'balance',
 ]);
+
+/** Aplica la animación de entrada (slide) a la sección que se muestra, según la
+    dirección del último swipe (_tabAnimDir: +1 entra desde la derecha, -1 desde
+    la izquierda, 0 sin animación). */
+function _animTabSection(el) {
+  if (!el || !_tabAnimDir) { _tabAnimDir = 0; return; }
+  const cls = _tabAnimDir > 0 ? 'tab-in-r' : 'tab-in-l';
+  _tabAnimDir = 0;
+  el.classList.remove('tab-in-r', 'tab-in-l');
+  void el.offsetWidth;                       // reinicia la animación
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 340);
+}
 
 function switchTab(tab) {
   currentTab = tab;
@@ -640,6 +654,7 @@ function switchTab(tab) {
     secTarjetasMobile?.classList.add('hidden');
     secMetasMobile?.classList.add('hidden');
     renderMovimientos();
+    _animTabSection(secMov);
     return;
   }
 
@@ -649,6 +664,7 @@ function switchTab(tab) {
     secTarjetasMobile?.classList.remove('hidden');
     secMetasMobile?.classList.add('hidden');
     renderTarjetasMobile();
+    _animTabSection(secTarjetasMobile);
     return;
   }
 
@@ -658,6 +674,7 @@ function switchTab(tab) {
     secTarjetasMobile?.classList.add('hidden');
     secMetasMobile?.classList.remove('hidden');
     renderMetasMobile();
+    _animTabSection(secMetasMobile);
     return;
   }
 
@@ -666,6 +683,7 @@ function switchTab(tab) {
   secMov?.classList.add('hidden');
   secTarjetasMobile?.classList.add('hidden');
   secMetasMobile?.classList.add('hidden');
+  _animTabSection(root);
 
   if (tab === 'analisis') {
     // Filtrar visualmente: solo widgets analíticos
@@ -8532,7 +8550,12 @@ async function init() {
   // Event listeners
   // Botón + → diálogo de selección
   // El + entra DIRECTO a la carga de gasto; desde ahí el toggle cambia a ingreso.
-  document.getElementById('btn-add').onclick = () => openDialog('dlg-gasto');
+  document.getElementById('btn-add').onclick = (e) => {
+    const b = e.currentTarget;
+    b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');   // animación de toque
+    setTimeout(() => b.classList.remove('pop'), 360);
+    openDialog('dlg-gasto');
+  };
   document.getElementById('choice-gasto').onclick = () => {
     document.getElementById('dlg-choice').close();
     openDialog('dlg-gasto');
@@ -8613,10 +8636,11 @@ async function init() {
       const n = document.getElementById('bottom-nav');
       return n && getComputedStyle(n).display !== 'none';
     };
+    const utilsAbierto = () => document.getElementById('utils-drawer')?.classList.contains('open');
     const bloqueado = (t) => !t || (t.closest && t.closest(
-      'input, textarea, select, .leaflet-container, #wheel-menu, #wheel-overlay, .conv-row, [data-no-swipe], .overflow-x-auto, .prod-super-chips, .mov-filtros-row'));
+      'input, textarea, select, .leaflet-container, #wheel-menu, #wheel-overlay, #utils-drawer, .conv-row, [data-no-swipe], .overflow-x-auto, .prod-super-chips, .mov-filtros-row'));
     document.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1 || !navVisible() || document.querySelector('dialog[open]')
+      if (e.touches.length !== 1 || !navVisible() || document.querySelector('dialog[open]') || utilsAbierto()
           || document.getElementById('wheel-menu')?.classList.contains('open') || bloqueado(e.target)) { track = false; return; }
       track = true; const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now();
     }, { passive: true });
@@ -8627,7 +8651,10 @@ async function init() {
       const idx = ORDEN.indexOf(currentTab);
       if (idx < 0) return;
       const next = dx < 0 ? idx + 1 : idx - 1;   // izq → siguiente, der → anterior
-      if (next < 0 || next >= ORDEN.length) return;
+      // En el extremo izquierdo (Inicio) + deslizar a la derecha → abrir Utilidades.
+      if (next < 0) { if (typeof abrirUtilidades === 'function') abrirUtilidades(); return; }
+      if (next >= ORDEN.length) return;
+      _tabAnimDir = dx < 0 ? 1 : -1;   // izq→entra desde la derecha; der→desde la izquierda
       document.querySelector(`[data-tab="${ORDEN[next]}"]`)?.click();
     }, { passive: true });
   })();
