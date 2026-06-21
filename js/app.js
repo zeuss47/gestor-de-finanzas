@@ -2730,50 +2730,86 @@ function _numAR(str) {
   return Number.isFinite(n) ? n : 0;
 }
 
+const CONV_MONEDAS = [
+  { code: 'USD', nombre: 'Dólar' },
+  { code: 'EUR', nombre: 'Euro' },
+  { code: 'BRL', nombre: 'Real brasileño' },
+  { code: 'UYU', nombre: 'Peso uruguayo' },
+  { code: 'CLP', nombre: 'Peso chileno' },
+  { code: 'PYG', nombre: 'Guaraní' },
+  { code: 'BOB', nombre: 'Boliviano' },
+  { code: 'PEN', nombre: 'Sol peruano' },
+  { code: 'COP', nombre: 'Peso colombiano' },
+  { code: 'MXN', nombre: 'Peso mexicano' },
+  { code: 'GBP', nombre: 'Libra esterlina' },
+];
+
 function renderConversor(el) {
   const $ = s => el.querySelector(s);
   const num = sel => _numAR($(sel)?.value);
   const _n = n => (n).toLocaleString('es-AR', { maximumFractionDigits: 2 });
-  let mode = 'usd';
-  const monedaTxt = () => ($('[data-bind="conv-moneda"]')?.value || '').trim() || 'moneda';
 
-  // Calcula sin tocar el DOM (todos los valores se ingresan a mano).
+  // Lista desplegable de monedas (default Guaraní). El destino siempre es ARS.
+  const sel = $('[data-bind="conv-moneda-sel"]');
+  if (sel && !sel.options.length) {
+    sel.innerHTML = CONV_MONEDAS.map(m => `<option value="${m.code}">${m.nombre} (${m.code})</option>`).join('');
+    sel.value = 'PYG';
+  }
+  const monedaCode = () => (sel?.value || 'USD');
+  const esUSD = () => monedaCode() === 'USD';
+  let mode = 'usd';
+
+  // Conversión en cadena: origen → USD → ARS. Si el origen ES USD, el monto ya es USD.
   const calc = () => {
     const monto = num('[data-bind="conv-monto"]');
     const dolar = num('[data-bind="conv-dolar"]');
-    const usd = mode === 'tasa'
-      ? (() => { const t = num('[data-bind="conv-tasa"]'); return t > 0 ? monto / t : 0; })()
-      : num('[data-bind="conv-usd"]');
+    let usd;
+    if (esUSD())              usd = monto;
+    else if (mode === 'tasa') { const t = num('[data-bind="conv-tasa"]'); usd = t > 0 ? monto / t : 0; }
+    else                      usd = num('[data-bind="conv-usd"]');
     return { monto, dolar, usd, pesos: usd * dolar };
   };
 
   const compute = () => {
+    const code = monedaCode();
     const { monto, dolar, usd, pesos } = calc();
     $('[data-bind="conv-result"]').textContent = FMT.format(pesos);
-    $('[data-bind="conv-detail"]').textContent = (usd > 0 && dolar > 0)
-      ? `US$ ${_n(usd)} × ${FMT.format(dolar)}${monto > 0 ? ` · 1 US$ = ${_n(monto / usd)} ${monedaTxt()}` : ''}`
-      : 'Completá los pasos para ver el total';
+    let det = 'Completá los pasos para ver el total';
+    if (pesos > 0) {
+      det = esUSD()
+        ? `US$ ${_n(usd)} × ${FMT.format(dolar)}`
+        : `${_n(monto)} ${code} → US$ ${_n(usd)} × ${FMT.format(dolar)}${(monto > 0 && usd > 0) ? ` · 1 US$ = ${_n(monto / usd)} ${code}` : ''}`;
+    }
+    $('[data-bind="conv-detail"]').textContent = det;
     const g = $('[data-bind="conv-guardar"]'); if (g) g.disabled = !(pesos > 0);
   };
 
-  // Toggle modo
+  // Al cambiar de moneda: oculta el paso 2 si es USD, actualiza labels/placeholder.
+  const aplicarMoneda = () => {
+    const code = monedaCode();
+    const step2 = $('[data-conv-step="usd"]'); if (step2) step2.hidden = esUSD();
+    const lbl = $('[data-bind="conv-moneda-lbl"]'); if (lbl) lbl.textContent = code;
+    const mInp = $('[data-bind="conv-monto"]'); if (mInp) mInp.placeholder = esUSD() ? 'Monto en US$' : `Monto en ${code}`;
+    compute();
+  };
+  if (sel) sel.onchange = () => {
+    // la tasa/usd/monto son de la moneda anterior → limpiar al cambiar
+    ['conv-tasa', 'conv-usd', 'conv-monto'].forEach(k => { const i = $(`[data-bind="${k}"]`); if (i) i.value = ''; });
+    aplicarMoneda();
+  };
+
+  // Toggle "Me cobraron US$" / "Sé la tasa"
   el.querySelectorAll('[data-conv-mode]').forEach(b => b.onclick = () => {
     mode = b.dataset.convMode;
     el.querySelectorAll('[data-conv-mode]').forEach(x => x.classList.toggle('active', x === b));
-    const pu = el.querySelector('[data-conv-pane="usd"]'); if (pu) pu.hidden = mode !== 'usd';
-    const pt = el.querySelector('[data-conv-pane="tasa"]'); if (pt) pt.hidden = mode !== 'tasa';
+    const pu = $('[data-conv-pane="usd"]'); if (pu) pu.hidden = mode !== 'usd';
+    const pt = $('[data-conv-pane="tasa"]'); if (pt) pt.hidden = mode !== 'tasa';
     compute();
   });
 
-  const monedaInp = $('[data-bind="conv-moneda"]');
-  if (monedaInp) monedaInp.oninput = () => {
-    const l = $('[data-bind="conv-moneda-lbl"]'); if (l) l.textContent = monedaTxt();
-    compute();
-  };
-  // Recalcular al tipear en los campos numéricos (excluye desc/moneda que tienen data-no-calc)
   el.querySelectorAll('input').forEach(i => { if (!i.dataset.noCalc) i.oninput = compute; });
 
-  // ── Lista de registro (ej. precios en el súper) — persiste en localStorage ──
+  // ── Lista de registro (precios) — persiste en localStorage ──
   const LS_KEY = 'gf_conv_lista';
   const getLista = () => { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } };
   const setLista = (l) => { try { localStorage.setItem(LS_KEY, JSON.stringify(l)); } catch {} };
@@ -2805,15 +2841,15 @@ function renderConversor(el) {
     if (!(pesos > 0)) return;
     const desc = ($('[data-bind="conv-desc"]')?.value || '').trim();
     const arr = getLista();
-    arr.push({ desc, monto, moneda: monedaTxt(), usd, dolar, pesos, ts: Date.now() });
+    arr.push({ desc, monto, moneda: monedaCode(), usd, dolar, pesos, ts: Date.now() });
     setLista(arr); renderLista();
-    // Limpiar solo lo del ítem (mantener moneda/tasa/dólar para el siguiente precio)
     ['conv-desc', 'conv-monto', 'conv-usd'].forEach(k => { const i = $(`[data-bind="${k}"]`); if (i) i.value = ''; });
     compute();
     if (typeof toast === 'function') toast('✓ Agregado a la lista');
   });
   $('[data-bind="conv-lista-clear"]')?.addEventListener('click', () => { setLista([]); renderLista(); });
 
+  aplicarMoneda();
   renderLista();
   compute();
 }

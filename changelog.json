@@ -1,6 +1,14 @@
 {
   "entradas": [
     {
+      "version": "2.9",
+      "fecha": "2026-06-19",
+      "items": [
+        "Conversor de viaje: ahora elegís la moneda de una lista (dólar, euro, real, guaraní, peso uruguayo, peso chileno, sol, boliviano, libra y más).",
+        "Conversión en cadena: moneda extranjera → dólar → pesos. Si elegís dólar, va directo a pesos (sin el paso intermedio)."
+      ]
+    },
+    {
       "version": "2.8",
       "fecha": "2026-06-19",
       "items": [

@@ -1022,17 +1022,15 @@
     </header>
 
     <div class="space-y-3">
-      <!-- Paso 1: monto extranjero -->
+      <!-- Paso 1: moneda (lista) + monto -->
       <div>
-        <label class="conv-step-lbl">1 · Gasté en el exterior</label>
-        <div class="conv-row">
-          <input type="text" inputmode="decimal" class="input" data-bind="conv-monto" placeholder="217620" aria-label="Monto gastado en moneda extranjera"/>
-          <input type="text" class="input conv-moneda-inp" data-bind="conv-moneda" value="Guaraní" data-no-calc aria-label="Nombre de la moneda"/>
-        </div>
+        <label class="conv-step-lbl">1 · Moneda y monto</label>
+        <select class="input conv-moneda-sel" data-bind="conv-moneda-sel" data-no-calc aria-label="Moneda de origen"></select>
+        <input type="text" inputmode="decimal" class="input mt-2" data-bind="conv-monto" placeholder="Monto" aria-label="Monto en la moneda elegida"/>
       </div>
 
-      <!-- Paso 2: a dólares -->
-      <div>
+      <!-- Paso 2: a dólares (oculto si la moneda elegida es USD) -->
+      <div data-conv-step="usd">
         <label class="conv-step-lbl">2 · Convertido a dólar</label>
         <div class="conv-toggle" role="tablist">
           <button type="button" class="conv-toggle-btn active" data-conv-mode="usd" role="tab">Me cobraron US$</button>
