@@ -740,6 +740,15 @@ const AJUSTES_DEFAULT = {
     BRL: { nombre: 'Real', valor: 220,  simbolo: '🇧🇷' },
   },
   catalogos: {
+    supermercados: [
+      { id: 'carrefour', nombre: 'Carrefour',   icono: '🛒', color: '#0b4ea2' },
+      { id: 'coto',      nombre: 'Coto',        icono: '🛒', color: '#e30613' },
+      { id: 'dia',       nombre: 'Día',         icono: '🛒', color: '#d52b1e' },
+      { id: 'jumbo',     nombre: 'Jumbo',       icono: '🛒', color: '#00a14b' },
+      { id: 'laanonima', nombre: 'La Anónima',  icono: '🛒', color: '#e2b857' },
+      { id: 'chino',     nombre: 'Súper chino', icono: '🏪', color: '#f59e0b' },
+      { id: 'otro',      nombre: 'Otro',        icono: '🏬', color: '#94a3b8' },
+    ],
     categorias_gasto: [
       { id: 'comida',       nombre: 'Comida',       icono: '🛒', color: '#10b981' },
       { id: 'combustible',  nombre: 'Combustible',  icono: '⛽', color: '#f59e0b' },

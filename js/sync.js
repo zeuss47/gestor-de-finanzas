@@ -25,6 +25,8 @@ const ARCHIVOS = {
   tarjetas: 'tarjetas.json',
   cuentas:  'cuentas.json',
   metas:    'metas.json',
+  productos: 'productos.json',   // v3: registro de productos (código de barras)
+  precios:   'precios.json',     // v3: precios por supermercado
 };
 // El store "ajustes" NO se sube tal cual (contiene el PAT). Pero SÍ respaldamos
 // una versión SANITIZADA en config.json (categorías, habituales, estrategia, UI…)

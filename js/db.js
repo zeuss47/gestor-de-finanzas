@@ -15,7 +15,7 @@
  */
 
 const DB_NAME = 'gestor_finanzas_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const SCHEMA = {
   gastos:     { keyPath: 'id', indexes: ['fecha', 'tarjeta_id', 'cuenta_id', 'categoria', 'updated_at'] },
@@ -25,6 +25,9 @@ const SCHEMA = {
   metas:      { keyPath: 'id', indexes: ['prioridad', 'updated_at'] },
   ajustes:    { keyPath: 'id' },
   sync_queue: { keyPath: 'qid', autoIncrement: true },
+  // v3: registro de productos por código de barras + precios por supermercado
+  productos:  { keyPath: 'id', indexes: ['codigo', 'nombre', 'updated_at'] },
+  precios:    { keyPath: 'id', indexes: ['producto_id', 'supermercado_id', 'fecha', 'updated_at'] },
 };
 
 let _dbPromise = null;
