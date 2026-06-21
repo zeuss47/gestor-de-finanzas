@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.24",
+      "fecha": "2026-06-21",
+      "items": [
+        "Arreglo: al arrastrar para girar la rueda se movía el fondo en vez de la rueda. Ahora gira correctamente (y también se puede girar arrastrando sobre la zona de los íconos)."
+      ]
+    },
+    {
       "version": "2.23",
       "fecha": "2026-06-21",
       "items": [

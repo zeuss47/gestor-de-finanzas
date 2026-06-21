@@ -1,7 +1,7 @@
 {
-  "version": "2.23",
-  "build": 137,
-  "modified": "2026-06-21T20:30:00Z",
-  "commit": "rueda de seleccion rotable + trigger mas abajo + swipe horizontal para cambiar de tab",
+  "version": "2.24",
+  "build": 138,
+  "modified": "2026-06-21T21:00:00Z",
+  "commit": "fix: rueda giraba el fondo en vez de rotar (touch-action:none + drag en zona items)",
   "notes": "Version derivada de changelog.json"
 }

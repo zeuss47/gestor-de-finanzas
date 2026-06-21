@@ -8578,25 +8578,27 @@ async function init() {
   // Menú de rueda (rueda de selección rotable desde el borde derecho)
   document.getElementById('wheel-trigger')?.addEventListener('click', () => toggleWheel());
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleWheel(false); });
-  // Arrastre vertical sobre el overlay = girar la rueda; tap (sin arrastrar) = cerrar.
-  const _ovEl = document.getElementById('wheel-overlay');
-  if (_ovEl) {
+  // Arrastre vertical = girar la rueda (rueda de selección). Se enlaza al overlay
+  // (tap sin arrastrar = cerrar) y a la zona de ítems (para girar desde ahí también).
+  const _bindWheelDrag = (el, closeOnTap) => {
+    if (!el) return;
     let active = false, startY = 0, startRot = 0;
-    _ovEl.addEventListener('pointerdown', (e) => {
+    el.addEventListener('pointerdown', (e) => {
       active = true; _wheelDragged = false; startY = e.clientY; startRot = _wheelRot;
-      try { _ovEl.setPointerCapture(e.pointerId); } catch {}
+      try { (e.target.setPointerCapture ? e.target : el).setPointerCapture(e.pointerId); } catch {}
     });
-    _ovEl.addEventListener('pointermove', (e) => {
+    el.addEventListener('pointermove', (e) => {
       if (!active || !_wheelGeo) return;
       const dy = e.clientY - startY;
       if (Math.abs(dy) > 6) _wheelDragged = true;
       _wheelRot = Math.max(_wheelGeo.rotMin, Math.min(0, startRot + dy * 0.42));
       _applyWheelLayout(true);
     });
-    const _end = () => { if (!active) return; active = false; if (!_wheelDragged) toggleWheel(false); };
-    _ovEl.addEventListener('pointerup', _end);
-    _ovEl.addEventListener('pointercancel', () => { active = false; });
-  }
+    el.addEventListener('pointerup', () => { if (!active) return; active = false; if (closeOnTap && !_wheelDragged) toggleWheel(false); });
+    el.addEventListener('pointercancel', () => { active = false; });
+  };
+  _bindWheelDrag(document.getElementById('wheel-overlay'), true);
+  _bindWheelDrag(document.getElementById('wheel-items'), false);
   renderWheel();
 
   // ── Swipe horizontal (móvil) para cambiar de pestaña ──────────────

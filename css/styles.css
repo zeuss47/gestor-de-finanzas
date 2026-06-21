@@ -877,8 +877,12 @@ html.light #bottom-nav::before { background: #eef2ff; }
      (queda display:block), así que NO podemos depender de `hidden` para no tapar
      la pantalla. Gateamos los clics por pointer-events según la clase .open. */
   pointer-events: none;
+  /* Sin esto, el arrastre para girar la rueda hace scroll del fondo (y dispara
+     pointercancel → no gira). touch-action:none deja que rotemos a mano. */
+  touch-action: none;
 }
 #wheel-overlay.open { opacity: 1; pointer-events: auto; }
+#wheel-items, .wheel-item { touch-action: none; }
 #wheel-menu {
   position: fixed; right: 16px; bottom: 76px; z-index: 36;   /* más abajo, cerca del nav */
   width: 52px; height: 52px;
