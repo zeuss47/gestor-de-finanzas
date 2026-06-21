@@ -800,55 +800,42 @@ html.light #bottom-nav::before { background: #eef2ff; }
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent), 0 8px 26px rgba(0,0,0,.28) !important;
 }
 
-/* btn-add central — estilo gradiente (acentos personalizables brand→brand-2) +
-   animación de halo + barrido de brillo. El botón NO se mueve en idle (vive en
-   el cradle del nav y moverlo revelaría el fondo); el ícono "+" gira al tocar. */
-@keyframes btn-add-halo {
-  0%   { box-shadow: 0 8px 22px rgba(0,0,0,.45), 0 0 0 0 var(--brand-glow); }
-  70%  { box-shadow: 0 8px 22px rgba(0,0,0,.45), 0 0 0 11px transparent; }
-  100% { box-shadow: 0 8px 22px rgba(0,0,0,.45), 0 0 0 0 transparent; }
-}
-@keyframes btn-add-shine {
-  0%, 55% { transform: translateX(-140%) rotate(8deg); }
-  80%     { transform: translateX(140%)  rotate(8deg); }
-  100%    { transform: translateX(140%)  rotate(8deg); }
-}
+/* btn-add central (acción primaria) — brass satinado sobrio: gradiente vertical
+   con filo superior iluminado, aro fino y elevación con glow brand ESTÁTICO
+   (sin halo pulsante ni barrido). El "+" gira al tocar. */
 #btn-add {
   position: relative;
   z-index: 2;                       /* por encima del cradle ::before */
-  overflow: hidden;                 /* recorta el barrido al círculo */
-  background:
-    radial-gradient(circle at 30% 24%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 48%),
-    linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
-  box-shadow: 0 8px 22px rgba(0,0,0,.45), 0 0 0 0 var(--brand-glow);
-  border: 2px solid rgba(255,255,255,.3);
+  border: none;
   cursor: pointer;
   color: #fff;
-  animation: btn-add-halo 3s ease-out infinite;
-  transition: transform .2s cubic-bezier(.34,1.56,.64,1), filter .2s, box-shadow .2s;
-  will-change: box-shadow;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--brand) 76%, #ffffff) 0%,
+      var(--brand) 46%,
+      color-mix(in srgb, var(--brand-2) 90%, #000000) 100%);
+  box-shadow:
+    inset 0 1.5px 1px rgba(255,255,255,.55),
+    inset 0 -2px 4px color-mix(in srgb, var(--brand-2) 65%, #000),
+    0 6px 16px rgba(0,0,0,.42),
+    0 3px 10px color-mix(in srgb, var(--brand) 40%, transparent);
+  transition: transform .22s cubic-bezier(.34,1.56,.64,1), filter .2s, box-shadow .25s;
 }
-/* Barrido de luz que cruza el botón cada ciclo */
+/* Aro fino satinado en el borde (sustituye al borde blanco grueso) */
 #btn-add::before {
   content: '';
-  position: absolute;
-  top: -20%; left: 0; width: 60%; height: 140%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
-  transform: translateX(-140%) rotate(8deg);
-  animation: btn-add-shine 3.6s ease-in-out infinite;
-  pointer-events: none;
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
 }
 .btn-add-icon {
   width: 26px; height: 26px;
   position: relative; z-index: 1;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.28));
   transition: transform .3s cubic-bezier(.34,1.56,.64,1);
 }
-#btn-add:hover  { transform: scale(1.12); filter: brightness(1.07); }
+#btn-add:hover  { transform: scale(1.07); filter: brightness(1.05); }
 #btn-add:hover .btn-add-icon { transform: rotate(90deg); }
-#btn-add:active { transform: scale(.9); transition: transform .1s ease; }
-@media (prefers-reduced-motion: reduce) {
-  #btn-add, #btn-add::before { animation: none; }
-}
+#btn-add:active { transform: scale(.92); transition: transform .1s ease; }
 
 /* ── Menú de RUEDA (acciones rápidas radiales, borde derecho) ──────
    Reemplaza la antigua barra horizontal. Un botón circular fijado al borde
@@ -862,26 +849,43 @@ html.light #bottom-nav::before { background: #eef2ff; }
 }
 #wheel-overlay.open { opacity: 1; }
 #wheel-menu {
-  position: fixed; right: 14px; bottom: 104px; z-index: 36;
-  width: 58px; height: 58px;
+  position: fixed; right: 16px; bottom: 104px; z-index: 36;
+  width: 52px; height: 52px;
 }
+/* Trigger SECUNDARIO (cerrado): círculo oscuro de vidrio con aro brass, ícono
+   brass. Al abrir se "enciende" a brass relleno. Más chico que el + primario. */
 #wheel-trigger {
   position: relative; z-index: 2;
-  width: 58px; height: 58px; border-radius: 50%;
-  display: grid; place-items: center; cursor: pointer; color: #fff;
-  border: 2px solid rgba(255,255,255,.28);
+  width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  color: var(--brand-ink);
   background:
-    radial-gradient(circle at 32% 26%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 50%),
-    linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
-  box-shadow: 0 8px 22px rgba(0,0,0,.42);
-  transition: transform .3s cubic-bezier(.34,1.56,.64,1), filter .2s;
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--surface-3) 90%, #fff) 0%,
+      color-mix(in srgb, var(--bg) 55%, var(--surface-2)) 100%);
+  border: 1px solid color-mix(in srgb, var(--brand) 42%, var(--border));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 6px 16px rgba(0,0,0,.40);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1), background .25s, color .2s, border-color .2s, box-shadow .25s;
 }
-#wheel-trigger:active { transform: scale(.92); }
-#wheel-menu.open #wheel-trigger { transform: rotate(45deg); filter: brightness(1.05); }
-.wheel-trigger-ic { width: 26px; height: 26px; transition: transform .3s ease; }
-#wheel-items { position: absolute; right: 0; bottom: 0; width: 58px; height: 58px; pointer-events: none; }
+#wheel-trigger:active { transform: scale(.9); }
+#wheel-menu.open #wheel-trigger {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--brand) 76%, #fff) 0%, var(--brand) 48%, var(--brand-2) 100%);
+  box-shadow:
+    inset 0 1.5px 1px rgba(255,255,255,.5),
+    0 6px 18px rgba(0,0,0,.42),
+    0 3px 10px color-mix(in srgb, var(--brand) 45%, transparent);
+  transform: rotate(90deg);
+}
+.wheel-trigger-ic { width: 23px; height: 23px; transition: transform .3s ease; }
+#wheel-items { position: absolute; right: 0; bottom: 0; width: 52px; height: 52px; pointer-events: none; }
 .wheel-item {
-  position: absolute; right: 5px; bottom: 5px;     /* centro ≈ centro del trigger */
+  position: absolute; right: 2px; bottom: 2px;     /* centro ≈ centro del trigger */
   width: 48px; height: 48px; border-radius: 50%;
   display: grid; place-items: center;
   font-size: 1.25rem; line-height: 1;

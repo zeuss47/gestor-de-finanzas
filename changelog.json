@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.19",
+      "fecha": "2026-06-21",
+      "items": [
+        "Rediseño del botón + y del botón de la rueda: el + ahora es un círculo brass satinado y sobrio (sin el halo pulsante ni el destello que lo recargaban); la rueda es un círculo oscuro de vidrio con aro brass que se 'enciende' al abrirla. Quedan con jerarquía clara y dejan de competir."
+      ]
+    },
+    {
       "version": "2.18",
       "fecha": "2026-06-21",
       "items": [

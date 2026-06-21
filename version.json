@@ -1,7 +1,7 @@
 {
-  "version": "2.18",
-  "build": 132,
-  "modified": "2026-06-21T17:00:00Z",
-  "commit": "barra inferior -> menu de rueda radial (acciones rapidas desde el borde derecho)",
+  "version": "2.19",
+  "build": 133,
+  "modified": "2026-06-21T18:00:00Z",
+  "commit": "rediseño botones + (brass satinado sobrio) y rueda (vidrio oscuro/aro brass, se enciende al abrir)",
   "notes": "Version derivada de changelog.json"
 }
