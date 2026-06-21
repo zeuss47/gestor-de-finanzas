@@ -1,7 +1,7 @@
 {
-  "version": "2.9",
-  "build": 123,
-  "modified": "2026-06-19T16:00:00Z",
-  "commit": "conversor: lista de monedas + conversion en cadena 3/2 pasos",
+  "version": "2.10",
+  "build": 124,
+  "modified": "2026-06-19T17:00:00Z",
+  "commit": "fix: scroll del menu de utilidades en movil",
   "notes": "Version derivada de changelog.json"
 }

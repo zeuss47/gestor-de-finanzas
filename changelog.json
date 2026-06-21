@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.10",
+      "fecha": "2026-06-19",
+      "items": [
+        "Menú de Utilidades: ahora podés deslizar para ver todo el contenido y la lista completa en el teléfono (antes el contenido largo no scrolleaba)."
+      ]
+    },
+    {
       "version": "2.9",
       "fecha": "2026-06-19",
       "items": [
