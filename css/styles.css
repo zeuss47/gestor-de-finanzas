@@ -807,54 +807,54 @@ html.light #bottom-nav::before { background: #eef2ff; }
 @keyframes orb-breathe {
   0%, 100% {
     box-shadow:
-      inset -7px -9px 20px rgba(0,8,30,.55),
-      inset 6px 7px 18px rgba(150,200,255,.26),
-      0 0 0 1px rgba(120,170,255,.28),
-      0 0 18px 3px rgba(58,124,246,.42),
-      0 0 44px 12px rgba(40,90,220,.26);
+      inset -7px -9px 20px rgba(20,12,0,.55),
+      inset 6px 7px 18px rgba(255,228,160,.14),
+      0 0 0 1px rgba(201,162,78,.20),
+      0 0 11px 2px rgba(201,162,78,.20),
+      0 0 24px 6px rgba(160,120,40,.12);
   }
   50% {
     box-shadow:
-      inset -7px -9px 20px rgba(0,8,30,.55),
-      inset 6px 7px 18px rgba(160,205,255,.34),
-      0 0 0 1px rgba(150,190,255,.42),
-      0 0 30px 6px rgba(74,142,255,.62),
-      0 0 66px 22px rgba(52,112,240,.4);
+      inset -7px -9px 20px rgba(20,12,0,.55),
+      inset 6px 7px 18px rgba(255,232,170,.18),
+      0 0 0 1px rgba(214,176,92,.28),
+      0 0 16px 4px rgba(210,170,80,.30),
+      0 0 34px 10px rgba(170,130,50,.18);
   }
 }
 @keyframes orb-spin { to { transform: rotate(360deg); } }
 .orb-btn {
   position: relative;
-  border: none; cursor: pointer; color: #eaf2ff; overflow: visible;
+  border: none; cursor: pointer; color: #fff8ec; overflow: visible;
   background:
     radial-gradient(circle at 70% 28%,
-      #c8e0ff 0%, #6aa6ff 11%, #2f74e6 27%, #1648a6 47%, #0c2660 67%, #07163b 100%);
-  animation: orb-breathe 4.4s ease-in-out infinite;
+      #f2dfa8 0%, var(--brand) 14%, #b8893a 30%, #6e521d 52%, #3a2c11 74%, #211907 100%);
+  animation: orb-breathe 4.6s ease-in-out infinite;
   transition: transform .22s cubic-bezier(.34,1.56,.64,1), filter .2s;
 }
-/* Rim crescente luminoso girando alrededor del borde */
+/* Rim crescente cálido (dorado) girando alrededor del borde */
 .orb-btn::before {
   content: ''; position: absolute; inset: -1px; border-radius: 50%; pointer-events: none;
   background: conic-gradient(from 0deg,
-    transparent 0deg, rgba(198,224,255,0) 28deg,
-    rgba(198,224,255,.9) 72deg, rgba(120,180,255,.25) 128deg,
+    transparent 0deg, rgba(255,236,190,0) 28deg,
+    rgba(255,236,190,.6) 72deg, rgba(214,176,92,.18) 128deg,
     transparent 168deg, transparent 360deg);
   -webkit-mask: radial-gradient(circle, transparent 57%, #000 70%);
           mask: radial-gradient(circle, transparent 57%, #000 70%);
   filter: blur(1.4px);
-  animation: orb-spin 6s linear infinite;
+  animation: orb-spin 7s linear infinite;
 }
 @media (hover: hover) and (pointer: fine) {
-  .orb-btn:hover { filter: brightness(1.1) saturate(1.05); }
+  .orb-btn:hover { filter: brightness(1.06) saturate(1.03); }
 }
-.orb-btn:active { transform: scale(.92); filter: brightness(1.18) saturate(1.12); }
+.orb-btn:active { transform: scale(.92); filter: brightness(1.1) saturate(1.06); }
 
 /* btn-add central (acción primaria): usa el estilo orbe; el "+" gira al tocar. */
 #btn-add { position: relative; z-index: 2; cursor: pointer; }   /* sobre el cradle */
 .btn-add-icon {
   width: 26px; height: 26px;
   position: relative; z-index: 1;
-  filter: drop-shadow(0 1px 2px rgba(0,4,30,.5));
+  filter: drop-shadow(0 1px 2px rgba(20,12,0,.5));
   transition: transform .3s cubic-bezier(.34,1.56,.64,1);
 }
 #btn-add:hover .btn-add-icon { transform: rotate(90deg); }
@@ -888,8 +888,8 @@ html.light #bottom-nav::before { background: #eef2ff; }
 }
 #wheel-trigger:active { transform: scale(.9); }
 #wheel-menu.open #wheel-trigger {
-  transform: rotate(90deg) scale(1.04);
-  filter: brightness(1.16) saturate(1.14);
+  transform: rotate(90deg) scale(1.03);
+  filter: brightness(1.08) saturate(1.07);
 }
 .wheel-trigger-ic { width: 22px; height: 22px; transition: transform .3s ease; position: relative; z-index: 1; }
 #wheel-items { position: absolute; right: 0; bottom: 0; width: 52px; height: 52px; pointer-events: none; }

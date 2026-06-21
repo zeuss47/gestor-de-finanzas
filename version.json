@@ -1,7 +1,7 @@
 {
-  "version": "2.20",
-  "build": 134,
-  "modified": "2026-06-21T19:00:00Z",
-  "commit": "botones + y rueda con estilo orbe luminoso (glow azul, rim giratorio, respiracion)",
+  "version": "2.21",
+  "build": 135,
+  "modified": "2026-06-21T19:30:00Z",
+  "commit": "orbe dorado (brillo a la mitad) + icono rueda a tres lineas",
   "notes": "Version derivada de changelog.json"
 }

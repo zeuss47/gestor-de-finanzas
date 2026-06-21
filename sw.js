@@ -15,7 +15,7 @@
  *  4. MESSAGE SKIP_WAITING: el cliente decide cuando activar el SW nuevo.
  */
 
-const VERSION = 'v3.3.0-pages-b134';
+const VERSION = 'v3.3.0-pages-b135';
 const SHELL_CACHE = `shell-${VERSION}`;
 
 // Base scope dinamico: el SW se registra en su propio directorio,

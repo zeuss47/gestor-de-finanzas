@@ -1,6 +1,13 @@
 {
   "entradas": [
     {
+      "version": "2.21",
+      "fecha": "2026-06-21",
+      "items": [
+        "Botones + y rueda: el orbe ahora usa el dorado del tema (en vez de azul) y con la mitad de brillo, más sobrio. El botón de la rueda cambia su ícono a tres líneas."
+      ]
+    },
+    {
       "version": "2.20",
       "fecha": "2026-06-21",
       "items": [
