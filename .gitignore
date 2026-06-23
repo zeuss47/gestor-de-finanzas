@@ -8,6 +8,8 @@ Thumbs.db
 .env.local
 package-lock.json
 package.json
+# El package.json de android-twa sí va al repo (necesario para CI)
+!android-twa/package.json
 tailwind.config.js
 css/tailwind-input.css
 backups/

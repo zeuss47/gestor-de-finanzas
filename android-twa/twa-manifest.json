@@ -1,0 +1,59 @@
+{
+  "packageId": "com.zeuss47.gestorfinanzas",
+  "host": "zeuss47.github.io",
+  "name": "Gestor de Finanzas",
+  "launcherName": "Finanzas",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#00f0ff",
+  "navigationColor": "#050614",
+  "navigationColorDark": "#050614",
+  "navigationDividerColor": "#050614",
+  "navigationDividerColorDark": "#050614",
+  "backgroundColor": "#050614",
+  "enableNotifications": true,
+  "startUrl": "/gestor-de-finanzas/?source=pwa",
+  "iconUrl": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-512.png",
+  "maskableIconUrl": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-maskable-512.png",
+  "monochromeIconUrl": null,
+  "shortcuts": [
+    {
+      "name": "Nuevo gasto",
+      "shortName": "Gasto",
+      "url": "/gestor-de-finanzas/?action=new-gasto",
+      "icons": [{ "src": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Nuevo ingreso",
+      "shortName": "Ingreso",
+      "url": "/gestor-de-finanzas/?action=new-ingreso",
+      "icons": [{ "src": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tarjetas",
+      "shortName": "Tarjetas",
+      "url": "/gestor-de-finanzas/?action=tarjetas",
+      "icons": [{ "src": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://zeuss47.github.io/gestor-de-finanzas/manifest.json",
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://zeuss47.github.io/gestor-de-finanzas/",
+  "minSdkVersion": 19,
+  "targetSdkVersion": 34,
+  "fingerprints": [],
+  "enableSiteSettingsShortcut": true,
+  "isTrustedWebActivity": true,
+  "serviceAccountJsonFile": null,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "appVersionCode": 1,
+  "appVersion": "1.2.0",
+  "splashScreenFadeOutDuration": 300
+}
