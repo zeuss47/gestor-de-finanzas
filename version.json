@@ -1,7 +1,7 @@
 ﻿{
     "version":  "2.29",
-    "build":  146,
-    "modified":  "2026-06-23T17:41:02Z",
-    "commit":  "M js/app.js, M js/notifications.js",
-    "notes":  "Auto-update 2026-06-23 14:41"
+    "build":  147,
+    "modified":  "2026-06-23T18:44:57Z",
+    "commit":  "M android-twa/android-project/app/src/main/res/xml/shortcuts.xml",
+    "notes":  "Auto-update 2026-06-23 15:44"
 }
