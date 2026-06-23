@@ -24,10 +24,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install Android SDK components
+      - name: Accept SDK licenses and install components
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platforms;android-34" \
+            "build-tools;35.0.0" \
             "build-tools;34.0.0" \
             "platform-tools" 2>/dev/null || true
 
