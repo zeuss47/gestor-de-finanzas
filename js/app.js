@@ -2618,6 +2618,22 @@ function renderTipoCambio(el) {
   });
 }
 
+/** Devuelve el valor ARS de una clave de tipo de cambio (ej: 'USD_BLUE').
+ *  Retorna 0 si no hay cotización disponible. Usada por toda la app. */
+function getCotizacion(clave) {
+  return Number(state.ajustes?.tipos_cambio?.[clave]?.valor) || 0;
+}
+
+/** Retorna el nombre legible y símbolo de una clave de moneda. */
+function getMonedaInfo(clave) {
+  if (!clave || clave === 'ARS') return { nombre: 'Pesos ARS', simbolo: '$' };
+  const tc = state.ajustes?.tipos_cambio?.[clave];
+  if (tc) return { nombre: tc.nombre || clave, simbolo: tc.simbolo || '💱' };
+  const nombres = { USD: 'Dólar oficial', USD_BLUE: 'Dólar blue', USD_TARJETA: 'Dólar tarjeta',
+    USD_MEP: 'Dólar MEP', USD_CCL: 'Dólar CCL', EUR: 'Euro', BRL: 'Real' };
+  return { nombre: nombres[clave] || clave, simbolo: '💱' };
+}
+
 /**
  * Fetch automático de cotizaciones desde dolarapi.com y mergeo en ajustes.
  * Las cotizaciones marcadas con `auto:true` se sobrescriben; las manuales
@@ -2715,6 +2731,126 @@ async function guardarEditorTiposCambio() {
   await reloadAll();
   document.getElementById('dlg-editor-cotiz')?.close();
   toast('✓ Cotizaciones actualizadas');
+}
+
+/** Renderiza la lista de cotizaciones dentro del panel de Ajustes. */
+function renderCotizacionesPanel() {
+  const lista = document.getElementById('stab-cotiz-lista');
+  if (!lista) return;
+  const cambios = state.ajustes?.tipos_cambio || {};
+  const orden = ['USD','USD_BLUE','USD_TARJETA','USD_MEP','USD_CCL','USD_CRIPTO','USD_MAYOR','EUR','BRL'];
+  const entries = Object.entries(cambios).sort(([a],[b]) => {
+    const ia = orden.indexOf(a), ib = orden.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  lista.innerHTML = entries.map(([key, c]) => `
+    <div class="ec-row" data-key="${key}">
+      <label class="ec-toggle" title="Mostrar en el dashboard">
+        <input type="checkbox" class="ec-visible" ${c.visible !== false ? 'checked' : ''}>
+        <span class="ec-simbolo">${c.simbolo || '💱'}</span>
+      </label>
+      <div class="ec-info">
+        <span class="ec-nombre">${escapeHtml(c.nombre || key)}</span>
+        <span class="ec-key">${key}${c.auto ? ' · LIVE' : c.manual ? ' · manual' : ''}</span>
+      </div>
+      <div class="ec-valor-wrap">
+        <span class="ec-prefix">$</span>
+        <input type="number" step="0.01" class="ec-valor input" value="${c.valor ?? ''}" placeholder="0">
+      </div>
+    </div>`
+  ).join('') || `<p class="text-xs" style="color:var(--ink-muted)">Sin cotizaciones. Tocá 🔄 Actualizar para traerlas.</p>`;
+  const upd = document.getElementById('stab-cotiz-updated');
+  if (upd) upd.textContent = state.ajustes?.tipos_cambio_updated ? `Última actualización: ${state.ajustes.tipos_cambio_updated}` : '';
+}
+
+/** Guarda las cotizaciones editadas en el panel de Ajustes (mismo formato que el editor modal). */
+async function guardarCotizacionesPanel() {
+  const lista = document.getElementById('stab-cotiz-lista');
+  if (!lista) return;
+  const cambios = { ...(state.ajustes?.tipos_cambio || {}) };
+  lista.querySelectorAll('.ec-row').forEach(row => {
+    const key = row.dataset.key;
+    if (!cambios[key]) return;
+    const visible = row.querySelector('.ec-visible')?.checked !== false;
+    const valorRaw = row.querySelector('.ec-valor')?.value;
+    const valor = parseFloat(valorRaw);
+    const prevValor = cambios[key].valor;
+    cambios[key] = {
+      ...cambios[key],
+      visible,
+      valor: isNaN(valor) ? prevValor : valor,
+      manual: (!isNaN(valor) && valor !== prevValor) ? true : cambios[key].manual,
+      auto: (!isNaN(valor) && valor !== prevValor) ? false : cambios[key].auto,
+    };
+  });
+  state.ajustes.tipos_cambio = cambios;
+  state.ajustes.tipos_cambio_updated = new Date().toLocaleString('es-AR');
+  await saveAjustes({});
+  await reloadAll();
+  renderCotizacionesPanel();
+  toast('✓ Cotizaciones guardadas');
+}
+
+/** Drag-and-drop para reordenar las pestañas de Ajustes. Persiste en localStorage. */
+function initSettingsTabDrag() {
+  const container = document.getElementById('settings-tabs');
+  if (!container) return;
+
+  // Restaurar orden guardado
+  try {
+    const saved = JSON.parse(localStorage.getItem('gf_stab_order') || 'null');
+    if (Array.isArray(saved) && saved.length) {
+      saved.forEach(s => {
+        const el = container.querySelector(`[data-stab="${s}"]`);
+        if (el) container.appendChild(el);
+      });
+    }
+  } catch {}
+
+  const saveOrder = () => {
+    try {
+      const order = [...container.querySelectorAll('.settings-tab')].map(t => t.dataset.stab);
+      localStorage.setItem('gf_stab_order', JSON.stringify(order));
+    } catch {}
+  };
+
+  let dragSrc = null;
+
+  container.querySelectorAll('.settings-tab').forEach(tab => {
+    tab.setAttribute('draggable', 'true');
+
+    tab.addEventListener('dragstart', e => {
+      dragSrc = tab;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tab.dataset.stab);
+      setTimeout(() => tab.classList.add('stab-dragging'), 0);
+    });
+
+    tab.addEventListener('dragend', () => {
+      tab.classList.remove('stab-dragging');
+      container.querySelectorAll('.stab-over').forEach(t => t.classList.remove('stab-over'));
+      dragSrc = null;
+      saveOrder();
+    });
+
+    tab.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!dragSrc || dragSrc === tab) return;
+      container.querySelectorAll('.stab-over').forEach(t => t.classList.remove('stab-over'));
+      tab.classList.add('stab-over');
+    });
+
+    tab.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === tab) return;
+      const siblings = [...container.querySelectorAll('.settings-tab')];
+      const fromIdx = siblings.indexOf(dragSrc);
+      const toIdx = siblings.indexOf(tab);
+      if (fromIdx < toIdx) container.insertBefore(dragSrc, tab.nextElementSibling);
+      else container.insertBefore(dragSrc, tab);
+    });
+  });
 }
 
 function renderCalculadora(el) {
@@ -3037,12 +3173,40 @@ function renderProductos(el) {
   };
   renderSuperChips();
   const selectedSuper = () => chipsSuper?.querySelector('input:checked')?.value || supers()[0]?.id;
+  const selectedMoneda = () => $('[data-bind="prod-moneda"]')?.value || 'ARS';
   let productos = [], precios = [], prodActual = null;
+
+  const actualizarPrefijo = () => {
+    const moneda = selectedMoneda();
+    const prefix = $('[data-bind="prod-moneda-prefix"]');
+    const hint = $('[data-bind="prod-conv-hint"]');
+    if (prefix) {
+      const etiquetas = { ARS:'$', USD:'U$D', USD_BLUE:'U$D', USD_TARJETA:'U$D',
+        USD_MEP:'U$D', USD_CCL:'U$D', EUR:'€', BRL:'R$' };
+      prefix.textContent = etiquetas[moneda] || moneda;
+    }
+    const precio = _numAR($('[data-bind="prod-precio"]')?.value);
+    if (hint) {
+      if (moneda !== 'ARS' && precio > 0) {
+        const tasa = getCotizacion(moneda);
+        const info = getMonedaInfo(moneda);
+        hint.textContent = tasa
+          ? `≈ ${FMT.format(Math.round(precio * tasa))} ARS · ${info.nombre} ×${FMT.format(tasa)}`
+          : `Sin cotización para ${moneda}. Se guardará el monto como ARS.`;
+        hint.style.color = tasa ? 'var(--ink-muted)' : 'var(--warning)';
+      } else {
+        hint.textContent = '';
+      }
+    }
+  };
+
   const actualizarGuardar = () => {
     const nombre = ($('[data-bind="prod-nombre"]')?.value || '').trim();
     const precio = _numAR($('[data-bind="prod-precio"]')?.value);
     const g = $('[data-bind="prod-guardar"]'); if (g) g.disabled = !(nombre && precio > 0);
+    actualizarPrefijo();
   };
+
   const renderLista = () => {
     const cont = $('[data-bind="prod-lista"]'); if (!cont) return;
     const filtro = ($('[data-bind="prod-filtro"]')?.value || '').toLowerCase().trim();
@@ -3053,7 +3217,10 @@ function renderProductos(el) {
       const min = prx[0]; const minS = min ? superById(min.supermercado_id) : null;
       const filas = prx.map((x, i) => {
         const sp = superById(x.supermercado_id);
-        return `<div class="prod-precio-row ${i === 0 && prx.length > 1 ? 'mejor' : ''}"><span class="prod-precio-super"><b style="color:${sp.color}">${sp.icono}</b> ${escapeHtml(sp.nombre)}</span><span class="prod-precio-val">${FMT.format(x.precio)}</span><span class="prod-precio-fecha">${x.fecha || ''}</span><button type="button" class="conv-lista-del" data-delprecio="${x.id}" aria-label="Borrar precio">✕</button></div>`;
+        const monedaTag = x.moneda
+          ? `<span class="prod-precio-moneda-tag">${x.moneda.replace('USD_','').replace('USD','U$D')} ${(x.precio_original||0).toLocaleString('es-AR',{minimumFractionDigits:2})}</span>`
+          : '';
+        return `<div class="prod-precio-row ${i === 0 && prx.length > 1 ? 'mejor' : ''}"><span class="prod-precio-super"><b style="color:${sp.color}">${sp.icono}</b> ${escapeHtml(sp.nombre)}</span><span class="prod-precio-val">${monedaTag}${FMT.format(x.precio)}</span><span class="prod-precio-fecha">${x.fecha || ''}</span><button type="button" class="conv-lista-del" data-delprecio="${x.id}" aria-label="Borrar precio">✕</button></div>`;
       }).join('');
       return `<div class="prod-item"><button type="button" class="prod-item-head" data-toggle="${p.id}"><span class="prod-item-nombre">${escapeHtml(p.nombre)}</span><span class="prod-item-min">${min ? FMT.format(min.precio) : '-'}${minS ? ' · ' + escapeHtml(minS.nombre) : ''}</span><span class="prod-item-chev">▾</span></button><div class="prod-item-body" hidden>${filas || '<p class="conv-lista-empty">Sin precios.</p>'}<button type="button" class="conv-lista-clear prod-del-prod" data-delprod="${p.id}">Borrar producto</button></div></div>`;
     }).join('');
@@ -3091,8 +3258,22 @@ function renderProductos(el) {
     const codigo = ($('[data-bind="prod-codigo"]')?.value || '').trim();
     const nombre = ($('[data-bind="prod-nombre"]')?.value || '').trim();
     const superId = selectedSuper();
-    const precio = _numAR($('[data-bind="prod-precio"]')?.value);
-    if (!nombre || !(precio > 0)) { if (typeof toast === 'function') toast('Completá nombre y precio'); return; }
+    const moneda = selectedMoneda();
+    const precioOriginal = _numAR($('[data-bind="prod-precio"]')?.value);
+    if (!nombre || !(precioOriginal > 0)) { if (typeof toast === 'function') toast('Completá nombre y precio'); return; }
+
+    // Convertir a ARS si la moneda es extranjera
+    let precioARS = precioOriginal;
+    let tasaUsada = null;
+    if (moneda !== 'ARS') {
+      tasaUsada = getCotizacion(moneda);
+      if (tasaUsada) {
+        precioARS = precioOriginal * tasaUsada;
+      } else {
+        toast('Sin cotización para ' + moneda + ' — se guardó como ARS');
+      }
+    }
+
     // Buscar el producto por código; si no, por nombre exacto (así re-cargar el mismo
     // producto en otro súper le suma un precio en vez de duplicarlo). Sin estado previo.
     let prod = (codigo && productos.find(p => p.codigo === codigo))
@@ -3100,10 +3281,22 @@ function renderProductos(el) {
             || null;
     if (!prod) { prod = { id: uuid(), codigo: codigo || null, nombre, updated_at: nowTs() }; await DB.put('productos', prod); }
     else if ((codigo && prod.codigo !== codigo) || prod.nombre !== nombre) { if (codigo) prod.codigo = codigo; prod.nombre = nombre; prod.updated_at = nowTs(); await DB.put('productos', prod); }
-    await DB.put('precios', { id: uuid(), producto_id: prod.id, supermercado_id: superId, precio, fecha: new Date().toISOString().slice(0, 10), updated_at: nowTs() });
+
+    await DB.put('precios', {
+      id: uuid(),
+      producto_id: prod.id,
+      supermercado_id: superId,
+      precio: precioARS,                                    // siempre en ARS para comparar
+      moneda: moneda !== 'ARS' ? moneda : null,             // null = ARS nativo
+      precio_original: moneda !== 'ARS' ? precioOriginal : null,
+      cotizacion_usada: tasaUsada || null,
+      fecha: new Date().toISOString().slice(0, 10),
+      updated_at: nowTs(),
+    });
     if (typeof toast === 'function') toast('✓ Precio guardado');
     ['prod-codigo', 'prod-nombre', 'prod-precio'].forEach(k => { const i = $(`[data-bind="${k}"]`); if (i) i.value = ''; });
     const hint = $('[data-bind="prod-hint"]'); if (hint) hint.textContent = '';
+    const convHint = $('[data-bind="prod-conv-hint"]'); if (convHint) convHint.textContent = '';
     actualizarGuardar(); await cargar(); _prodSync();
   };
   let stream = null, scanning = false;
@@ -3133,6 +3326,7 @@ function renderProductos(el) {
   $('[data-bind="prod-guardar"]')?.addEventListener('click', guardar);
   $('[data-bind="prod-nombre"]')?.addEventListener('input', actualizarGuardar);
   $('[data-bind="prod-precio"]')?.addEventListener('input', actualizarGuardar);
+  $('[data-bind="prod-moneda"]')?.addEventListener('change', actualizarPrefijo);
   $('[data-bind="prod-filtro"]')?.addEventListener('input', renderLista);
   renderMapa(el);   // el mapa vive dentro de la misma pestaña Productos
   cargar();
@@ -5102,6 +5296,7 @@ function abrirSettings() {
   renderHabitualesSettings();
   renderCuentasSettings();
   renderTarjetasSettings();
+  renderCotizacionesPanel();  // pre-renderiza el panel aunque no esté visible
 
   dlg.showModal();
 }
@@ -8873,9 +9068,37 @@ async function init() {
     document.querySelectorAll('[data-sidebar-tab]').forEach(b=>b.classList.toggle('active', b.dataset.sidebarTab==='gastos'));
   });
 
-  // Settings tabs
+  // Settings tabs: click para cambiar + drag para reordenar
+  initSettingsTabDrag();   // aplica orden guardado ANTES de enlazar el click
   document.querySelectorAll('#settings-tabs .settings-tab').forEach(b =>
     b.addEventListener('click', () => cambiarSettingsTab(b.dataset.stab)));
+
+  // Botones del panel Cotizaciones en Ajustes
+  document.getElementById('stab-cotiz-refresh')?.addEventListener('click', async () => {
+    toast('🔄 Actualizando cotizaciones…', 1500);
+    try {
+      await actualizarCotizacionesAuto(true);
+      renderCotizacionesPanel();
+      toast('✓ Cotizaciones actualizadas');
+    } catch { toast('Sin conexión — se muestran los valores guardados'); renderCotizacionesPanel(); }
+  });
+
+  document.getElementById('stab-cotiz-guardar')?.addEventListener('click', guardarCotizacionesPanel);
+
+  document.getElementById('cotiz-new-add')?.addEventListener('click', () => {
+    const clave = (document.getElementById('cotiz-new-clave')?.value || '').toUpperCase().trim().replace(/\s+/g,'_');
+    const nombre = (document.getElementById('cotiz-new-nombre')?.value || '').trim();
+    const simbolo = (document.getElementById('cotiz-new-simbolo')?.value || '💱').trim();
+    const valor = parseFloat(document.getElementById('cotiz-new-valor')?.value || '0');
+    if (!clave || !nombre || !(valor > 0)) { toast('Completá clave, nombre y valor'); return; }
+    if (!state.ajustes.tipos_cambio) state.ajustes.tipos_cambio = {};
+    state.ajustes.tipos_cambio[clave] = { nombre, simbolo, valor, manual: true, visible: true };
+    renderCotizacionesPanel();
+    ['cotiz-new-clave','cotiz-new-nombre','cotiz-new-simbolo','cotiz-new-valor'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    toast(`✓ Moneda ${clave} agregada — guardá para confirmar`);
+  });
 
   // Restablecer colores del sistema a los defaults del tema
   document.getElementById('colores-reset')?.addEventListener('click', async () => {

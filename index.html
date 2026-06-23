@@ -1125,10 +1125,23 @@
         <label class="conv-step-lbl">3 · ¿En qué supermercado?</label>
         <div class="chip-row-big prod-super-chips" data-bind="prod-super-chips" role="radiogroup" aria-label="Supermercado"></div>
         <label class="conv-step-lbl" style="margin-top:.7rem">Precio</label>
-        <div class="input-with-prefix w-full">
-          <span class="input-prefix">$</span>
-          <input type="text" inputmode="decimal" class="input w-full" data-bind="prod-precio" placeholder="Precio"/>
+        <div class="prod-precio-moneda-row">
+          <select class="input" data-bind="prod-moneda" aria-label="Moneda del precio">
+            <option value="ARS">$ ARS</option>
+            <option value="USD">USD · Oficial</option>
+            <option value="USD_BLUE">USD · Blue</option>
+            <option value="USD_TARJETA">USD · Tarjeta</option>
+            <option value="USD_MEP">USD · MEP</option>
+            <option value="USD_CCL">USD · CCL</option>
+            <option value="EUR">EUR · Euro</option>
+            <option value="BRL">BRL · Real</option>
+          </select>
+          <div class="input-with-prefix flex-1">
+            <span class="input-prefix" data-bind="prod-moneda-prefix">$</span>
+            <input type="text" inputmode="decimal" class="input w-full" data-bind="prod-precio" placeholder="Precio"/>
+          </div>
         </div>
+        <p class="prod-conv-hint" data-bind="prod-conv-hint"></p>
       </div>
       <button type="button" class="btn-primary w-full" data-bind="prod-guardar" disabled>+ Guardar precio</button>
     </div>
@@ -2889,6 +2902,7 @@
         <button type="button" class="settings-tab"       data-stab="notif">Notif</button>
         <button type="button" class="settings-tab"       data-stab="catalogos">Catálogos</button>
         <button type="button" class="settings-tab"       data-stab="cuentas">Cuentas</button>
+        <button type="button" class="settings-tab"       data-stab="cotizaciones">💱 Cotizaciones</button>
       </div>
     </div>
 
@@ -3300,6 +3314,41 @@
             + Agregar tarjeta
           </button>
         </fieldset>
+
+      </div>
+
+      <!-- TAB: COTIZACIONES -->
+      <div data-spanel="cotizaciones" class="settings-panel hidden">
+
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <p class="text-xs" style="color:var(--ink-muted);flex:1">
+            Guardá el valor de cada moneda. Se usa en toda la app: registro de gastos, productos, tarjetas y análisis IA.
+          </p>
+          <button type="button" id="stab-cotiz-refresh" class="btn-secondary text-xs" style="white-space:nowrap">🔄 Actualizar</button>
+        </div>
+
+        <p class="text-[11px] mb-2" style="color:var(--ink-muted)">
+          El <b>tilde</b> controla la visibilidad en el dashboard. Editar un valor manualmente congela esa moneda (el actualizador automático no la pisa).
+        </p>
+
+        <div id="stab-cotiz-lista" class="ec-lista"></div>
+        <p id="stab-cotiz-updated" class="text-[10px] mt-1" style="color:var(--ink-muted)"></p>
+
+        <!-- Agregar moneda personalizada -->
+        <fieldset class="space-y-2 mt-4">
+          <legend>Agregar moneda personalizada</legend>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="text" id="cotiz-new-clave" class="input" placeholder="Clave (ej: GBP)" maxlength="16" style="text-transform:uppercase"/>
+            <input type="text" id="cotiz-new-nombre" class="input" placeholder="Nombre (ej: Libra esterlina)"/>
+          </div>
+          <div class="flex gap-2">
+            <input type="text" id="cotiz-new-simbolo" class="input" placeholder="🏴󠁧󠁢󠁥󠁮󠁧󠁿" style="width:56px;text-align:center"/>
+            <input type="number" id="cotiz-new-valor" class="input flex-1" placeholder="Valor en ARS" step="0.01" min="0"/>
+            <button type="button" id="cotiz-new-add" class="btn-secondary" style="white-space:nowrap">+ Agregar</button>
+          </div>
+        </fieldset>
+
+        <button type="button" id="stab-cotiz-guardar" class="btn-primary w-full mt-4">Guardar cotizaciones</button>
 
       </div>
 

@@ -1702,6 +1702,15 @@ html.light select.input { color-scheme: light; }
   color: var(--brand-ink);
   border-color: var(--border-2);
 }
+/* Estados de drag-and-drop para reordenar las pestañas */
+.settings-tab[draggable="true"] { cursor: grab; }
+.settings-tab[draggable="true"]:active { cursor: grabbing; }
+.settings-tab.stab-dragging { opacity: .35; }
+.settings-tab.stab-over {
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+}
 
 .color-preset {
   width: 100%;
@@ -3936,10 +3945,24 @@ body.view-analisis #main-widgets::before {
 .prod-precio-row:last-of-type { border-bottom: none; }
 .prod-precio-row.mejor { background: var(--success-bg); margin: 0 -.4rem; padding: .4rem; border-radius: .5rem; border-bottom: none; }
 .prod-precio-super { font-size: .8rem; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prod-precio-val { font-family: 'IBM Plex Mono', monospace; font-size: .8rem; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.prod-precio-val { font-family: 'IBM Plex Mono', monospace; font-size: .8rem; font-weight: 600; color: var(--ink); white-space: nowrap; display: flex; align-items: center; flex-wrap: wrap; gap: .15rem; }
 .prod-precio-row.mejor .prod-precio-val { color: var(--success); }
 .prod-precio-fecha { font-size: .66rem; color: var(--ink-muted); white-space: nowrap; }
 .prod-del-prod { margin-top: .5rem; display: inline-block; }
+
+/* Selector de moneda + precio en fila */
+.prod-precio-moneda-row { display: flex; gap: .4rem; align-items: center; }
+.prod-precio-moneda-row select { flex: 0 0 auto; min-width: 0; width: auto; font-size: .78rem; padding: .35rem .5rem; }
+.prod-precio-moneda-row .input-with-prefix { flex: 1; min-width: 0; }
+.prod-conv-hint { font-size: .7rem; margin-top: .25rem; min-height: 1rem; }
+/* Badge de moneda extranjera en la lista de precios */
+.prod-precio-moneda-tag {
+  font-size: .62rem; font-weight: 700; letter-spacing: .01em;
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  color: var(--brand-ink); border-radius: 4px; padding: 1px 4px;
+  white-space: nowrap; font-family: 'IBM Plex Mono', monospace;
+}
+
 /* Chips de supermercado (grilla tipo categorías): el elegido se tiñe con su color */
 .prod-super-chips { margin-top: .35rem; }
 .prod-super-chips .cat-chip:has(input:checked) {
