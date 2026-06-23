@@ -52,6 +52,7 @@ def twaManifest = [
 
 android {
     compileSdkVersion 34
+    buildToolsVersion "34.0.0"
     namespace "com.zeuss47.gestorfinanzas"
     defaultConfig {
         applicationId "com.zeuss47.gestorfinanzas"

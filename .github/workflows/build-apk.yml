@@ -24,14 +24,31 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Accept SDK licenses and install components
+      - name: Accept Android SDK licenses (write hashes directly)
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf '%s\n' \
+            '24333f8a63b6825ea9c5514f83c2829b004d1fee' \
+            'd56f5187479451eabf01fb78af6dfcb131a6481e' \
+            '84831b9409646a918e30573bab4c9c91346d8abd' \
+            > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf '%s\n' \
+            '504667f4c0de7af1a06de9f4b1727b84351f2910' \
+            > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          echo "Licenses written OK"
+
+      - name: Install Android SDK components
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          echo "sdkmanager path: $SDKMANAGER"
+          ls "$ANDROID_HOME/cmdline-tools/" || echo "No cmdline-tools"
+          $SDKMANAGER \
             "platforms;android-34" \
-            "build-tools;35.0.0" \
             "build-tools;34.0.0" \
-            "platform-tools" 2>/dev/null || true
+            "platform-tools"
+          echo "SDK install done"
+          ls "$ANDROID_HOME/build-tools/" || echo "No build-tools"
+          ls "$ANDROID_HOME/platforms/" || echo "No platforms"
 
       - name: Create signing keystore
         run: |
@@ -55,11 +72,11 @@ jobs:
             -Pandroid.injected.signing.store.password=android123 \
             -Pandroid.injected.signing.key.alias=android \
             -Pandroid.injected.signing.key.password=android123 \
-            --no-daemon
+            --no-daemon \
+            --stacktrace
 
       - name: Show SHA-256 fingerprint (para assetlinks.json)
         run: |
-          echo ""
           echo "=== SHA-256 FINGERPRINT ==="
           keytool -list -v \
             -keystore android-twa/android-project/android.keystore \
