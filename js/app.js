@@ -5300,6 +5300,14 @@ function abrirSettings() {
   renderTarjetasSettings();
   renderCotizacionesPanel();  // pre-renderiza el panel aunque no esté visible
 
+  // Mostrar link de descarga APK solo cuando la app NO corre como TWA instalada
+  const apkLink = document.getElementById('apk-download-link');
+  if (apkLink) {
+    const esTWA = document.referrer.includes('android-app://') ||
+                  window.matchMedia('(display-mode: standalone)').matches && navigator.userAgent.includes('wv');
+    apkLink.style.display = esTWA ? 'none' : 'flex';
+  }
+
   dlg.showModal();
 }
 

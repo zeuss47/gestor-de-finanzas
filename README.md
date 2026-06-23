@@ -1,8 +1,17 @@
 # 💹 Gestor de Finanzas Personales
 
-gestión financiera personal, **100% offline-first** con sincronización opcional a GitHub para usarlo en múltiples dispositivos.
+Gestión financiera personal, **100% offline-first** con sincronización opcional a GitHub para usarlo en múltiples dispositivos.
 
-🔗 **App en vivo:** https://zeuss47.github.io/gestor-de-finanzas/
+---
+
+## 📲 Descargar e instalar
+
+| Plataforma | Acceso |
+|---|---|
+| 🌐 **Web / iOS / Desktop** | [Abrir app en vivo →](https://zeuss47.github.io/gestor-de-finanzas/) |
+| 🤖 **Android (APK)** | [⬇ Descargar APK →](https://github.com/zeuss47/gestor-de-finanzas/releases/latest/download/gestor-finanzas.apk) |
+
+> **Instalar APK:** Habilitá *Fuentes desconocidas* en Ajustes → Seguridad, luego abrí el archivo descargado. Si ya tenés una versión instalada con firma diferente, desinstalá primero.
 
 ---
 

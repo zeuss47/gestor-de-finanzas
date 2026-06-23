@@ -8,6 +8,9 @@ on:
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Compilar APK
@@ -39,13 +42,7 @@ jobs:
       - name: Install Android SDK components
         run: |
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          echo "SDK: $ANDROID_HOME"
-          ls "$ANDROID_HOME/cmdline-tools/" || echo "(no cmdline-tools)"
           $SDKM "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-          echo "Installed build-tools:"
-          ls "$ANDROID_HOME/build-tools/" || echo "(none)"
-          echo "Installed platforms:"
-          ls "$ANDROID_HOME/platforms/" || echo "(none)"
 
       - name: Create signing keystore
         run: |
@@ -72,7 +69,6 @@ jobs:
             -Pandroid.injected.signing.key.password=android123 \
             --no-daemon \
             --stacktrace 2>&1 | tee /tmp/gradle-build.log
-          echo "BUILD_EXIT=$?" >> "$GITHUB_ENV"
           test -f app/build/outputs/apk/release/app-release.apk && echo "APK_EXISTS=true" >> "$GITHUB_ENV" || echo "APK_EXISTS=false" >> "$GITHUB_ENV"
 
       - name: Upload Gradle log (para diagnóstico)
@@ -92,12 +88,51 @@ jobs:
             -alias android \
             -storepass android123 2>/dev/null | grep -i "sha256"
 
-      - name: Upload APK artifact
+      - name: Prepare APK for release
+        if: env.APK_EXISTS == 'true'
+        run: |
+          cp android-twa/android-project/app/build/outputs/apk/release/app-release.apk /tmp/gestor-finanzas.apk
+          # Extraer version del manifest
+          VERSION=$(grep 'versionName' android-twa/android-project/app/build.gradle | head -1 | grep -o '"[^"]*"' | tr -d '"')
+          BUILD_DATE=$(date '+%d/%m/%Y %H:%M UTC')
+          echo "APK_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_DATE=$BUILD_DATE" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub Release (latest)
+        if: env.APK_EXISTS == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Borrar release y tag anterior si existen
+          gh release delete latest --yes 2>/dev/null || true
+          git push origin :refs/tags/latest 2>/dev/null || true
+          # Crear release nuevo con el APK
+          gh release create latest /tmp/gestor-finanzas.apk \
+            --title "Gestor de Finanzas v${{ env.APK_VERSION }} — APK Android" \
+            --notes "## Descargar APK
+
+**[⬇ gestor-finanzas.apk](https://github.com/zeuss47/gestor-de-finanzas/releases/latest/download/gestor-finanzas.apk)**
+
+Versión \`${{ env.APK_VERSION }}\` — generada el ${{ env.BUILD_DATE }}
+
+### Instalación
+1. Descargá el archivo \`gestor-finanzas.apk\`
+2. En Android: **Configuración → Seguridad → Fuentes desconocidas** (activar)
+3. Abrí el archivo descargado e instalá
+4. Si ya tenés una versión instalada con firma diferente, desinstalá primero
+
+### Notas
+- La app carga la PWA en tiempo real — el contenido siempre está actualizado
+- Solo hace falta reinstalar el APK cuando hay nuevas funciones nativas (widgets, permisos, etc.)" \
+            --latest
+          echo "Release publicado: https://github.com/zeuss47/gestor-de-finanzas/releases/latest"
+
+      - name: Upload APK artifact (backup 60 días)
         if: env.APK_EXISTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: gestor-finanzas-apk
-          path: android-twa/android-project/app/build/outputs/apk/release/app-release.apk
+          path: /tmp/gestor-finanzas.apk
           retention-days: 60
 
       - name: Fail if APK was not produced
