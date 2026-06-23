@@ -24,7 +24,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Accept Android SDK licenses (write hashes directly)
+      - name: Accept Android SDK licenses
         run: |
           mkdir -p "$ANDROID_HOME/licenses"
           printf '%s\n' \
@@ -35,20 +35,17 @@ jobs:
           printf '%s\n' \
             '504667f4c0de7af1a06de9f4b1727b84351f2910' \
             > "$ANDROID_HOME/licenses/android-sdk-preview-license"
-          echo "Licenses written OK"
 
       - name: Install Android SDK components
         run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          echo "sdkmanager path: $SDKMANAGER"
-          ls "$ANDROID_HOME/cmdline-tools/" || echo "No cmdline-tools"
-          $SDKMANAGER \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "platform-tools"
-          echo "SDK install done"
-          ls "$ANDROID_HOME/build-tools/" || echo "No build-tools"
-          ls "$ANDROID_HOME/platforms/" || echo "No platforms"
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          echo "SDK: $ANDROID_HOME"
+          ls "$ANDROID_HOME/cmdline-tools/" || echo "(no cmdline-tools)"
+          $SDKM "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          echo "Installed build-tools:"
+          ls "$ANDROID_HOME/build-tools/" || echo "(none)"
+          echo "Installed platforms:"
+          ls "$ANDROID_HOME/platforms/" || echo "(none)"
 
       - name: Create signing keystore
         run: |
@@ -64,6 +61,7 @@ jobs:
         run: echo "sdk.dir=$ANDROID_HOME" > android-twa/android-project/local.properties
 
       - name: Build release APK
+        continue-on-error: true
         run: |
           cd android-twa/android-project
           chmod +x gradlew
@@ -73,21 +71,37 @@ jobs:
             -Pandroid.injected.signing.key.alias=android \
             -Pandroid.injected.signing.key.password=android123 \
             --no-daemon \
-            --stacktrace
+            --stacktrace 2>&1 | tee /tmp/gradle-build.log
+          echo "BUILD_EXIT=$?" >> "$GITHUB_ENV"
+          test -f app/build/outputs/apk/release/app-release.apk && echo "APK_EXISTS=true" >> "$GITHUB_ENV" || echo "APK_EXISTS=false" >> "$GITHUB_ENV"
 
-      - name: Show SHA-256 fingerprint (para assetlinks.json)
+      - name: Upload Gradle log (para diagnóstico)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gradle-build-log
+          path: /tmp/gradle-build.log
+          retention-days: 7
+
+      - name: Show SHA-256 fingerprint
+        if: env.APK_EXISTS == 'true'
         run: |
           echo "=== SHA-256 FINGERPRINT ==="
           keytool -list -v \
             -keystore android-twa/android-project/android.keystore \
             -alias android \
             -storepass android123 2>/dev/null | grep -i "sha256"
-          echo "==========================="
 
       - name: Upload APK artifact
+        if: env.APK_EXISTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: gestor-finanzas-apk
           path: android-twa/android-project/app/build/outputs/apk/release/app-release.apk
           retention-days: 60
-          if-no-files-found: error
+
+      - name: Fail if APK was not produced
+        if: env.APK_EXISTS != 'true'
+        run: |
+          echo "Build failed — APK not produced. Download 'gradle-build-log' artifact for details."
+          exit 1
