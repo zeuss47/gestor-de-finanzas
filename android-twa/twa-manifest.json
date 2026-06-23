@@ -15,25 +15,24 @@
   "startUrl": "/gestor-de-finanzas/?source=pwa",
   "iconUrl": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-512.png",
   "maskableIconUrl": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-maskable-512.png",
-  "monochromeIconUrl": null,
   "shortcuts": [
     {
       "name": "Nuevo gasto",
       "shortName": "Gasto",
       "url": "/gestor-de-finanzas/?action=new-gasto",
-      "icons": [{ "src": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png", "sizes": "192x192" }]
+      "chosenIconUrl": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png"
     },
     {
       "name": "Nuevo ingreso",
       "shortName": "Ingreso",
       "url": "/gestor-de-finanzas/?action=new-ingreso",
-      "icons": [{ "src": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png", "sizes": "192x192" }]
+      "chosenIconUrl": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png"
     },
     {
       "name": "Tarjetas",
       "shortName": "Tarjetas",
       "url": "/gestor-de-finanzas/?action=tarjetas",
-      "icons": [{ "src": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png", "sizes": "192x192" }]
+      "chosenIconUrl": "https://zeuss47.github.io/gestor-de-finanzas/icons/icon-192.png"
     }
   ],
   "generatorApp": "bubblewrap-cli",

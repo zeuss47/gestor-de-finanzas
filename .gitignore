@@ -13,3 +13,8 @@ package.json
 tailwind.config.js
 css/tailwind-input.css
 backups/
+android-twa/android-project/local.properties
+android-twa/android-project/*.keystore
+android-twa/android-project/build/
+android-twa/android-project/app/build/
+android-twa/android-project/.gradle/
