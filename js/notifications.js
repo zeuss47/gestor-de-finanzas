@@ -21,6 +21,12 @@
 import { DB } from './db.js';
 import { resumenTarjeta } from './cards.js';
 
+// Referencia a state.ajustes.notificaciones actualizada desde app.js
+// mediante setNotifConfig(). Permite que habilitadas() respete el flag
+// de usuario sin tener que importar state (evita dependencia circular).
+let _notifCfg = null;
+export function setNotifConfig(cfg) { _notifCfg = cfg; }
+
 export const Notif = {
   async pedirPermiso() {
     if (!('Notification' in window)) return 'unsupported';
@@ -30,6 +36,8 @@ export const Notif = {
   },
 
   habilitadas() {
+    // El usuario puede deshabilitar en Ajustes aunque el browser tenga permiso
+    if (_notifCfg?.habilitadas === false) return false;
     return 'Notification' in window && Notification.permission === 'granted';
   },
 
@@ -147,6 +155,7 @@ export const Notif = {
  */
 export async function chequeoDiarioTarjetas() {
   const aj = await DB.get('ajustes', 'ajustes_globales');
+  if (aj?.notificaciones?.habilitadas === false) return;   // usuario desactivó notificaciones
   const dias_alerta = aj?.notificaciones?.alertas_tarjeta_dias || [5, 2, 1];
 
   const tarjetas = (await DB.live('tarjetas')).filter(t => t.activa !== false);
@@ -173,6 +182,7 @@ export async function chequeoDiarioTarjetas() {
  */
 export async function chequeoMargenDisponible() {
   const aj = await DB.get('ajustes', 'ajustes_globales');
+  if (aj?.notificaciones?.habilitadas === false) return;   // usuario desactivó notificaciones
   if (!aj?.notificaciones?.alertas_margen) return; // feature opt-in
 
   const umbral = Number(aj.notificaciones.margen_minimo) || 0;

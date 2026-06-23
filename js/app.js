@@ -21,7 +21,7 @@ import { diagnosticar, diagnosticarTarjetas } from './ai-local.js';
 import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria, estimarMesesMeta } from './ai-predict.js';
 import { analizarSaludFinanciera, simularEscenario } from './ai-advisor.js';
 import { fetchCotizaciones, timestampUltimoFetch } from './cotizaciones.js';
-import { Notif, chequeoDiarioTarjetas, chequeoMargenDisponible } from './notifications.js';
+import { Notif, chequeoDiarioTarjetas, chequeoMargenDisponible, setNotifConfig } from './notifications.js';
 import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync, wipeRemoto } from './sync.js';
 
 /* ============ Estado en memoria (cache de render) ============ */
@@ -813,6 +813,7 @@ async function loadAjustes() {
     await DB.put('ajustes', aj);
   }
   state.ajustes = aj;
+  setNotifConfig(aj.notificaciones);  // sincroniza el flag habilitadas con notifications.js
   await _migrarWidgetsNuevos(aj);
   return aj;
 }
@@ -842,6 +843,7 @@ async function saveAjustes(patch) {
   state.ajustes = { ...state.ajustes, ...patch, updated_at: nowTs() };
   await DB.put('ajustes', state.ajustes);
   aplicarTema();
+  setNotifConfig(state.ajustes.notificaciones);  // actualiza el flag en tiempo real
   // Si cambió la config de GitHub, reiniciamos auto-sync
   const newPat = state.ajustes?.github?.pat;
   if (prevPat !== newPat || patch.github) {
