@@ -97,40 +97,35 @@ jobs:
             -alias android -storepass android123 2>/dev/null \
             | grep -i "sha256" || true
 
-      - name: Publish GitHub Release
+      - name: Build release notes
         if: env.APK_EXISTS == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           APK_VERSION="${{ env.APK_VERSION }}"
           BUILD_DATE="${{ env.BUILD_DATE }}"
           APK_SHA="${{ env.APK_SHA }}"
+          RUN_NUM="${{ github.run_number }}"
           DOWNLOAD_URL="https://github.com/zeuss47/gestor-de-finanzas/releases/latest/download/gestor-finanzas.apk"
-
-          # Construir notas del release en archivo (evita problemas YAML con multilinea)
-          printf '## Gestor de Finanzas v%s — APK Android\n\n' "$APK_VERSION" > /tmp/notes.md
+          printf '## Gestor de Finanzas v%s\n\n' "$APK_VERSION" > /tmp/notes.md
           printf '**[Descargar gestor-finanzas.apk](%s)**\n\n' "$DOWNLOAD_URL" >> /tmp/notes.md
-          printf 'Version `%s` | Generada: %s\n\n' "$APK_VERSION" "$BUILD_DATE" >> /tmp/notes.md
+          printf 'Version `%s` | Build #%s | %s\n\n' "$APK_VERSION" "$RUN_NUM" "$BUILD_DATE" >> /tmp/notes.md
           printf 'SHA-256: `%s`\n\n' "$APK_SHA" >> /tmp/notes.md
           printf '### Instalacion\n' >> /tmp/notes.md
           printf '1. Descarga `gestor-finanzas.apk`\n' >> /tmp/notes.md
-          printf '2. En Android: **Configuracion > Seguridad > Fuentes desconocidas** (activar)\n' >> /tmp/notes.md
-          printf '3. Abri el archivo descargado e instala\n' >> /tmp/notes.md
-          printf '4. Si ya tenes una version instalada con firma diferente, desinstala primero\n\n' >> /tmp/notes.md
-          printf '### Notas\n' >> /tmp/notes.md
-          printf '- El contenido de la app se actualiza automaticamente (carga la PWA en tiempo real)\n' >> /tmp/notes.md
-          printf '- Solo hace falta reinstalar el APK cuando hay nuevas funciones nativas\n' >> /tmp/notes.md
+          printf '2. Android: Configuracion > Seguridad > Fuentes desconocidas (activar)\n' >> /tmp/notes.md
+          printf '3. Abri el archivo e instala\n' >> /tmp/notes.md
+          printf '4. Si hay version anterior con firma diferente, desinstala primero\n\n' >> /tmp/notes.md
+          printf '> El contenido se actualiza automaticamente — solo reinstalar el APK cuando hay nuevas funciones nativas.\n' >> /tmp/notes.md
 
-          # Borrar release y tag anterior si existen
-          gh release delete latest --yes 2>/dev/null || true
-          git push origin :refs/tags/latest 2>/dev/null || true
-
-          # Publicar nuevo release
-          gh release create latest /tmp/gestor-finanzas.apk \
-            --title "Gestor de Finanzas v${APK_VERSION} — APK Android" \
-            --notes-file /tmp/notes.md \
-            --latest
-          echo "Release publicado: https://github.com/zeuss47/gestor-de-finanzas/releases/latest"
+      - name: Publish GitHub Release
+        if: env.APK_EXISTS == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ env.APK_VERSION }}-b${{ github.run_number }}"
+          name: "Gestor de Finanzas v${{ env.APK_VERSION }} (build #${{ github.run_number }})"
+          body_path: /tmp/notes.md
+          files: /tmp/gestor-finanzas.apk
+          make_latest: true
+          token: ${{ github.token }}
 
       - name: Upload APK artifact (backup 60 dias)
         if: env.APK_EXISTS == 'true'
