@@ -794,11 +794,7 @@ html.light #bottom-nav::before { background: #eef2ff; }
   100% { opacity:1; transform: translateY(0) scale(1); }
 }
 
-/* Tarjeta con cierre/venc inminente: borde rojo ESTÁTICO (sin pulso). */
-.credit-card.card-urgente {
-  border: 1.5px solid var(--danger) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent), 0 8px 26px rgba(0,0,0,.28) !important;
-}
+/* card-urgente: indicador visual desactivado por preferencia del usuario */
 
 /* ── Botón ORBE (color sólido, sin gradiente ni brillo) ────────────
    Color plano var(--brand). Compartido por #btn-add y el trigger de la rueda. */
