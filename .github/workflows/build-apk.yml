@@ -44,15 +44,11 @@ jobs:
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           $SDKM "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
-      - name: Create signing keystore
+      - name: Restore signing keystore
         run: |
-          keytool -genkey -v \
-            -keystore android-twa/android-project/android.keystore \
-            -alias android \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android123 \
-            -keypass android123 \
-            -dname "CN=Gestor Finanzas,OU=Personal,O=Personal,L=BuenosAires,S=CABA,C=AR"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d \
+            > android-twa/android-project/android.keystore
+          echo "Keystore SHA256: $(sha256sum android-twa/android-project/android.keystore | cut -d' ' -f1)"
 
       - name: Configure SDK path
         run: echo "sdk.dir=$ANDROID_HOME" > android-twa/android-project/local.properties
