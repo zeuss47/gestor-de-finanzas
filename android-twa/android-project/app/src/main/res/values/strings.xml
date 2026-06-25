@@ -20,5 +20,6 @@
   <!-- Widget descriptions shown in the widget picker (required for Android 12+) -->
   <string name="widget_gastos_desc">Ver historial de gastos y registrar un nuevo gasto rapido</string>
   <string name="widget_productos_desc">Gestionar lista de productos y escanear codigos de barras</string>
+  <string name="widget_habituales_desc">Ver y aprobar gastos habituales del mes desde la pantalla de inicio</string>
 
 </resources>

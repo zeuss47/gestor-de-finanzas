@@ -3112,6 +3112,7 @@ function abrirUtilidades() {
       const acc = document.createElement('div');
       acc.className = 'util-acc';
       acc.dataset.open = 'false';
+      acc.dataset.id = id;
       acc.innerHTML =
         `<button type="button" class="util-acc-head" aria-expanded="false">
            <span class="util-acc-ic" aria-hidden="true">${ic}</span>
@@ -8891,10 +8892,61 @@ async function init() {
     }
   });
 
-  // Atajos desde URL (shortcuts del manifest / notificaciones)
+  // Atajos desde URL (shortcuts del manifest / widgets Android / notificaciones)
   const urlParams = new URLSearchParams(location.search);
-  if (urlParams.get('action') === 'new-gasto')  setTimeout(() => openDialog('dlg-gasto'), 500);
-  if (urlParams.get('action') === 'sync')        setTimeout(doSync, 500);
+  const _urlAction = urlParams.get('action');
+  if (_urlAction) setTimeout(() => {
+    switch (_urlAction) {
+      case 'new-gasto':
+        openDialog('dlg-gasto');
+        break;
+      case 'new-ingreso':
+        openDialog('dlg-ingreso');
+        break;
+      case 'historial':
+        switchTab('gastos');
+        break;
+      case 'tarjetas':
+        switchTab('tarjetas');
+        break;
+      case 'habituales':
+        switchTab('home');
+        document.querySelector('[data-widget="habituales"]')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        break;
+      case 'aprobar-habituales': {
+        switchTab('home');
+        const mes = new Date().toISOString().slice(0,7);
+        const habs = getHabituales();
+        let aprobados = 0;
+        Promise.all(habs.map(async h => {
+          const gs = _gastosHabitualMes(h.id, mes);
+          if (gs.length && !h.cuenta_id && !_habitualAprobadoMes(h.id, mes)) {
+            await _aprobarHabitualMes(h.id, true);
+            aprobados++;
+          }
+        })).then(() => {
+          if (!aprobados) toast('No hay habituales pendientes de aprobar este mes', 2500);
+        });
+        break;
+      }
+      case 'productos':
+        abrirUtilidades();
+        break;
+      case 'escanear':
+        abrirUtilidades();
+        // Abre el acordeon de Productos y dispara el escaner tras la animacion
+        setTimeout(() => {
+          const prodAcc = document.querySelector('.util-acc[data-id="productos"] .util-acc-head');
+          if (prodAcc && prodAcc.closest('.util-acc').dataset.open !== 'true') prodAcc.click();
+          setTimeout(() => document.querySelector('[data-action="prod-scan"]')?.click(), 400);
+        }, 400);
+        break;
+      case 'sync':
+        doSync();
+        break;
+    }
+  }, 600);
 
   // Submit de diálogos
   document.getElementById('dlg-gasto').addEventListener('close', (e) => {
