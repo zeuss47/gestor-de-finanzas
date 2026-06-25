@@ -8878,10 +8878,14 @@ async function init() {
       switchTab('tarjetas');
     } else if (tab === 'metas') {
       switchTab('metas');
+    } else if (tab === 'analisis') {
+      switchTab('analisis');
     } else {
       switchTab('home');
     }
   });
+
+  document.getElementById('btn-utils-nav')?.addEventListener('click', abrirUtilidades);
 
   // Listener de mensajes del Service Worker (Background Sync)
   navigator.serviceWorker?.addEventListener('message', (e) => {
@@ -9119,9 +9123,10 @@ async function init() {
     });
   });
 
-  // Sidebar sync y settings
+  // Sidebar sync, settings y utilidades
   document.getElementById('sb-sync')?.addEventListener('click', doSync);
   document.getElementById('sb-settings')?.addEventListener('click', abrirSettings);
+  document.getElementById('sb-utils')?.addEventListener('click', abrirUtilidades);
 
   // Right panel acciones rápidas
   document.getElementById('rp-btn-gasto')?.addEventListener('click', () => openDialog('dlg-gasto'));
