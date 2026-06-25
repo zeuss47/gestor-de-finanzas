@@ -374,7 +374,17 @@
 
   <!-- HEADER -->
   <header id="app-header">
-    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-end">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <button id="btn-utils"
+                class="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                style="background:var(--surface-2);border:1px solid var(--border)"
+                aria-label="Utilidades" title="Utilidades">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
       <div class="flex items-center gap-2">
         <button id="btn-sync"
                 class="rounded-xl flex items-center justify-center transition-colors"
@@ -511,13 +521,6 @@
       <span>Historial</span>
     </button>
 
-    <button data-tab="analisis" class="nav-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-      </svg>
-      <span>Análisis</span>
-    </button>
-
     <button id="btn-add" aria-label="Agregar movimiento"
             class="orb-btn -mt-6 mx-auto w-14 h-14 rounded-full flex items-center justify-center">
       <svg class="btn-add-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -545,12 +548,6 @@
       <span>Metas</span>
     </button>
 
-    <button id="btn-utils-nav" class="nav-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-      </svg>
-      <span>Utilidades</span>
-    </button>
   </nav>
 
 </div><!-- /#main-area -->

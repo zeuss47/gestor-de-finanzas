@@ -8885,8 +8885,6 @@ async function init() {
     }
   });
 
-  document.getElementById('btn-utils-nav')?.addEventListener('click', abrirUtilidades);
-
   // Listener de mensajes del Service Worker (Background Sync)
   navigator.serviceWorker?.addEventListener('message', (e) => {
     if (e.data?.type === 'TRIGGER_SYNC') doSync();
