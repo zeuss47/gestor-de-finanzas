@@ -12,28 +12,50 @@ import android.widget.RemoteViews;
 
 public class GastosWidgetProvider extends AppWidgetProvider {
 
-    private static final String TAG = "GastosWidget";
+    private static final String TAG      = "GastosWidget";
     private static final String BASE_URL = "https://zeuss47.github.io/gestor-de-finanzas/";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        for (int widgetId : appWidgetIds) {
-            try {
-                updateWidget(context, appWidgetManager, widgetId);
-            } catch (Exception e) {
-                Log.e(TAG, "Error actualizando widget id=" + widgetId, e);
-            }
+        // Mostrar datos en caché de inmediato
+        for (int id : appWidgetIds) {
+            try { updateWidget(context, appWidgetManager, id); }
+            catch (Exception e) { Log.e(TAG, "updateWidget error id=" + id, e); }
         }
+        // Obtener datos frescos en segundo plano
+        WidgetCache.fetch(context, () -> {
+            for (int id : appWidgetIds) {
+                try { updateWidget(context, appWidgetManager, id); }
+                catch (Exception e) { Log.e(TAG, "post-fetch error id=" + id, e); }
+            }
+        });
     }
 
     static void updateWidget(Context context, AppWidgetManager appWidgetManager, int widgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_gastos);
 
-        PendingIntent piHistorial = buildIntent(context, BASE_URL + "?action=historial", 1001);
-        views.setOnClickPendingIntent(R.id.wg_btn_historial, piHistorial);
+        // Botones de acción
+        views.setOnClickPendingIntent(R.id.wg_btn_historial,
+                buildIntent(context, BASE_URL + "?action=historial", 1001));
+        views.setOnClickPendingIntent(R.id.wg_btn_nuevo,
+                buildIntent(context, BASE_URL + "?action=new-gasto", 1002));
 
-        PendingIntent piNuevo = buildIntent(context, BASE_URL + "?action=new-gasto", 1002);
-        views.setOnClickPendingIntent(R.id.wg_btn_nuevo, piNuevo);
+        // Datos del caché
+        String[] descs = WidgetCache.getGastosDesc(context);
+        String[] amts  = WidgetCache.getGastosAmt(context);
+
+        int[] descIds = { R.id.wg_r1_desc, R.id.wg_r2_desc, R.id.wg_r3_desc };
+        int[] amtIds  = { R.id.wg_r1_amt,  R.id.wg_r2_amt,  R.id.wg_r3_amt  };
+
+        for (int i = 0; i < descIds.length; i++) {
+            if (i < descs.length) {
+                views.setTextViewText(descIds[i], descs[i]);
+                views.setTextViewText(amtIds[i], i < amts.length ? amts[i] : "");
+            } else {
+                views.setTextViewText(descIds[i], i == 0 && descs.length == 0 ? "Sincroniza la app para ver datos" : "");
+                views.setTextViewText(amtIds[i], "");
+            }
+        }
 
         appWidgetManager.updateAppWidget(widgetId, views);
     }

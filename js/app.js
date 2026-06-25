@@ -22,7 +22,7 @@ import { proyectarBalance, predecirSaturacionTarjetas, sugerirCategoria, estimar
 import { analizarSaludFinanciera, simularEscenario } from './ai-advisor.js';
 import { fetchCotizaciones, timestampUltimoFetch } from './cotizaciones.js';
 import { Notif, chequeoDiarioTarjetas, chequeoMargenDisponible, setNotifConfig } from './notifications.js';
-import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync, wipeRemoto } from './sync.js';
+import { syncAll, pullAll, startAutoSync, stopAutoSync, programarPush, triggerSync, ultimaSync, wipeRemoto, pushWidgetCache } from './sync.js';
 
 /* ============ Estado en memoria (cache de render) ============ */
 const state = {
@@ -5458,6 +5458,15 @@ const syncCallbacks = {
       try { await loadAjustes(); aplicarTema(); } catch (e) { console.warn('refrescar config', e); }
     }
     await reloadAll();
+    // Actualizar cache para widgets Android
+    try {
+      const ghCfg = state.ajustes?.github;
+      if (ghCfg?.pat && ghCfg?.owner && ghCfg?.repo) {
+        const prods   = await DB.live('productos').catch(() => []);
+        const precios = await DB.live('precios').catch(() => []);
+        pushWidgetCache(ghCfg, state.gastos || [], prods, precios).catch(() => {});
+      }
+    } catch {}
     setSyncIndicator('ok');
     actualizarTimestampSync();
     document.getElementById('btn-sync')?.classList.remove('syncing');

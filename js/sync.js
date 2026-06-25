@@ -633,3 +633,65 @@ function _onVisChange() {
     triggerSync('hidden').catch(() => {});
   }
 }
+
+/* ---------- Widget cache (widgets nativos Android) ---------- */
+export async function pushWidgetCache(cfg, gastos, productos, precios) {
+  if (!cfg?.pat || !cfg?.owner || !cfg?.repo) return;
+
+  const top4 = (gastos || [])
+    .filter(g => !g.deleted)
+    .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.updated_at||0) - (a.updated_at||0))
+    .slice(0, 4)
+    .map(g => {
+      const f = (g.fecha || '').split('-');
+      return {
+        d: (g.descripcion || '').slice(0, 28),
+        m: Math.round(g.monto || 0),
+        f: f.length >= 3 ? `${f[2]}/${f[1]}` : '',
+      };
+    });
+
+  const precios_ = precios || [];
+  const top6prod = (productos || [])
+    .filter(p => !p.deleted)
+    .slice(0, 6)
+    .map(p => {
+      const latestP = precios_
+        .filter(pr => !pr.deleted && pr.producto_id === p.id)
+        .sort((a, b) => (b.updated_at||0) - (a.updated_at||0))[0];
+      return {
+        n: (p.nombre || '').slice(0, 28),
+        p: latestP ? Math.round(latestP.precio || 0) : 0,
+      };
+    });
+
+  const dataStr = JSON.stringify({ g: top4, p: top6prod });
+  const fingerprint = btoa(dataStr).slice(0, 20);
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('_wc_fp') === fingerprint) return;
+  } catch {}
+
+  const cache = { v: 1, gastos: top4, productos: top6prod, ts: Math.floor(Date.now() / 1000) };
+  const path = `${cfg.ruta_datos || 'data'}/widget-cache.json`;
+  const apiUrl = `${GITHUB_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}`;
+
+  let sha = null;
+  try {
+    const existing = await gh('GET', `${apiUrl}?ref=${encodeURIComponent(cfg.branch || 'main')}`, cfg);
+    if (existing) sha = existing.sha;
+  } catch {}
+
+  const body = {
+    message: 'chore: widget-cache update',
+    content: toB64(JSON.stringify(cache)),
+    branch: cfg.branch || 'main',
+  };
+  if (sha) body.sha = sha;
+
+  try {
+    await gh('PUT', apiUrl, cfg, body);
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem('_wc_fp', fingerprint); } catch {}
+  } catch (e) {
+    console.warn('[widget-cache]', (e.message || '').slice(0, 80));
+  }
+}

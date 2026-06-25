@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Widget Gastos: solo vistas de la lista oficial RemoteViews
-    (LinearLayout, RelativeLayout, TextView, ImageView, ProgressBar, Button)
-    Sin <View> como spacer (no garantizado), sin emoji en XML, sin singleLine.
--->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:padding="12dp">
 
-    <!-- Titulo y subtitulo en la parte superior -->
     <LinearLayout
         android:id="@+id/wg_header_block"
         android:layout_width="match_parent"
@@ -29,9 +23,9 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Gastos"
+            android:text="Ultimos gastos"
             android:textColor="#00F0FF"
-            android:textSize="17sp"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:layout_marginTop="1dp"/>
 
@@ -39,14 +33,13 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="#1E2A3A"
-            android:layout_marginTop="6dp"/>
+            android:layout_marginTop="5dp"/>
     </LinearLayout>
 
-    <!-- Botones en la parte inferior -->
     <LinearLayout
         android:id="@+id/wg_btn_row"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
+        android:layout_height="34dp"
         android:orientation="horizontal"
         android:layout_alignParentBottom="true">
 
@@ -75,7 +68,6 @@
             android:textStyle="bold"/>
     </LinearLayout>
 
-    <!-- Contenido central entre header y botones -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -83,40 +75,97 @@
         android:layout_below="@id/wg_header_block"
         android:layout_above="@id/wg_btn_row"
         android:gravity="center_vertical"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp">
+        android:paddingTop="5dp"
+        android:paddingBottom="4dp">
 
-        <TextView
-            android:id="@+id/wg_item1"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Accede rapido a tus gastos"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wg_r1_desc"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Sincroniza la app para ver datos"
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wg_r1_amt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#00F0FF"
+                android:textSize="11sp"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/wg_item2"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#1E2A3A"/>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Registra un nuevo gasto"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginTop="3dp"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wg_r2_desc"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text=""
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wg_r2_amt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#00F0FF"
+                android:textSize="11sp"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/wg_item3"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#1E2A3A"/>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Historial siempre disponible"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginTop="3dp"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wg_r3_desc"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text=""
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wg_r3_amt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#00F0FF"
+                android:textSize="11sp"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
+
     </LinearLayout>
 
 </RelativeLayout>

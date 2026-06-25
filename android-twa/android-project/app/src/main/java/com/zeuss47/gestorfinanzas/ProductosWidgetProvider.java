@@ -12,28 +12,46 @@ import android.widget.RemoteViews;
 
 public class ProductosWidgetProvider extends AppWidgetProvider {
 
-    private static final String TAG = "ProductosWidget";
+    private static final String TAG      = "ProductosWidget";
     private static final String BASE_URL = "https://zeuss47.github.io/gestor-de-finanzas/";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        for (int widgetId : appWidgetIds) {
-            try {
-                updateWidget(context, appWidgetManager, widgetId);
-            } catch (Exception e) {
-                Log.e(TAG, "Error actualizando widget id=" + widgetId, e);
-            }
+        for (int id : appWidgetIds) {
+            try { updateWidget(context, appWidgetManager, id); }
+            catch (Exception e) { Log.e(TAG, "updateWidget error id=" + id, e); }
         }
+        WidgetCache.fetch(context, () -> {
+            for (int id : appWidgetIds) {
+                try { updateWidget(context, appWidgetManager, id); }
+                catch (Exception e) { Log.e(TAG, "post-fetch error id=" + id, e); }
+            }
+        });
     }
 
     static void updateWidget(Context context, AppWidgetManager appWidgetManager, int widgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_productos);
 
-        PendingIntent piLista = buildIntent(context, BASE_URL + "?action=productos", 2001);
-        views.setOnClickPendingIntent(R.id.wp_btn_lista, piLista);
+        views.setOnClickPendingIntent(R.id.wp_btn_lista,
+                buildIntent(context, BASE_URL + "?action=productos", 2001));
+        views.setOnClickPendingIntent(R.id.wp_btn_escanear,
+                buildIntent(context, BASE_URL + "?action=escanear", 2002));
 
-        PendingIntent piEscanear = buildIntent(context, BASE_URL + "?action=escanear", 2002);
-        views.setOnClickPendingIntent(R.id.wp_btn_escanear, piEscanear);
+        String[] names  = WidgetCache.getProductosNames(context);
+        String[] prices = WidgetCache.getProductosPrices(context);
+
+        int[] nameIds  = { R.id.wp_r1_name,  R.id.wp_r2_name,  R.id.wp_r3_name  };
+        int[] priceIds = { R.id.wp_r1_price, R.id.wp_r2_price, R.id.wp_r3_price };
+
+        for (int i = 0; i < nameIds.length; i++) {
+            if (i < names.length) {
+                views.setTextViewText(nameIds[i], names[i]);
+                views.setTextViewText(priceIds[i], i < prices.length ? prices[i] : "");
+            } else {
+                views.setTextViewText(nameIds[i], i == 0 && names.length == 0 ? "Sincroniza la app para ver datos" : "");
+                views.setTextViewText(priceIds[i], "");
+            }
+        }
 
         appWidgetManager.updateAppWidget(widgetId, views);
     }

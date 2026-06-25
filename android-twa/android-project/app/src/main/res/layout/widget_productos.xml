@@ -1,15 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Widget Productos: solo vistas de la lista oficial RemoteViews.
-    Sin <View> spacer, sin emoji en XML, sin singleLine deprecated.
--->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:padding="12dp">
 
-    <!-- Titulo en la parte superior -->
     <LinearLayout
         android:id="@+id/wp_header_block"
         android:layout_width="match_parent"
@@ -28,9 +23,9 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Productos"
+            android:text="Mis productos"
             android:textColor="#A78BFA"
-            android:textSize="17sp"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:layout_marginTop="1dp"/>
 
@@ -38,14 +33,13 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="#2D1B69"
-            android:layout_marginTop="6dp"/>
+            android:layout_marginTop="5dp"/>
     </LinearLayout>
 
-    <!-- Botones en la parte inferior -->
     <LinearLayout
         android:id="@+id/wp_btn_row"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
+        android:layout_height="34dp"
         android:orientation="horizontal"
         android:layout_alignParentBottom="true">
 
@@ -74,7 +68,6 @@
             android:textStyle="bold"/>
     </LinearLayout>
 
-    <!-- Contenido central entre header y botones -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -82,40 +75,97 @@
         android:layout_below="@id/wp_header_block"
         android:layout_above="@id/wp_btn_row"
         android:gravity="center_vertical"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp">
+        android:paddingTop="5dp"
+        android:paddingBottom="4dp">
 
-        <TextView
-            android:id="@+id/wp_item1"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Compara precios facilmente"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wp_r1_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Sincroniza la app para ver datos"
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wp_r1_price"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#A78BFA"
+                android:textSize="11sp"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/wp_item2"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#2D1B69"/>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Escanea codigo de barras"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginTop="3dp"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wp_r2_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text=""
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wp_r2_price"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#A78BFA"
+                android:textSize="11sp"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/wp_item3"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#2D1B69"/>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Gestion de lista de compras"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginTop="3dp"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wp_r3_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text=""
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wp_r3_price"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#A78BFA"
+                android:textSize="11sp"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
+
     </LinearLayout>
 
 </RelativeLayout>
