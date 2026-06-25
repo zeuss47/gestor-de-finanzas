@@ -63,6 +63,7 @@ jobs:
             -Pandroid.injected.signing.store.password=android123 \
             -Pandroid.injected.signing.key.alias=android \
             -Pandroid.injected.signing.key.password=android123 \
+            -PversionCode=${{ github.run_number }} \
             --no-daemon \
             --stacktrace 2>&1 | tee /tmp/gradle-build.log
           test -f app/build/outputs/apk/release/app-release.apk \

@@ -15,4 +15,10 @@
 -->
 <paths>
     <files-path path="twa_splash/" name="twa_splash" />
+    <!--
+        Expone la carpeta de descargas privada de la app (getExternalFilesDir(DOWNLOADS))
+        para que el instalador del sistema pueda leer el APK via FileProvider.
+        No expone el directorio público de Descargas del usuario.
+    -->
+    <external-files-path path="Download/" name="apk_downloads" />
 </paths>

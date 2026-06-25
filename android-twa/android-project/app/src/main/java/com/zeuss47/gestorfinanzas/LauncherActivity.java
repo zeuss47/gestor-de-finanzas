@@ -24,9 +24,10 @@ import android.os.Bundle;
 
 public class LauncherActivity
         extends com.google.androidbrowserhelper.trusted.LauncherActivity {
-    
 
-    
+
+    // Evitar que el check se dispare más de una vez por sesión de activity
+    private boolean mUpdateCheckDone = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,11 +44,22 @@ public class LauncherActivity
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // Comprobar actualizaciones una sola vez por sesión de uso (no en cada onResume).
+        // UpdateChecker respeta internamente un intervalo mínimo de 12 h entre checks reales.
+        if (!mUpdateCheckDone) {
+            mUpdateCheckDone = true;
+            UpdateChecker.check(this);
+        }
+    }
+
+    @Override
     protected Uri getLaunchingUrl() {
         // Get the original launch Url.
         Uri uri = super.getLaunchingUrl();
 
-        
+
 
         return uri;
     }

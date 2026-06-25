@@ -22,15 +22,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.zeuss47.gestorfinanzas">
 
-    
-        <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    
+    <!-- Auto-update: descargar APK y abrirlo con el instalador del sistema -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!--
+        WRITE_EXTERNAL_STORAGE solo se necesita en API 28 e inferior.
+        En API 29+ getExternalFilesDir() no requiere este permiso.
+    -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"/>
 
-    
 
-    
 
     <application
         android:name="Application"

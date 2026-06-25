@@ -58,8 +58,9 @@ android {
         applicationId "com.zeuss47.gestorfinanzas"
         minSdkVersion 21
         targetSdkVersion 34
-        versionCode 1
-        versionName "1.2.0"
+        // versionCode = github.run_number inyectado por CI (-PversionCode=N)
+        versionCode project.hasProperty('versionCode') ? project.versionCode.toInteger() : 1
+        versionName "1.3"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
