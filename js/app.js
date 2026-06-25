@@ -849,6 +849,7 @@ async function saveAjustes(patch) {
   if (prevPat !== newPat || patch.github) {
     if (typeof reiniciarAutoSync === 'function') reiniciarAutoSync();
   }
+  notificarCambioLocal(); // categorías, habituales, tipos de cambio, etc. → sync
 }
 
 /* ============ Tema ============ */
@@ -6633,6 +6634,7 @@ async function guardarEditorCiclos() {
     t.ciclos_custom = custom;
     t.updated_at = nowTs();
     await DB.put('tarjetas', t);
+    notificarCambioLocal();
 
     document.getElementById('dlg-editar-ciclos').close();
     toast('✓ Fechas de los ciclos actualizadas');
@@ -9153,6 +9155,7 @@ async function init() {
       if (data.ingresos) { await DB.clear('ingresos'); await DB.bulkPut('ingresos', data.ingresos); }
       if (data.tarjetas) { await DB.clear('tarjetas'); await DB.bulkPut('tarjetas', data.tarjetas); }
       if (data.metas)    { await DB.clear('metas');    await DB.bulkPut('metas', data.metas); }
+      notificarCambioLocal();
       await reloadAll();
       toast('✓ Importado correctamente');
     } catch (err) {
