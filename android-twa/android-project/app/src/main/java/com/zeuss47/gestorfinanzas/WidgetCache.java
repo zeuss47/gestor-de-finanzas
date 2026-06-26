@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Base64;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -15,40 +14,36 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+/**
+ * Lee widget-cache.json desde GitHub Pages (URL pública, sin auth, sin rate limits).
+ * El archivo es generado por la app web en cada sync y servido en:
+ * https://zeuss47.github.io/gestor-de-finanzas/data/widget-cache.json
+ */
 public class WidgetCache {
 
-    private static final String TAG     = "WidgetCache";
-    private static final String PREFS   = "widget_cache_v1";
-    private static final String K_GDESC = "g_desc";
-    private static final String K_GAMT  = "g_amt";
-    private static final String K_PNAME = "p_name";
-    private static final String K_PPRICE= "p_price";
+    private static final String TAG      = "WidgetCache";
+    private static final String PREFS    = "widget_cache_v1";
+    private static final String K_GDESC  = "g_desc";
+    private static final String K_GAMT   = "g_amt";
+    private static final String K_PNAME  = "p_name";
+    private static final String K_PPRICE = "p_price";
+    private static final String K_HNAME  = "h_name";
+    private static final String K_HSTATUS= "h_status";   // "OK" | ""
 
-    // GitHub repository info (public repo served via GitHub Pages)
-    private static final String GH_OWNER  = "zeuss47";
-    private static final String GH_REPO   = "gestor-de-finanzas";
-    private static final String GH_BRANCH = "main";
-    private static final String GH_PATH   = "data/widget-cache.json";
+    // GitHub Pages sirve todos los archivos del repo publicamente
+    private static final String PAGES_URL =
+        "https://zeuss47.github.io/gestor-de-finanzas/data/widget-cache.json";
 
-    // ── Getters (read from SharedPreferences) ──────────────────────────
+    // ── Getters ────────────────────────────────────────────────────────
 
-    static String[] getGastosDesc(Context ctx) {
-        return loadArray(ctx, K_GDESC);
-    }
+    static String[] getGastosDesc(Context ctx)      { return load(ctx, K_GDESC);   }
+    static String[] getGastosAmt(Context ctx)        { return load(ctx, K_GAMT);    }
+    static String[] getProductosNames(Context ctx)   { return load(ctx, K_PNAME);   }
+    static String[] getProductosPrices(Context ctx)  { return load(ctx, K_PPRICE);  }
+    static String[] getHabitualesNames(Context ctx)  { return load(ctx, K_HNAME);   }
+    static String[] getHabitualesStatus(Context ctx) { return load(ctx, K_HSTATUS); }
 
-    static String[] getGastosAmt(Context ctx) {
-        return loadArray(ctx, K_GAMT);
-    }
-
-    static String[] getProductosNames(Context ctx) {
-        return loadArray(ctx, K_PNAME);
-    }
-
-    static String[] getProductosPrices(Context ctx) {
-        return loadArray(ctx, K_PPRICE);
-    }
-
-    private static String[] loadArray(Context ctx, String key) {
+    private static String[] load(Context ctx, String key) {
         String json = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(key, null);
         if (json == null) return new String[0];
         try {
@@ -56,25 +51,21 @@ public class WidgetCache {
             String[] out = new String[arr.length()];
             for (int i = 0; i < arr.length(); i++) out[i] = arr.optString(i, "");
             return out;
-        } catch (Exception e) {
-            return new String[0];
-        }
+        } catch (Exception e) { return new String[0]; }
     }
 
-    // ── Fetch from GitHub API (background thread) ──────────────────────
+    // ── Fetch desde GitHub Pages (hilo de fondo) ───────────────────────
 
     static void fetch(Context ctx, Runnable onDone) {
         new Thread(() -> {
             try {
-                // Use GitHub Contents API (unauthenticated, public repo, 60 req/hour limit)
-                String apiUrl = "https://api.github.com/repos/" + GH_OWNER + "/" + GH_REPO
-                        + "/contents/" + GH_PATH + "?ref=" + GH_BRANCH;
-                HttpURLConnection conn = (HttpURLConnection) new URL(apiUrl).openConnection();
+                // Parametro _t para saltar cache del CDN de GitHub Pages
+                String url = PAGES_URL + "?_t=" + System.currentTimeMillis();
+                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(10_000);
                 conn.setReadTimeout(10_000);
-                conn.setRequestProperty("Accept", "application/vnd.github+json");
-                conn.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+                conn.setRequestProperty("Cache-Control", "no-cache");
 
                 int code = conn.getResponseCode();
                 if (code == 200) {
@@ -84,13 +75,10 @@ public class WidgetCache {
                         String line;
                         while ((line = br.readLine()) != null) sb.append(line);
                     }
-                    JSONObject apiResp = new JSONObject(sb.toString());
-                    // GitHub API returns content as base64 (with newlines)
-                    String b64 = apiResp.getString("content").replaceAll("\\s+", "");
-                    String cacheJson = new String(Base64.decode(b64, Base64.DEFAULT), "UTF-8");
-                    parseAndStore(ctx, new JSONObject(cacheJson));
+                    // GitHub Pages devuelve el JSON directamente (sin base64)
+                    parseAndStore(ctx, new JSONObject(sb.toString()));
                 } else {
-                    Log.w(TAG, "fetch HTTP " + code);
+                    Log.w(TAG, "fetch HTTP " + code + " — sin datos frescos, usando cache");
                 }
             } catch (Exception e) {
                 Log.w(TAG, "fetch error: " + e.getMessage());
@@ -102,42 +90,53 @@ public class WidgetCache {
     }
 
     private static void parseAndStore(Context ctx, JSONObject root) throws Exception {
-        JSONArray gastos   = root.optJSONArray("gastos");
-        JSONArray productos = root.optJSONArray("productos");
-
-        JSONArray gDesc  = new JSONArray();
-        JSONArray gAmt   = new JSONArray();
+        // ── Gastos ──
+        JSONArray gastos = root.optJSONArray("gastos");
+        JSONArray gDesc = new JSONArray(), gAmt = new JSONArray();
         if (gastos != null) {
             for (int i = 0; i < gastos.length(); i++) {
                 JSONObject g = gastos.getJSONObject(i);
-                String fecha = g.optString("f", "");
-                String desc  = g.optString("d", "");
-                long monto   = g.optLong("m", 0);
-                gDesc.put(fecha.isEmpty() ? desc : fecha + "  " + desc);
-                gAmt.put(monto > 0 ? "-$" + fmtNum(monto) : "");
+                String f = g.optString("f", ""), d = g.optString("d", "");
+                long m = g.optLong("m", 0);
+                gDesc.put(f.isEmpty() ? d : f + "  " + d);
+                gAmt.put(m > 0 ? "-$" + fmt(m) : "");
             }
         }
 
-        JSONArray pName  = new JSONArray();
-        JSONArray pPrice = new JSONArray();
+        // ── Productos ──
+        JSONArray productos = root.optJSONArray("productos");
+        JSONArray pName = new JSONArray(), pPrice = new JSONArray();
         if (productos != null) {
             for (int i = 0; i < productos.length(); i++) {
                 JSONObject p = productos.getJSONObject(i);
                 pName.put(p.optString("n", ""));
-                long precio = p.optLong("p", 0);
-                pPrice.put(precio > 0 ? "$" + fmtNum(precio) : "");
+                long pr = p.optLong("p", 0);
+                pPrice.put(pr > 0 ? "$" + fmt(pr) : "");
+            }
+        }
+
+        // ── Habituales ──
+        JSONArray habs = root.optJSONArray("habituales");
+        JSONArray hName = new JSONArray(), hStatus = new JSONArray();
+        if (habs != null) {
+            for (int i = 0; i < habs.length(); i++) {
+                JSONObject h = habs.getJSONObject(i);
+                hName.put(h.optString("n", ""));
+                hStatus.put(h.optBoolean("ok", false) ? "OK" : "");
             }
         }
 
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putString(K_GDESC,  gDesc.toString())
-                .putString(K_GAMT,   gAmt.toString())
-                .putString(K_PNAME,  pName.toString())
-                .putString(K_PPRICE, pPrice.toString())
+                .putString(K_GDESC,   gDesc.toString())
+                .putString(K_GAMT,    gAmt.toString())
+                .putString(K_PNAME,   pName.toString())
+                .putString(K_PPRICE,  pPrice.toString())
+                .putString(K_HNAME,   hName.toString())
+                .putString(K_HSTATUS, hStatus.toString())
                 .apply();
     }
 
-    private static String fmtNum(long n) {
+    private static String fmt(long n) {
         String s = Long.toString(n);
         StringBuilder sb = new StringBuilder();
         int len = s.length();

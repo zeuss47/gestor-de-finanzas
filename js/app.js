@@ -5464,7 +5464,9 @@ const syncCallbacks = {
       if (ghCfg?.pat && ghCfg?.owner && ghCfg?.repo) {
         const prods   = await DB.live('productos').catch(() => []);
         const precios = await DB.live('precios').catch(() => []);
-        pushWidgetCache(ghCfg, state.gastos || [], prods, precios).catch(() => {});
+        const ajRaw   = await DB.get('ajustes', 'ajustes_globales').catch(() => null);
+        const habs    = ajRaw?.catalogos?.habituales || [];
+        pushWidgetCache(ghCfg, state.gastos || [], prods, precios, habs).catch(() => {});
       }
     } catch {}
     setSyncIndicator('ok');

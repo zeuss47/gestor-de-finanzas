@@ -12,30 +12,55 @@ import android.widget.RemoteViews;
 
 public class HabitualesWidgetProvider extends AppWidgetProvider {
 
-    private static final String TAG = "HabitualesWidget";
+    private static final String TAG      = "HabitualesWidget";
     private static final String BASE_URL = "https://zeuss47.github.io/gestor-de-finanzas/";
+
+    private static final int COLOR_OK      = 0xFF10B981;  // verde esmeralda
+    private static final int COLOR_PENDING = 0xFF8892A4;  // gris
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        for (int widgetId : appWidgetIds) {
-            try {
-                updateWidget(context, appWidgetManager, widgetId);
-            } catch (Exception e) {
-                Log.e(TAG, "Error actualizando widget id=" + widgetId, e);
-            }
+        // Mostrar cache inmediatamente
+        for (int id : appWidgetIds) {
+            try { updateWidget(context, appWidgetManager, id); }
+            catch (Exception e) { Log.e(TAG, "updateWidget error id=" + id, e); }
         }
+        // Refrescar en segundo plano
+        WidgetCache.fetch(context, () -> {
+            for (int id : appWidgetIds) {
+                try { updateWidget(context, appWidgetManager, id); }
+                catch (Exception e) { Log.e(TAG, "post-fetch error id=" + id, e); }
+            }
+        });
     }
 
     static void updateWidget(Context context, AppWidgetManager appWidgetManager, int widgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_habituales);
 
-        // "Ver habituales" -> abre la app en el widget de habituales (home tab, scroll)
-        PendingIntent piVer = buildIntent(context, BASE_URL + "?action=habituales", 3001);
-        views.setOnClickPendingIntent(R.id.wh_btn_ver, piVer);
+        views.setOnClickPendingIntent(R.id.wh_btn_ver,
+                buildIntent(context, BASE_URL + "?action=habituales", 3001));
+        views.setOnClickPendingIntent(R.id.wh_btn_aprobar,
+                buildIntent(context, BASE_URL + "?action=aprobar-habituales", 3002));
 
-        // "Aprobar mes" -> abre la app y aprueba automaticamente todos los habituales del mes
-        PendingIntent piAprobar = buildIntent(context, BASE_URL + "?action=aprobar-habituales", 3002);
-        views.setOnClickPendingIntent(R.id.wh_btn_aprobar, piAprobar);
+        String[] names    = WidgetCache.getHabitualesNames(context);
+        String[] statuses = WidgetCache.getHabitualesStatus(context);
+
+        int[] nameIds   = { R.id.wh_r1_name,   R.id.wh_r2_name,   R.id.wh_r3_name   };
+        int[] statusIds = { R.id.wh_r1_status, R.id.wh_r2_status, R.id.wh_r3_status };
+
+        for (int i = 0; i < nameIds.length; i++) {
+            if (i < names.length) {
+                String st = i < statuses.length ? statuses[i] : "";
+                boolean ok = "OK".equals(st);
+                views.setTextViewText(nameIds[i], names[i]);
+                views.setTextViewText(statusIds[i], ok ? "OK" : "pend.");
+                views.setTextColor(nameIds[i],   ok ? COLOR_OK : COLOR_PENDING);
+                views.setTextColor(statusIds[i], ok ? COLOR_OK : COLOR_PENDING);
+            } else {
+                views.setTextViewText(nameIds[i],   i == 0 && names.length == 0 ? "Sincroniza la app para ver datos" : "");
+                views.setTextViewText(statusIds[i], "");
+            }
+        }
 
         appWidgetManager.updateAppWidget(widgetId, views);
     }

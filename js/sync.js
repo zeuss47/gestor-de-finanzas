@@ -635,10 +635,13 @@ function _onVisChange() {
 }
 
 /* ---------- Widget cache (widgets nativos Android) ---------- */
-export async function pushWidgetCache(cfg, gastos, productos, precios) {
+export async function pushWidgetCache(cfg, gastos, productos, precios, habituales) {
   if (!cfg?.pat || !cfg?.owner || !cfg?.repo) return;
 
-  const top4 = (gastos || [])
+  const gastos_ = gastos || [];
+  const mes = new Date().toISOString().slice(0, 7);
+
+  const top4 = gastos_
     .filter(g => !g.deleted)
     .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.updated_at||0) - (a.updated_at||0))
     .slice(0, 4)
@@ -665,13 +668,21 @@ export async function pushWidgetCache(cfg, gastos, productos, precios) {
       };
     });
 
-  const dataStr = JSON.stringify({ g: top4, p: top6prod });
+  const top6hab = (habituales || [])
+    .slice(0, 6)
+    .map(h => {
+      const entries = gastos_.filter(g => !g.deleted && g.habitual_id === h.id && (g.fecha||'').startsWith(mes));
+      const ok = entries.length > 0 && entries.every(g => g.aprobado);
+      return { n: (h.nombre || '').slice(0, 28), ok };
+    });
+
+  const dataStr = JSON.stringify({ g: top4, p: top6prod, h: top6hab });
   const fingerprint = btoa(dataStr).slice(0, 20);
   try {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('_wc_fp') === fingerprint) return;
   } catch {}
 
-  const cache = { v: 1, gastos: top4, productos: top6prod, ts: Math.floor(Date.now() / 1000) };
+  const cache = { v: 1, gastos: top4, productos: top6prod, habituales: top6hab, ts: Math.floor(Date.now() / 1000) };
   const path = `${cfg.ruta_datos || 'data'}/widget-cache.json`;
   const apiUrl = `${GITHUB_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}`;
 

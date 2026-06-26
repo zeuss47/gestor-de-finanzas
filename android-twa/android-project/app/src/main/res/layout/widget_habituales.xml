@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Widget Habituales: solo vistas de la lista oficial RemoteViews.
-    Sin <View> spacer, sin emoji en XML, sin singleLine deprecated.
-    Tema: verde esmeralda (#10B981) para identificar gastos recurrentes.
--->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:padding="12dp">
 
-    <!-- Titulo en la parte superior -->
     <LinearLayout
         android:id="@+id/wh_header_block"
         android:layout_width="match_parent"
@@ -29,9 +23,9 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Habituales"
+            android:text="Habituales del mes"
             android:textColor="#10B981"
-            android:textSize="17sp"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:layout_marginTop="1dp"/>
 
@@ -39,14 +33,13 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="#064E3B"
-            android:layout_marginTop="6dp"/>
+            android:layout_marginTop="5dp"/>
     </LinearLayout>
 
-    <!-- Botones en la parte inferior -->
     <LinearLayout
         android:id="@+id/wh_btn_row"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
+        android:layout_height="34dp"
         android:orientation="horizontal"
         android:layout_alignParentBottom="true">
 
@@ -75,7 +68,7 @@
             android:textStyle="bold"/>
     </LinearLayout>
 
-    <!-- Contenido central entre header y botones -->
+    <!-- Lista de habituales: nombre (flex) + estado (OK / pendiente) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -83,40 +76,100 @@
         android:layout_below="@id/wh_header_block"
         android:layout_above="@id/wh_btn_row"
         android:gravity="center_vertical"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp">
+        android:paddingTop="5dp"
+        android:paddingBottom="4dp">
 
-        <TextView
-            android:id="@+id/wh_item1"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Registros fijos del mes"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wh_r1_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Sincroniza la app para ver datos"
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wh_r1_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#10B981"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/wh_item2"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#064E3B"/>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Tocar para ver y gestionar"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginTop="3dp"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wh_r2_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text=""
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wh_r2_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#10B981"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/wh_item3"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#064E3B"/>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Aprobar descuenta del saldo"
-            android:textColor="#8892A4"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginTop="3dp"/>
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+            <TextView
+                android:id="@+id/wh_r3_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text=""
+                android:textColor="#8892A4"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/wh_r3_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#10B981"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginStart="4dp"/>
+        </LinearLayout>
+
     </LinearLayout>
 
 </RelativeLayout>
